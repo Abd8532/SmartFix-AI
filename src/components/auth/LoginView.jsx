@@ -3,7 +3,7 @@ import { Mail, Lock, User, Wrench, ShieldCheck, ArrowRight, AlertCircle, CheckCi
 import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
 
-// Antigravity Auth Validation Login & Registration Portal
+// Admin Auth Validation Login & Registration Portal
 export default function LoginView({ onLogin }) {
   const { login, register } = useAuth();
   const { addToast } = useTickets();
@@ -86,9 +86,9 @@ export default function LoginView({ onLogin }) {
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200/90 text-slate-700 text-xs font-semibold mb-3">
             <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-            <span>Antigravity Auth Validation</span>
+            <span>Admin Auth Validation</span>
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">FixFlow AI</h1>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight mb-2">SmartFixFlow - AI</h1>
           <p className="text-slate-500 text-sm">
             {isSignUp ? 'Create an account to request campus maintenance portal access' : 'Sign in to access your campus maintenance dashboard'}
           </p>
@@ -294,7 +294,7 @@ export default function LoginView({ onLogin }) {
         </div>
 
         <div className="mt-5 text-center text-xs text-slate-600">
-          {isSignUp ? "Already have an account? " : "New to FixFlow AI? "}
+          {isSignUp ? "Already have an account? " : "New to SmartFixFlow - AI? "}
           <button 
             type="button"
             onClick={() => {

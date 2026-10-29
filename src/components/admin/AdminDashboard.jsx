@@ -168,10 +168,10 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
             </div>
             <div>
               <p className="font-bold text-amber-950">
-                Antigravity Auth: {pendingUsers.length} account request{pendingUsers.length > 1 ? 's' : ''} awaiting validation
+                Account Approvals: {pendingUsers.length} account request{pendingUsers.length > 1 ? 's' : ''} awaiting validation
               </p>
               <p className="text-amber-800 text-[11px] mt-0.5">
-                New user and technician registrations require your approval before they can access FixFlow AI.
+                New user and technician registrations require your approval before they can access SmartFixFlow - AI.
               </p>
             </div>
           </div>
@@ -197,7 +197,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
             <div>
               <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
                 <ShieldCheck className="w-5 h-5 text-blue-600" />
-                <span>Antigravity Auth Validation & User Gating</span>
+                <span>Admin Auth Validation & User Gating</span>
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
                 Strict admin gate: Approve or reject user and technician requests before granting portal access.

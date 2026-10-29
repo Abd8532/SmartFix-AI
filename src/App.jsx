@@ -16,7 +16,7 @@ function AppContent() {
   const [activeModalTicketId, setActiveModalTicketId] = useState(null);
   const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'approvals'
 
-  // STRICT ROUTING PROTECTION (Antigravity Auth Validation):
+  // STRICT ROUTING PROTECTION (Admin Auth Validation):
   // User must be authenticated AND their approvalStatus must strictly equal 'Approved'
   const isApproved = currentUser && currentUser.approvalStatus === 'Approved';
   const role = isApproved ? currentUser.role : null;

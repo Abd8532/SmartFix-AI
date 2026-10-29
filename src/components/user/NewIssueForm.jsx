@@ -201,7 +201,7 @@ export default function NewIssueForm({ onTicketCreated }) {
     }
   };
 
-  // Antigravity AI Dispatch with Multi-Model Fallback & Safety Net
+  // SmartFixFlow AI Dispatch with Multi-Model Fallback & Safety Net
   const processWithAI = async () => {
     const base64DataUrl = await getBase64DataUrl();
     let ticketData = null;
@@ -219,7 +219,7 @@ export default function NewIssueForm({ onTicketCreated }) {
       }
 
       // Exact prompt requested by user
-      const prompt = `You are the AI Chief Engineer for FixFlow AI. Analyze the image and user complaint: "${complaint}".
+      const prompt = `You are the AI Chief Engineer for SmartFixFlow - AI. Analyze the image and user complaint: "${complaint}".
 Extract the details and return ONLY a raw JSON object.
 Structure the JSON exactly like this:
 {
@@ -355,7 +355,7 @@ Structure the JSON exactly like this:
 
     setErrorMessage('');
     setIsProcessing(true);
-    setAiStatusMessage('Antigravity AI Chief Engineer is analyzing fault...');
+    setAiStatusMessage('AI Chief Engineer is analyzing fault...');
 
     try {
       const created = await processWithAI();
@@ -376,7 +376,7 @@ Structure the JSON exactly like this:
       setImageFile(null);
       setAiStatusMessage('');
     } catch (err) {
-      console.error('Antigravity AI error:', err);
+      console.error('SmartFixFlow AI error:', err);
       setErrorMessage(
         err.message?.includes('API_KEY_INVALID') || err.message?.includes('API key')
           ? 'Invalid Gemini API key. Please check your key in the settings above.'
@@ -547,7 +547,7 @@ Structure the JSON exactly like this:
             </button>
           </div>
           <p className="text-[11px] text-slate-500 leading-relaxed">
-            FixFlow AI automatically discovers supported models on your key and falls back sequentially across <code className="font-mono text-slate-800">gemini-2.5-flash</code>, <code className="font-mono text-slate-800">gemini-2.0-flash</code>, and <code className="font-mono text-slate-800">gemini-1.5-flash-latest</code>.
+            SmartFixFlow - AI automatically discovers supported models on your key and falls back sequentially across <code className="font-mono text-slate-800">gemini-2.5-flash</code>, <code className="font-mono text-slate-800">gemini-2.0-flash</code>, and <code className="font-mono text-slate-800">gemini-1.5-flash-latest</code>.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">

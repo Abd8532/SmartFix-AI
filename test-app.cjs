@@ -58,7 +58,7 @@ async function waitForText(page, text, timeout = 10000) {
 }
 
 async function runTests() {
-  console.log('--- STARTING FIXFLOW AI E2E ACTUATION TESTS ---');
+  console.log('--- STARTING SMARTFIXFLOW - AI E2E ACTUATION TESTS ---');
 
   const viteBin = path.resolve(__dirname, 'node_modules', 'vite', 'bin', 'vite.js');
   const serverProcess = spawn(process.execPath, [viteBin, '--port', String(TEST_PORT), '--strictPort', '--host', '127.0.0.1'], {
@@ -86,16 +86,16 @@ async function runTests() {
     page.on('pageerror', (err) => console.log(`[Browser error]: ${err.toString()}`));
 
     // 1. TEST LOGIN SCREEN & STRICT GATING
-    console.log('\n[TEST 1] Testing Modern FixFlow AI Login & Antigravity Auth Validation...');
+    console.log('\n[TEST 1] Testing Modern SmartFixFlow - AI Login & Admin Auth Validation...');
     await page.setViewport({ width: 1280, height: 800 });
     await page.goto(APP_URL, { waitUntil: 'networkidle0' });
     await page.evaluate(() => localStorage.clear());
     await page.reload({ waitUntil: 'networkidle0' });
 
-    await waitForText(page, 'FixFlow AI');
+    await waitForText(page, 'SmartFixFlow - AI');
     await waitForText(page, 'Email Address');
     await waitForText(page, 'Password');
-    console.log('✓ Found FixFlow AI login header, Email Address, and Password inputs.');
+    console.log('✓ Found SmartFixFlow - AI login header, Email Address, and Password inputs.');
 
     // 1a. Test pending login restriction
     console.log('\n[TEST 1a] Testing Gated Login: Pending user cannot log in...');

@@ -250,7 +250,7 @@ export function AuthProvider({ children }) {
       };
     }
 
-    // STRICT ANTIGRAVITY AUTH VALIDATION CHECK FOR REGULAR USERS & TECHNICIANS
+    // STRICT ADMIN AUTH VALIDATION CHECK FOR REGULAR USERS & TECHNICIANS
     if (user.approvalStatus === 'Pending') {
       return {
         success: false,
