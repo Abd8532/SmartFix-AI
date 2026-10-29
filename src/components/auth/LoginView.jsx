@@ -24,7 +24,7 @@ export default function LoginView({ onLogin }) {
     setSuccessMessage('');
 
     if (isSignUp) {
-      // 1. REGISTRATION: Register with strict 'Pending' status
+      // 1. REGISTRATION: Conditional approval based on selected role
       const result = register({
         name: formData.name,
         email: formData.email,
@@ -37,16 +37,26 @@ export default function LoginView({ onLogin }) {
         return;
       }
 
-      // Success message requested by user
-      setSuccessMessage('Account created successfully. Please wait for an Administrator to approve your account before logging in.');
+      // If registered as admin -> automatically approved!
+      if (formData.role === 'admin') {
+        setSuccessMessage('Administrator account created and automatically approved! You can now log in.');
+        addToast({
+          type: 'success',
+          title: 'Admin Registered & Approved',
+          message: 'Welcome! Your administrator account is ready. Please log in.'
+        });
+      } else {
+        // user or technician -> pending approval
+        setSuccessMessage('Account created successfully. Please wait for an Administrator to approve your account before logging in.');
+        addToast({
+          type: 'info',
+          title: 'Registration Pending Approval',
+          message: 'Account created. Please wait for an Administrator to approve your account.'
+        });
+      }
+
       setFormData((prev) => ({ ...prev, password: '' }));
       setIsSignUp(false); // Switch to login view with success banner
-
-      addToast({
-        type: 'info',
-        title: 'Registration Pending Approval',
-        message: 'Account created. Please wait for an Administrator to approve your account.'
-      });
     } else {
       // 2. LOGIN: Strictly verified against approvalStatus === 'Approved'
       const result = login(formData.email, formData.password);
@@ -162,39 +172,59 @@ export default function LoginView({ onLogin }) {
             </div>
           </div>
 
-          {/* Only show Role Selection if they are signing up */}
+          {/* Role Selection for Sign-Up: Campus User, Field Technician, and Admin */}
           {isSignUp && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">I am requesting access as...</label>
-              <div className="grid grid-cols-2 gap-3">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">I am registering as...</label>
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setFormData({...formData, role: 'user'})}
-                  className={`py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs transition-all ${
+                  className={`py-2 px-1.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs transition-all ${
                     formData.role === 'user' 
                       ? 'border-slate-900 bg-slate-900 text-white font-bold shadow-2xs' 
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white'
                   }`}
                 >
-                  <User className="w-3.5 h-3.5" />
-                  <span>Campus User</span>
+                  <User className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Campus User</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setFormData({...formData, role: 'technician'})}
-                  className={`py-2.5 px-3 rounded-xl border flex items-center justify-center gap-2 text-xs transition-all ${
+                  className={`py-2 px-1.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs transition-all ${
                     formData.role === 'technician' 
                       ? 'border-slate-900 bg-slate-900 text-white font-bold shadow-2xs' 
                       : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white'
                   }`}
                 >
-                  <Wrench className="w-3.5 h-3.5" />
-                  <span>Field Technician</span>
+                  <Wrench className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Field Tech</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, role: 'admin'})}
+                  className={`py-2 px-1.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs transition-all ${
+                    formData.role === 'admin' 
+                      ? 'border-slate-900 bg-slate-900 text-white font-bold shadow-2xs' 
+                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                  <span className="truncate">Admin</span>
                 </button>
               </div>
-              <p className="text-[11px] text-amber-700 mt-2 bg-amber-50 p-2.5 rounded-xl border border-amber-200/80">
-                🔒 <strong>Strict Admin Gating:</strong> New accounts will require verification from an Administrator before you can log in.
-              </p>
+
+              {formData.role === 'admin' ? (
+                <p className="text-[11px] text-emerald-800 mt-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200/80 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>⚡ <strong>Auto-Approved:</strong> Admin accounts are immediately approved and granted management access.</span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-700 mt-2 bg-amber-50 p-2.5 rounded-xl border border-amber-200/80">
+                  🔒 <strong>Strict Admin Gating:</strong> New accounts will require verification from an Administrator before you can log in.
+                </p>
+              )}
             </div>
           )}
 
@@ -202,7 +232,7 @@ export default function LoginView({ onLogin }) {
             type="submit"
             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors mt-3 shadow-2xs active:scale-[0.99]"
           >
-            <span>{isSignUp ? 'Request Account Approval' : 'Log In'}</span>
+            <span>{isSignUp ? (formData.role === 'admin' ? 'Create Administrator Account' : 'Request Account Approval') : 'Log In'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>

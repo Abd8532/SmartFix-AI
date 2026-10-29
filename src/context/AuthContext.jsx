@@ -151,8 +151,10 @@ export function AuthProvider({ children }) {
     return users.filter((u) => u.approvalStatus === 'Approved');
   }, [users]);
 
-  // 1. REGISTRATION: New accounts are strictly assigned 'Pending' approvalStatus.
-  // Gated Role Restriction: Only 'user' or 'technician' allowed. Prevents unauthorized admin creation.
+  // 1. REGISTRATION:
+  // Conditional Approval Logic:
+  // - If role is 'admin' -> approvalStatus is automatically set to 'Approved'
+  // - If role is 'user' or 'technician' -> approvalStatus remains 'Pending'
   const register = useCallback((userData) => {
     const emailNorm = (userData.email || '').trim().toLowerCase();
     const existing = users.find((u) => u.email.toLowerCase() === emailNorm);
@@ -164,19 +166,23 @@ export function AuthProvider({ children }) {
       };
     }
 
-    // Enforce restriction: No user can register as an admin
-    const safeRole = (userData.role === 'technician') ? 'technician' : 'user';
-    const roleDisplay = safeRole === 'technician' ? 'Field Technician' : 'Campus User';
+    const selectedRole = userData.role === 'admin' ? 'admin' : userData.role === 'technician' ? 'technician' : 'user';
+    const roleDisplay = selectedRole === 'admin' ? 'Administrator' : selectedRole === 'technician' ? 'Field Technician' : 'Campus User';
+    
+    // Admins are automatically approved; users and technicians remain 'Pending'
+    const approvalStatus = selectedRole === 'admin' ? 'Approved' : 'Pending';
 
     const newUser = {
-      id: `usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      name: userData.name || (emailNorm.split('@')[0] || 'New User'),
+      id: `${selectedRole === 'admin' ? 'adm' : selectedRole === 'technician' ? 'tech' : 'usr'}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      name: userData.name || (emailNorm.split('@')[0] || (selectedRole === 'admin' ? 'Campus Admin' : 'New User')),
       email: emailNorm,
       password: userData.password,
-      role: safeRole,
+      role: selectedRole,
       roleDisplay: roleDisplay,
-      approvalStatus: 'Pending', // Strictly gated by Antigravity Auth Validation!
-      avatar: safeRole === 'technician'
+      approvalStatus: approvalStatus,
+      avatar: selectedRole === 'admin'
+        ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80'
+        : selectedRole === 'technician'
         ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80'
         : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString()

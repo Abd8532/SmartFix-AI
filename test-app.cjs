@@ -106,12 +106,12 @@ async function runTests() {
     console.log('✓ Verified: Pending user received exact error: "Access Denied: Your account is still pending admin approval."');
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '01_login_pending_blocked.png') });
 
-    // 1b. Test Registration with Pending Status
+    // 1b. Test Registration with Pending Status (Campus User)
     console.log('\n[TEST 1b] Testing Sign-Up: Registers with Pending status...');
     await clickButtonWithText(page, 'Request account approval');
     await waitForText(page, 'Full Name');
     
-    // Fill in sign up details with unique test email
+    // Fill in sign up details with unique test email (default Campus User role)
     const uniqueEmail = `test.gated.${Date.now()}@campus.edu`;
     await page.type('input[placeholder="Alex Rivera"]', 'Taylor Morgan');
     await page.type('input[type="email"]', uniqueEmail);
@@ -123,13 +123,33 @@ async function runTests() {
     console.log('✓ Verified: Registration success message shown: "Account created successfully. Please wait for an Administrator to approve your account before logging in."');
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '01b_signup_success_pending.png') });
 
-    // 1c. Test Admin Approval Workflow
-    console.log('\n[TEST 1c] Testing Admin Approval Queue...');
+    // 1b-2. Test Admin Direct Sign-Up (Auto-Approved)
+    console.log('\n[TEST 1b-2] Testing Admin Sign-Up & Automatic Approval...');
+    await clickButtonWithText(page, 'Request account approval');
+    await waitForText(page, 'Full Name');
+    
+    // Select Admin role
     await clickButtonWithText(page, 'Admin');
-    await new Promise((r) => setTimeout(r, 400));
+    await waitForText(page, 'Auto-Approved');
+    console.log('✓ Selected Admin role: Auto-Approved notice verified.');
+
+    const newAdminEmail = `registered.admin.${Date.now()}@campus.edu`;
+    await page.type('input[placeholder="Alex Rivera"]', 'Morgan Vance');
+    await page.type('input[type="email"]', newAdminEmail);
+    await page.type('input[type="password"]', 'adminpass123');
+
+    await clickButtonWithText(page, 'Create Administrator Account');
+    await waitForText(page, 'Administrator account created and automatically approved! You can now log in.');
+    console.log('✓ Verified: Admin registration success message shown.');
+
+    // 1c. Test New Admin Login & Route to AdminDashboard
+    console.log('\n[TEST 1c] Testing Newly Registered Admin Login & Dashboard Access...');
+    // Email is already pre-filled from registration! Just enter password:
+    await page.type('input[type="password"]', 'adminpass123');
+    await new Promise((r) => setTimeout(r, 300));
     await clickButtonWithText(page, 'Log In');
     await waitForText(page, 'Safety first. Progress visible.');
-    console.log('✓ Logged in as System Administrator.');
+    console.log('✓ Newly registered admin successfully logged in and routed to AdminDashboard!');
 
     // Switch to Pending Approvals Tab
     await clickButtonWithText(page, 'Pending Approvals');
