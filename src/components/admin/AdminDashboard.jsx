@@ -307,95 +307,16 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
   return (
     <div className="space-y-8 pb-16">
       {/* Top Banner & Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-wider text-sky-600 mb-1">
-            MAINTENANCE OPERATIONS & ADMINISTRATION
-          </p>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
-            Safety first. Progress visible.
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Live campus maintenance requests, automatically routed and ready for review.
-          </p>
-        </div>
-
-        {/* Top Tab Switcher: Synced with Left Sidebar */}
-        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200 self-start sm:self-auto overflow-x-auto max-w-full">
-          <button
-            type="button"
-            onClick={() => handleTabSwitch('overview')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
-              currentTab === 'overview'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Overview & Work Orders
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabSwitch('approvals')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              currentTab === 'approvals'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
-            <span>Pending Approvals</span>
-            {pendingUsers.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-amber-500 text-white animate-pulse">
-                {pendingUsers.length}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabSwitch('requests')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              currentTab === 'requests'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <ListFilter className="w-3.5 h-3.5 text-slate-600" />
-            <span>Request Queue</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabSwitch('hazards')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              currentTab === 'hazards'
-                ? 'bg-white text-rose-900 shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-            <span>Hazard Queue</span>
-            {stats.critical > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-rose-600 text-white">
-                {stats.critical}
-              </span>
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleTabSwitch('settings')}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap ${
-              currentTab === 'settings'
-                ? 'bg-white text-slate-900 shadow-2xs font-bold'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <SettingsIcon className="w-3.5 h-3.5 text-slate-600" />
-            <span>Settings</span>
-          </button>
-        </div>
+      <div>
+        <p className="text-xs font-bold uppercase tracking-wider text-sky-600 mb-1">
+          MAINTENANCE OPERATIONS & ADMINISTRATION
+        </p>
+        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+          Safety first. Progress visible.
+        </h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Live campus maintenance requests, automatically routed and ready for review.
+        </p>
       </div>
 
       {/* PENDING APPROVALS NOTICE (Visible in Overview if there are pending users) */}
