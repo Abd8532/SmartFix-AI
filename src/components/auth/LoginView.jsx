@@ -238,7 +238,7 @@ export default function LoginView({ onLogin }) {
             <button
               type="button"
               onClick={() => {
-                setFormData({ name: 'Sarthak Chaudhary', email: 'admin@campus.edu', password: 'password123', role: 'admin' });
+                setFormData({ name: 'Master Administrator', email: 'admin@campus.edu', password: 'admin123', role: 'admin' });
                 setIsSignUp(false);
                 setErrorMessage('');
                 setSuccessMessage('');

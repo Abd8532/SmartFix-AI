@@ -3,12 +3,27 @@ import React, { createContext, useContext, useState, useEffect, useMemo, useCall
 const AuthContext = createContext(null);
 
 const STORAGE_KEYS = {
-  USERS: 'maintainx_auth_users_v1',
-  CURRENT_USER: 'maintainx_auth_current_user_v1'
+  USERS: 'maintainx_auth_users_v2',
+  CURRENT_USER: 'maintainx_auth_current_user_v2'
+};
+
+// Seeded Master Admin (Pre-approved default administrator required to approve pending sign-ups)
+export const MASTER_ADMIN = {
+  id: "adm_master_1",
+  name: "Master Administrator",
+  email: "admin@campus.edu",
+  password: "admin123",
+  role: "admin",
+  roleDisplay: "Administrator",
+  department: "Campus Facilities Operations",
+  approvalStatus: "Approved",
+  avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
+  createdAt: new Date().toISOString()
 };
 
 // Initial Seed Users with Pre-Approved Demo Accounts & Gated Pending Accounts
 export const INITIAL_USERS = [
+  MASTER_ADMIN,
   {
     id: "usr_1",
     name: "Alex Rivera",
@@ -32,18 +47,6 @@ export const INITIAL_USERS = [
     approvalStatus: "Approved",
     avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
     createdAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString()
-  },
-  {
-    id: "adm_1",
-    name: "Sarthak Chaudhary",
-    email: "admin@campus.edu",
-    password: "password123",
-    role: "admin",
-    roleDisplay: "Administrator",
-    department: "Campus Facilities Operations",
-    approvalStatus: "Approved",
-    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
-    createdAt: new Date(Date.now() - 10 * 24 * 3600 * 1000).toISOString()
   },
   // Sample Pending accounts so Admin can see and test approval workflow immediately
   {
@@ -73,13 +76,26 @@ export const INITIAL_USERS = [
 ];
 
 export function AuthProvider({ children }) {
-  // Registered users list
+  // Registered users list: Always guarantees Master Admin is pre-populated and Approved
   const [users, setUsers] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.USERS);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const adminIdx = parsed.findIndex((u) => u.email.toLowerCase() === 'admin@campus.edu');
+          if (adminIdx >= 0) {
+            parsed[adminIdx] = {
+              ...parsed[adminIdx],
+              role: 'admin',
+              roleDisplay: 'Administrator',
+              approvalStatus: 'Approved',
+              password: parsed[adminIdx].password || 'admin123'
+            };
+            return parsed;
+          }
+          return [MASTER_ADMIN, ...parsed];
+        }
       }
     } catch (e) {
       console.warn('Failed reading users from storage:', e);
@@ -135,7 +151,8 @@ export function AuthProvider({ children }) {
     return users.filter((u) => u.approvalStatus === 'Approved');
   }, [users]);
 
-  // 1. REGISTRATION: New accounts are strictly assigned 'Pending' approvalStatus
+  // 1. REGISTRATION: New accounts are strictly assigned 'Pending' approvalStatus.
+  // Gated Role Restriction: Only 'user' or 'technician' allowed. Prevents unauthorized admin creation.
   const register = useCallback((userData) => {
     const emailNorm = (userData.email || '').trim().toLowerCase();
     const existing = users.find((u) => u.email.toLowerCase() === emailNorm);
@@ -147,18 +164,19 @@ export function AuthProvider({ children }) {
       };
     }
 
-    const role = userData.role || 'user';
-    const roleDisplay = role === 'technician' ? 'Field Technician' : role === 'admin' ? 'Administrator' : 'Campus User';
+    // Enforce restriction: No user can register as an admin
+    const safeRole = (userData.role === 'technician') ? 'technician' : 'user';
+    const roleDisplay = safeRole === 'technician' ? 'Field Technician' : 'Campus User';
 
     const newUser = {
       id: `usr_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
       name: userData.name || (emailNorm.split('@')[0] || 'New User'),
       email: emailNorm,
       password: userData.password,
-      role: role,
+      role: safeRole,
       roleDisplay: roleDisplay,
       approvalStatus: 'Pending', // Strictly gated by Antigravity Auth Validation!
-      avatar: role === 'technician'
+      avatar: safeRole === 'technician'
         ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80'
         : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString()
@@ -172,7 +190,8 @@ export function AuthProvider({ children }) {
     };
   }, [users]);
 
-  // 2. LOGIN: Strictly checks approvalStatus before allowing access
+  // 2. LOGIN: Authenticates credentials, recognizes admin role, bypasses 'Pending' check for admin,
+  // and enforces 'Approved' status for standard users/technicians.
   const login = useCallback((email, password) => {
     const emailNorm = (email || '').trim().toLowerCase();
     
@@ -191,15 +210,41 @@ export function AuthProvider({ children }) {
       };
     }
 
-    // Check password if provided and user has a password set
-    if (password && user.password && user.password !== password && password !== 'password123') {
+    const enteredPassword = password || '';
+    const isMasterAdmin = user.email.toLowerCase() === 'admin@campus.edu' || user.role === 'admin';
+
+    // Verify password:
+    // Supports user.password, 'admin123' for Master Admin, or 'password123' for demo backwards-compatibility
+    const isPasswordValid =
+      !enteredPassword ||
+      user.password === enteredPassword ||
+      (isMasterAdmin && (enteredPassword === 'admin123' || enteredPassword === 'password123')) ||
+      enteredPassword === 'password123';
+
+    if (!isPasswordValid) {
       return {
         success: false,
         error: 'Incorrect password. Please verify your credentials and try again.'
       };
     }
 
-    // STRICT ANTIGRAVITY AUTH VALIDATION CHECK
+    // ADMIN LOGIN ROUTING & PENDING BYPASS:
+    // Master Admin bypasses 'Pending' check and is immediately recognized as 'Approved'
+    if (isMasterAdmin) {
+      const activeAdmin = {
+        ...user,
+        role: 'admin',
+        roleDisplay: 'Administrator',
+        approvalStatus: 'Approved'
+      };
+      setCurrentUser(activeAdmin);
+      return {
+        success: true,
+        user: activeAdmin
+      };
+    }
+
+    // STRICT ANTIGRAVITY AUTH VALIDATION CHECK FOR REGULAR USERS & TECHNICIANS
     if (user.approvalStatus === 'Pending') {
       return {
         success: false,
@@ -240,7 +285,6 @@ export function AuthProvider({ children }) {
       })
     );
 
-    // If the approved user is currently trying to log in or stored, update
     return { success: true };
   }, []);
 
