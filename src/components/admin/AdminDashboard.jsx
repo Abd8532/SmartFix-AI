@@ -790,34 +790,14 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
       {currentTab === 'requests' && (
         <div className="space-y-6 animate-slide-up">
           {/* Subheader */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
-                <ListFilter className="w-6 h-6 text-slate-800" />
-                <span>Work-Order Request Queue</span>
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Centralized queue of all campus maintenance work orders logged via web portal and Voiceflow AI.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleExportJson}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-xs font-semibold shadow-2xs transition-colors"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-600" />
-                <span>Export JSON</span>
-              </button>
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold shadow-2xs transition-colors"
-              >
-                Reset Filters
-              </button>
-            </div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5">
+              <ListFilter className="w-6 h-6 text-slate-800" />
+              <span>Work-Order Request Queue</span>
+            </h2>
+            <p className="text-xs text-slate-500 mt-1">
+              Centralized queue of all campus maintenance work orders logged via web portal and Voiceflow AI.
+            </p>
           </div>
 
           {/* Quick Filter Status Pills */}
