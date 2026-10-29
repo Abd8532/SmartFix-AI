@@ -81,9 +81,9 @@ flowchart TD
 
 | Role | Email | Password | Status |
 |---|---|---|---|
+| **Administrator** | `admin@campus.edu` | `admin123` | Master Admin (Pre-Approved) |
 | **Campus User** | `alex@campus.edu` | `password123` | Pre-Approved |
 | **Field Technician** | `tech@campus.edu` | `password123` | Pre-Approved |
-| **Administrator** | `admin@campus.edu` | `password123` | Pre-Approved |
 | **Pending User (Testing)** | `jordan@campus.edu` | `password123` | Pending Approval |
 
 ---
