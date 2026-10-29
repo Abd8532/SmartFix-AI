@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Mail, Lock, User, Wrench, ShieldCheck, ArrowRight, AlertCircle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Mail, Lock, User, Wrench, ShieldCheck, ArrowRight, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
 
@@ -12,11 +12,48 @@ export default function LoginView({ onLogin }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    role: 'user' // Default role for new sign-ups
+    name: 'Alex Rivera',
+    email: 'alex@campus.edu',
+    password: 'password123',
+    role: 'user'
   });
+
+  const handleRoleSelect = (roleKey) => {
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    if (!isSignUp) {
+      // In Login mode, auto-fill standard credentials for the selected role for seamless switching
+      if (roleKey === 'admin') {
+        setFormData({
+          name: 'Master Administrator',
+          email: 'admin@campus.edu',
+          password: 'admin123',
+          role: 'admin'
+        });
+      } else if (roleKey === 'technician') {
+        setFormData({
+          name: 'Marcus Vance',
+          email: 'tech@campus.edu',
+          password: 'password123',
+          role: 'technician'
+        });
+      } else {
+        setFormData({
+          name: 'Alex Rivera',
+          email: 'alex@campus.edu',
+          password: 'password123',
+          role: 'user'
+        });
+      }
+    } else {
+      // In Sign-up mode, update selected registration role
+      setFormData((prev) => ({
+        ...prev,
+        role: roleKey
+      }));
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -62,7 +99,6 @@ export default function LoginView({ onLogin }) {
       const result = login(formData.email, formData.password);
 
       if (!result.success) {
-        // Displays exact message: 'Access Denied: Your account is still pending admin approval.'
         setErrorMessage(result.error);
         addToast({
           type: 'error',
@@ -118,6 +154,66 @@ export default function LoginView({ onLogin }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
+          {/* Role Selector: User, Technician, and Admin */}
+          <div>
+            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+              {isSignUp ? 'I am registering as' : 'Choose Role / Account Type'}
+            </label>
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-2xl bg-slate-100 border border-slate-200/90">
+              <button
+                type="button"
+                onClick={() => handleRoleSelect('user')}
+                className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  formData.role === 'user'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold ring-1 ring-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <User className="w-3.5 h-3.5 text-slate-700" />
+                <span>User</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRoleSelect('technician')}
+                className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  formData.role === 'technician'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold ring-1 ring-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Wrench className="w-3.5 h-3.5 text-amber-600" />
+                <span>Technician</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleRoleSelect('admin')}
+                className={`py-2 px-2 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  formData.role === 'admin'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold ring-1 ring-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                <span>Admin</span>
+              </button>
+            </div>
+
+            {isSignUp && (
+              formData.role === 'admin' ? (
+                <p className="text-[11px] text-emerald-800 mt-2 bg-emerald-50 p-2 rounded-xl border border-emerald-200/80 flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                  <span>⚡ <strong>Auto-Approved:</strong> Admin accounts are immediately approved and granted management access.</span>
+                </p>
+              ) : (
+                <p className="text-[11px] text-amber-700 mt-2 bg-amber-50 p-2 rounded-xl border border-amber-200/80">
+                  🔒 <strong>Strict Admin Gating:</strong> New accounts will require verification from an Administrator before you can log in.
+                </p>
+              )
+            )}
+          </div>
+
           {/* Only show Name field if they are signing up */}
           {isSignUp && (
             <div>
@@ -172,62 +268,6 @@ export default function LoginView({ onLogin }) {
             </div>
           </div>
 
-          {/* Role Selection for Sign-Up: Campus User, Field Technician, and Admin */}
-          {isSignUp && (
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">I am registering as...</label>
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData({...formData, role: 'user'})}
-                  className={`py-2 px-1.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs transition-all ${
-                    formData.role === 'user' 
-                      ? 'border-slate-900 bg-slate-900 text-white font-bold shadow-2xs' 
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white'
-                  }`}
-                >
-                  <User className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Campus User</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({...formData, role: 'technician'})}
-                  className={`py-2 px-1.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs transition-all ${
-                    formData.role === 'technician' 
-                      ? 'border-slate-900 bg-slate-900 text-white font-bold shadow-2xs' 
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white'
-                  }`}
-                >
-                  <Wrench className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Field Tech</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({...formData, role: 'admin'})}
-                  className={`py-2 px-1.5 rounded-xl border flex flex-col sm:flex-row items-center justify-center gap-1.5 text-xs transition-all ${
-                    formData.role === 'admin' 
-                      ? 'border-slate-900 bg-slate-900 text-white font-bold shadow-2xs' 
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50 bg-white'
-                  }`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-blue-500" />
-                  <span className="truncate">Admin</span>
-                </button>
-              </div>
-
-              {formData.role === 'admin' ? (
-                <p className="text-[11px] text-emerald-800 mt-2 bg-emerald-50 p-2.5 rounded-xl border border-emerald-200/80 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                  <span>⚡ <strong>Auto-Approved:</strong> Admin accounts are immediately approved and granted management access.</span>
-                </p>
-              ) : (
-                <p className="text-[11px] text-amber-700 mt-2 bg-amber-50 p-2.5 rounded-xl border border-amber-200/80">
-                  🔒 <strong>Strict Admin Gating:</strong> New accounts will require verification from an Administrator before you can log in.
-                </p>
-              )}
-            </div>
-          )}
-
           <button
             type="submit"
             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors mt-3 shadow-2xs active:scale-[0.99]"
@@ -237,71 +277,21 @@ export default function LoginView({ onLogin }) {
           </button>
         </form>
 
-        {/* Demo Credentials Quick Fill for Instant Testing */}
-        <div className="mt-5 pt-4 border-t border-slate-100 text-[11px] text-slate-500 text-center">
-          <p className="font-semibold text-slate-600 mb-2">Test Credentials Quick-Fill:</p>
-          <div className="flex flex-wrap items-center justify-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setFormData({ name: 'Alex Rivera', email: 'alex@campus.edu', password: 'password123', role: 'user' });
-                setIsSignUp(false);
-                setErrorMessage('');
-                setSuccessMessage('');
-              }}
-              className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-medium border border-emerald-200"
-            >
-              ✓ Approved User
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFormData({ name: 'Marcus Vance', email: 'tech@campus.edu', password: 'password123', role: 'technician' });
-                setIsSignUp(false);
-                setErrorMessage('');
-                setSuccessMessage('');
-              }}
-              className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 font-medium border border-emerald-200"
-            >
-              ✓ Approved Tech
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFormData({ name: 'Master Administrator', email: 'admin@campus.edu', password: 'admin123', role: 'admin' });
-                setIsSignUp(false);
-                setErrorMessage('');
-                setSuccessMessage('');
-              }}
-              className="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-800 hover:bg-indigo-100 font-medium border border-indigo-200"
-            >
-              ✓ Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFormData({ name: 'Jordan Taylor', email: 'jordan@campus.edu', password: 'password123', role: 'user' });
-                setIsSignUp(false);
-                setErrorMessage('');
-                setSuccessMessage('');
-              }}
-              className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 font-medium border border-amber-200"
-              title="Click to test pending approval restriction"
-            >
-              ⏳ Test Pending
-            </button>
-          </div>
-        </div>
-
         <div className="mt-5 text-center text-xs text-slate-600">
           {isSignUp ? "Already have an account? " : "New to SmartFixFlow - AI? "}
           <button 
             type="button"
             onClick={() => {
-              setIsSignUp(!isSignUp);
+              const nextIsSignUp = !isSignUp;
+              setIsSignUp(nextIsSignUp);
               setErrorMessage('');
               setSuccessMessage('');
-              setFormData({ name: '', email: '', password: '', role: 'user' });
+              setFormData({ 
+                name: '', 
+                email: '', 
+                password: '', 
+                role: 'user' 
+              });
             }}
             className="font-bold text-sky-600 hover:text-sky-700 transition-colors ml-1"
           >

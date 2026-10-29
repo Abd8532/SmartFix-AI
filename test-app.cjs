@@ -57,6 +57,16 @@ async function waitForText(page, text, timeout = 10000) {
   );
 }
 
+async function setReactInput(page, selector, value) {
+  await page.evaluate((sel, val) => {
+    const input = document.querySelector(sel);
+    if (!input) return;
+    const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+    nativeSetter.call(input, val);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  }, selector, value);
+}
+
 async function runTests() {
   console.log('--- STARTING SMARTFIXFLOW - AI E2E ACTUATION TESTS ---');
 
@@ -99,7 +109,8 @@ async function runTests() {
 
     // 1a. Test pending login restriction
     console.log('\n[TEST 1a] Testing Gated Login: Pending user cannot log in...');
-    await clickButtonWithText(page, 'Test Pending');
+    await setReactInput(page, 'input[type="email"]', 'jordan@campus.edu');
+    await setReactInput(page, 'input[type="password"]', 'password123');
     await new Promise((r) => setTimeout(r, 400));
     await clickButtonWithText(page, 'Log In');
     await waitForText(page, 'Access Denied: Your account is still pending admin approval.');
@@ -177,18 +188,19 @@ async function runTests() {
 
     // Log out Admin
     await clickButtonWithText(page, 'Log out');
-    await waitForText(page, 'Test Credentials Quick-Fill');
+    await waitForText(page, 'Choose Role / Account Type');
 
     // 1d. Verify Jordan Taylor can now log in
     console.log('\n[TEST 1d] Testing Approved User Login...');
-    await clickButtonWithText(page, 'Test Pending'); // Auto-fills jordan@campus.edu
+    await setReactInput(page, 'input[type="email"]', 'jordan@campus.edu');
+    await setReactInput(page, 'input[type="password"]', 'password123');
     await new Promise((r) => setTimeout(r, 500));
     await clickButtonWithText(page, 'Log In');
     await page.waitForSelector('main', { timeout: 10000 });
     await waitForText(page, 'New Maintenance Issue');
     console.log('✓ Jordan Taylor successfully logged in after admin approval!');
     await clickButtonWithText(page, 'Log out');
-    await waitForText(page, 'Test Credentials Quick-Fill');
+    await waitForText(page, 'Choose Role / Account Type');
 
     // 2. TEST MOBILE USER VIEW & CAMERA CAPTURE (iPhone viewport: 390x844)
     console.log('\n[TEST 2] Testing Mobile User View & Native Camera Upload (iPhone viewport: 390x844)...');
@@ -196,7 +208,7 @@ async function runTests() {
     await page.goto(APP_URL, { waitUntil: 'networkidle0' });
     
     // Fill credentials & Log In as Approved User
-    await clickButtonWithText(page, 'Approved User');
+    await clickButtonWithText(page, 'User');
     await new Promise((r) => setTimeout(r, 500));
     await clickButtonWithText(page, 'Log In');
     await page.waitForSelector('nav');
@@ -247,8 +259,8 @@ async function runTests() {
 
     // Logout from user and login as technician
     await clickButtonWithText(page, 'Log out');
-    await waitForText(page, 'Test Credentials Quick-Fill');
-    await clickButtonWithText(page, 'Approved Tech');
+    await waitForText(page, 'Choose Role / Account Type');
+    await clickButtonWithText(page, 'Technician');
     await new Promise((r) => setTimeout(r, 500));
     await clickButtonWithText(page, 'Log In');
     await waitForText(page, 'Work Order Queue');
@@ -268,8 +280,8 @@ async function runTests() {
     // 4. TEST USER DUAL CONFIRMATION: "Confirm Issue Resolved"
     console.log('\n[TEST 4] Testing User Dual Confirmation ("Confirm Issue Resolved")...');
     await clickButtonWithText(page, 'Log out');
-    await waitForText(page, 'Test Credentials Quick-Fill');
-    await clickButtonWithText(page, 'Approved User');
+    await waitForText(page, 'Choose Role / Account Type');
+    await clickButtonWithText(page, 'User');
     await new Promise((r) => setTimeout(r, 500));
     await clickButtonWithText(page, 'Log In');
     
@@ -292,7 +304,7 @@ async function runTests() {
     // 5. TEST ADMIN ROLE & STATUS OVERRIDE
     console.log('\n[TEST 5] Testing Admin Role & Master Oversight...');
     await clickButtonWithText(page, 'Log out');
-    await waitForText(page, 'Test Credentials Quick-Fill');
+    await waitForText(page, 'Choose Role / Account Type');
     await clickButtonWithText(page, 'Admin');
     await new Promise((r) => setTimeout(r, 500));
     await clickButtonWithText(page, 'Log In');
@@ -309,7 +321,7 @@ async function runTests() {
     // 6. TEST LOGOUT
     console.log('\n[TEST 6] Testing Logout...');
     await clickButtonWithText(page, 'Log out');
-    await waitForText(page, 'Test Credentials Quick-Fill');
+    await waitForText(page, 'Choose Role / Account Type');
     console.log('✓ Successfully logged out and returned to login screen.');
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '08_logout_complete.png') });
 
