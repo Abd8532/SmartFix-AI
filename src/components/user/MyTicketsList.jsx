@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useTickets } from '../../context/TicketContext';
+import { useTickets, isUserTicket } from '../../context/TicketContext';
 import { 
   Search, 
   Calendar, 
@@ -12,14 +12,14 @@ import {
 import { STATUS_CONFIG } from '../../types/mockData';
 
 export default function MyTicketsList({ onSelectTicket }) {
-  const { tickets, currentUser, setUserTab, handleTicketClosure } = useTickets();
+  const { tickets, currentUser, setUserTab, handleTicketClosure, stats } = useTickets();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
   const userTickets = useMemo(() => {
-    return tickets.filter((t) => t.reportedBy?.id === currentUser?.id);
-  }, [tickets, currentUser]);
+    return stats.userTickets || tickets.filter((t) => isUserTicket(t, currentUser));
+  }, [stats.userTickets, tickets, currentUser]);
 
   const filteredTickets = useMemo(() => {
     return userTickets.filter((ticket) => {

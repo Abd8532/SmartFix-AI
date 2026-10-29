@@ -84,11 +84,11 @@ export default function Sidebar({ adminTab = 'overview', setAdminTab }) {
               </div>
               <div className="flex justify-between items-center text-slate-500">
                 <span>Open Requests</span>
-                <span className="font-semibold text-amber-700">{stats.open}</span>
+                <span className="font-semibold text-amber-700">{stats.userOpenCount}</span>
               </div>
               <div className="flex justify-between items-center text-slate-500">
                 <span>Resolved</span>
-                <span className="font-semibold text-emerald-700">{stats.done}</span>
+                <span className="font-semibold text-emerald-700">{stats.userResolvedCount}</span>
               </div>
             </div>
           </div>

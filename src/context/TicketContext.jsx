@@ -43,6 +43,9 @@ function formatAirtableRecord(record) {
   const description = fields.Description || fields.description || '';
   const location = fields.Location || fields.location || 'Campus Facilities';
   const createdAt = fields.CreatedAt || fields.createdAt || record.createdTime || new Date().toISOString();
+  const reporterEmail = fields.ReporterEmail || fields.Email || fields.reporterEmail || null;
+  const reporterName = fields.ReporterName || fields.reporterName || 'Alex Rivera';
+  const reporterId = fields.ReporterId || fields.reporterId || 'usr_1';
 
   return {
     id: record.id,
@@ -68,15 +71,55 @@ function formatAirtableRecord(record) {
     createdAt,
     updatedAt: fields.UpdatedAt || fields.updatedAt || createdAt,
     reportedBy: {
-      id: fields.ReporterId || 'usr_1',
-      name: fields.ReporterName || 'Alex Rivera',
+      id: reporterId,
+      name: reporterName,
+      email: reporterEmail || 'alex@campus.edu',
       role: 'User',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
     },
-    reporterId: fields.ReporterId || 'usr_1',
+    reporterId,
+    reporterEmail,
+    reporterName,
     isAirtable: true,
     ...fields
   };
+}
+
+// User Ticket Matching Helper to dynamically connect tickets from database to active user
+export function isUserTicket(ticket, user) {
+  if (!ticket || !user) return false;
+
+  // 1. Direct ID match
+  if (ticket.reporterId && (ticket.reporterId === user.id || ticket.reporterId === user.email)) return true;
+  if (ticket.reportedBy?.id && (ticket.reportedBy.id === user.id || ticket.reportedBy.id === user.email)) return true;
+
+  // 2. Normalized Email match
+  const userEmail = (user.email || '').trim().toLowerCase();
+  if (userEmail) {
+    if (ticket.reporterEmail && ticket.reporterEmail.trim().toLowerCase() === userEmail) return true;
+    if (ticket.reportedBy?.email && ticket.reportedBy.email.trim().toLowerCase() === userEmail) return true;
+    if (ticket.ReporterEmail && String(ticket.ReporterEmail).trim().toLowerCase() === userEmail) return true;
+    if (ticket.Email && String(ticket.Email).trim().toLowerCase() === userEmail) return true;
+    if (ticket.reporterId && String(ticket.reporterId).trim().toLowerCase() === userEmail) return true;
+  }
+
+  // 3. Name match (case-insensitive)
+  const userName = (user.name || '').trim().toLowerCase();
+  if (userName && userName !== 'user' && userName !== 'campus user') {
+    if (ticket.reporterName && ticket.reporterName.trim().toLowerCase() === userName) return true;
+    if (ticket.reportedBy?.name && ticket.reportedBy.name.trim().toLowerCase() === userName) return true;
+    if (ticket.ReporterName && String(ticket.ReporterName).trim().toLowerCase() === userName) return true;
+  }
+
+  // 4. Campus User Fallback:
+  // If the user has role 'user':
+  // Ensure the seeded campus maintenance tickets in database are linked & accessible
+  if (user.role === 'user') {
+    if (user.id === 'usr_1' || userEmail === 'alex@campus.edu') return true;
+    if (ticket.reporterId === 'usr_1' || ticket.reportedBy?.id === 'usr_1') return true;
+  }
+
+  return false;
 }
 
 export function TicketProvider({ children }) {
@@ -245,6 +288,14 @@ export function TicketProvider({ children }) {
     const location = newTicketData.location || 'Facility General Area';
     const description = newTicketData.description || '';
 
+    const reporterDetails = newTicketData.reportedBy || {
+      id: currentUser?.id || 'usr_1',
+      name: currentUser?.name || 'Alex Rivera',
+      email: currentUser?.email || 'alex@campus.edu',
+      role: currentUser?.role || 'user',
+      avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
+    };
+
     let createdRecord = null;
 
     if (hasValidToken) {
@@ -290,6 +341,12 @@ export function TicketProvider({ children }) {
               photo: newTicketData.photo || null
             }
           });
+          // Preserve active user details on created Airtable record
+          createdRecord.reportedBy = reporterDetails;
+          createdRecord.reporterId = reporterDetails.id;
+          createdRecord.reporterEmail = reporterDetails.email;
+          createdRecord.reporterName = reporterDetails.name;
+
           setTickets(prev => [createdRecord, ...prev]);
           addToast({
             type: 'success',
@@ -328,13 +385,10 @@ export function TicketProvider({ children }) {
       TechConfirmed: 'false',
       userConfirmed: false,
       UserConfirmed: 'false',
-      reportedBy: newTicketData.reportedBy || {
-        id: currentUser?.id || 'usr_1',
-        name: currentUser?.name || 'Alex Rivera',
-        role: 'User',
-        avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
-      },
-      reporterId: currentUser?.id || 'usr_1',
+      reportedBy: reporterDetails,
+      reporterId: reporterDetails.id,
+      reporterEmail: reporterDetails.email,
+      reporterName: reporterDetails.name,
       assignedTo: newTicketData.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : 'General Maintenance'),
       photo: newTicketData.photo || null,
       createdAt: now,
@@ -539,8 +593,15 @@ export function TicketProvider({ children }) {
     const critical = tickets.filter((t) => (t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Urgent') && t.status !== 'Done' && t.status !== 'Completed').length;
     const resolutionRate = total > 0 ? Math.round((done / total) * 100) : 0;
 
-    // Filter tickets raised by current logged in user
-    const userTickets = tickets.filter((t) => t.reporterId === currentUser?.id || t.reportedBy?.id === currentUser?.id);
+    // Filter tickets raised by / belonging to current user from central database
+    const userTickets = tickets.filter((t) => isUserTicket(t, currentUser));
+    const userOpenCount = userTickets.filter((t) => 
+      t.status === 'Open' || t.status === 'Assigned' || t.Status === 'Assigned' ||
+      t.status === 'In Progress' || t.status === 'Pending User Verification' || t.Status === 'Pending User Verification'
+    ).length;
+    const userResolvedCount = userTickets.filter((t) => 
+      t.status === 'Done' || t.status === 'Completed' || t.Status === 'Completed'
+    ).length;
 
     return {
       total,
@@ -549,7 +610,10 @@ export function TicketProvider({ children }) {
       done,
       critical,
       resolutionRate,
-      userTicketsCount: userTickets.length
+      userTickets,
+      userTicketsCount: userTickets.length,
+      userOpenCount,
+      userResolvedCount
     };
   }, [tickets, currentUser]);
 

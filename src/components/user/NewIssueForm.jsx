@@ -331,14 +331,23 @@ Structure the JSON exactly like this:
     setAiStatusMessage('Logging ticket to maintenance register...');
 
     // Inside NewIssueForm.jsx -> processWithAI (Exact requirement)
-    const created = addTicket({
+    const created = await addTicket({
       ...ticketData,
       priority: ticketData.urgency || ticketData.priority || 'Moderate',
       photo: base64DataUrl || imagePreview || null,
       status: 'Assigned', // Auto-assigned by AI
       techConfirmed: false,
       userConfirmed: false,
-      reporterId: currentUser?.id || 'usr_1', 
+      reportedBy: {
+        id: currentUser?.id || 'usr_1',
+        name: currentUser?.name || 'Alex Rivera',
+        email: currentUser?.email || 'alex@campus.edu',
+        role: currentUser?.role || 'user',
+        avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
+      },
+      reporterId: currentUser?.id || 'usr_1',
+      reporterEmail: currentUser?.email || 'alex@campus.edu',
+      reporterName: currentUser?.name || 'Alex Rivera',
       createdAt: new Date().toISOString()
     });
 
@@ -404,14 +413,23 @@ Structure the JSON exactly like this:
       const ticketData = runLocalHeuristics(complaint);
       setActiveModelUsed('Local Chief Engineer Engine');
 
-      const created = addTicket({
+      const created = await addTicket({
         ...ticketData,
         priority: ticketData.urgency || ticketData.priority || 'Moderate',
         photo: base64DataUrl || imagePreview || null,
         status: 'Assigned',
         techConfirmed: false,
         userConfirmed: false,
+        reportedBy: {
+          id: currentUser?.id || 'usr_1',
+          name: currentUser?.name || 'Alex Rivera',
+          email: currentUser?.email || 'alex@campus.edu',
+          role: currentUser?.role || 'user',
+          avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
+        },
         reporterId: currentUser?.id || 'usr_1',
+        reporterEmail: currentUser?.email || 'alex@campus.edu',
+        reporterName: currentUser?.name || 'Alex Rivera',
         createdAt: new Date().toISOString()
       });
 
