@@ -160,27 +160,51 @@ export default function Sidebar({ adminTab = 'overview', setAdminTab }) {
             </button>
 
             <button 
-              onClick={() => setAdminTab && setAdminTab('overview')}
-              className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-xs sm:text-sm text-left transition-colors"
+              onClick={() => setAdminTab && setAdminTab('requests')}
+              className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-xs sm:text-sm text-left transition-colors ${
+                adminTab === 'requests'
+                  ? 'bg-slate-200 text-slate-900 font-semibold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
             >
-              <ListFilter className="w-4 h-4 text-slate-500" />
-              <span>All requests</span>
+              <div className="flex items-center gap-3">
+                <ListFilter className="w-4 h-4 text-slate-500" />
+                <span>All requests</span>
+              </div>
+              {stats.total > 0 && (
+                <span className="px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-bold rounded-full border border-slate-200">
+                  {stats.total}
+                </span>
+              )}
             </button>
+
             <button 
-              onClick={() => setAdminTab && setAdminTab('overview')}
-              className="flex items-center justify-between px-3.5 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-xs sm:text-sm text-left transition-colors"
+              onClick={() => setAdminTab && setAdminTab('hazards')}
+              className={`flex items-center justify-between px-3.5 py-2.5 rounded-xl font-medium text-xs sm:text-sm text-left transition-colors ${
+                adminTab === 'hazards'
+                  ? 'bg-rose-100 text-rose-950 font-semibold shadow-2xs border border-rose-200'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
             >
               <div className="flex items-center gap-3">
                 <AlertTriangle className="w-4 h-4 text-rose-600" />
                 <span>Hazard queue</span>
               </div>
               {stats.critical > 0 && (
-                <span className="px-1.5 py-0.2 bg-rose-600 text-white text-[10px] font-bold rounded-full">
+                <span className="px-2 py-0.5 bg-rose-600 text-white text-[10px] font-bold rounded-full shadow-2xs">
                   {stats.critical}
                 </span>
               )}
             </button>
-            <button className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 font-medium text-xs sm:text-sm text-left transition-colors">
+
+            <button 
+              onClick={() => setAdminTab && setAdminTab('settings')}
+              className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-xs sm:text-sm text-left transition-colors ${
+                adminTab === 'settings'
+                  ? 'bg-slate-200 text-slate-900 font-semibold shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
               <Settings className="w-4 h-4 text-slate-500" />
               <span>Settings</span>
             </button>

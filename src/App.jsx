@@ -14,7 +14,7 @@ import TicketDetailModal from './components/tickets/TicketDetailModal';
 function AppContent() {
   const { currentUser } = useAuth();
   const [activeModalTicketId, setActiveModalTicketId] = useState(null);
-  const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'approvals'
+  const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'approvals' | 'requests' | 'hazards' | 'settings'
 
   // STRICT ROUTING PROTECTION (Admin Auth Validation):
   // User must be authenticated AND their approvalStatus must strictly equal 'Approved'
