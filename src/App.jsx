@@ -62,8 +62,8 @@ function AppContent() {
       {/* Universal Header with currentUser data & role pill */}
       <Header currentUser={currentUser} onLogout={logout} />
 
-      {/* Main Responsive Body with Sidebar & Content */}
-      <div className="flex-1 flex max-w-7xl w-full mx-auto">
+      {/* Main Responsive Body with Sidebar attached flush to the left edge */}
+      <div className="flex-1 flex w-full">
         <Sidebar adminTab={adminTab} setAdminTab={setAdminTab} />
 
         <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 pb-24 md:pb-12">

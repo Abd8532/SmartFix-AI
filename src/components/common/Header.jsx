@@ -24,7 +24,7 @@ export default function Header({ currentUser: propUser, onLogout }) {
 
   return (
     <header className="sticky top-0 z-30 w-full bg-white border-b border-slate-200/90 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
         {/* Title: SmartFixFlow - AI */}
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-sm">
