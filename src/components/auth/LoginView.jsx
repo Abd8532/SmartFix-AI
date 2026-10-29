@@ -95,17 +95,17 @@ export default function LoginView({ onLogin }) {
       setFormData((prev) => ({ ...prev, password: '' }));
       setIsSignUp(false); // Switch to login view with success banner
     } else {
-      // 2. LOGIN: Strictly verified against approvalStatus === 'Approved'
-      const result = login(formData.email, formData.password);
+      // 2. LOGIN: Strictly verified against approvalStatus === 'Approved' and selected domain role
+      const result = login(formData.email, formData.password, formData.role);
 
       if (!result.success) {
         setErrorMessage(result.error);
         addToast({
           type: 'error',
-          title: result.status === 'Pending' ? 'Approval Required' : 'Login Failed',
+          title: result.status === 'Pending' ? 'Approval Required' : 'Domain Access Denied',
           message: result.error
         });
-        return;
+        return; // Prevent routing on validation failure
       }
 
       // Login approved & granted!

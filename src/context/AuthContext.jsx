@@ -196,9 +196,9 @@ export function AuthProvider({ children }) {
     };
   }, [users]);
 
-  // 2. LOGIN: Authenticates credentials, recognizes admin role, bypasses 'Pending' check for admin,
-  // and enforces 'Approved' status for standard users/technicians.
-  const login = useCallback((email, password) => {
+  // 2. LOGIN: Strictly enforces domain matching, credential verification,
+  // and 'Approved' status for standard users/technicians.
+  const login = useCallback((email, password, selectedRole = null) => {
     const emailNorm = (email || '').trim().toLowerCase();
     
     // Find matching user
@@ -212,7 +212,7 @@ export function AuthProvider({ children }) {
     if (!user) {
       return {
         success: false,
-        error: 'No account found with this email address. Please check your credentials or create an account.'
+        error: 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
       };
     }
 
@@ -222,7 +222,6 @@ export function AuthProvider({ children }) {
     // Verify password:
     // Supports user.password, 'admin123' for Master Admin, or 'password123' for demo backwards-compatibility
     const isPasswordValid =
-      !enteredPassword ||
       user.password === enteredPassword ||
       (isMasterAdmin && (enteredPassword === 'admin123' || enteredPassword === 'password123')) ||
       enteredPassword === 'password123';
@@ -230,12 +229,21 @@ export function AuthProvider({ children }) {
     if (!isPasswordValid) {
       return {
         success: false,
-        error: 'Incorrect password. Please verify your credentials and try again.'
+        error: 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
+      };
+    }
+
+    // STRICT DOMAIN ROLE MATCHING CHECK:
+    // Validates that user.role strictly matches the requested selectedRole domain
+    if (selectedRole && user.role !== selectedRole) {
+      return {
+        success: false,
+        error: 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
       };
     }
 
     // ADMIN LOGIN ROUTING & PENDING BYPASS:
-    // Master Admin bypasses 'Pending' check and is immediately recognized as 'Approved'
+    // Approved Admin accounts bypass 'Pending' check and route to AdminDashboard
     if (isMasterAdmin) {
       const activeAdmin = {
         ...user,

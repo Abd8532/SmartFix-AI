@@ -213,10 +213,11 @@ export function TicketProvider({ children }) {
   // Auth actions
   const loginAs = (newRole, userDetails = null) => {
     if (auth?.login) {
+      const targetRole = typeof newRole === 'string' ? newRole : (userDetails?.role || 'user');
       const email = typeof newRole === 'string' 
         ? (newRole === 'admin' ? 'admin@campus.edu' : newRole === 'technician' ? 'tech@campus.edu' : 'alex@campus.edu')
         : (userDetails?.email || 'alex@campus.edu');
-      auth.login(email, 'password123');
+      auth.login(email, targetRole === 'admin' ? 'admin123' : 'password123', targetRole);
     }
   };
 

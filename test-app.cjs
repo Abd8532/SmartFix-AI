@@ -117,6 +117,16 @@ async function runTests() {
     console.log('✓ Verified: Pending user received exact error: "Access Denied: Your account is still pending admin approval."');
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '01_login_pending_blocked.png') });
 
+    // 1a-2. Test Domain Matching Security Check: Admin credentials on User domain rejected!
+    console.log('\n[TEST 1a-2] Testing Domain Matching: Admin credentials entered on User portal are strictly blocked...');
+    await clickButtonWithText(page, 'User');
+    await setReactInput(page, 'input[type="email"]', 'admin@campus.edu');
+    await setReactInput(page, 'input[type="password"]', 'admin123');
+    await new Promise((r) => setTimeout(r, 400));
+    await clickButtonWithText(page, 'Log In');
+    await waitForText(page, 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.');
+    console.log('✓ Verified: Cross-domain admin bypass blocked with message: "Invalid ID or password for this specific domain. Please ensure you have selected the correct role."');
+
     // 1b. Test Registration with Pending Status (Campus User)
     console.log('\n[TEST 1b] Testing Sign-Up: Registers with Pending status...');
     await clickButtonWithText(page, 'Request account approval');
