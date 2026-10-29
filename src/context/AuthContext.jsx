@@ -327,6 +327,30 @@ export function AuthProvider({ children }) {
     } catch {}
   }, []);
 
+  // 6. UPDATE PROFILE (change avatar/image, name, department)
+  const updateUserProfile = useCallback((updates) => {
+    if (!currentUser) return { success: false, error: 'No user is currently logged in.' };
+
+    const updatedUser = {
+      ...currentUser,
+      ...updates
+    };
+
+    setCurrentUser(updatedUser);
+
+    setUsers((prev) =>
+      prev.map((u) => (u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase() ? { ...u, ...updates } : u))
+    );
+
+    try {
+      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
+    } catch (e) {
+      console.warn('Failed saving updated profile to storage:', e);
+    }
+
+    return { success: true, user: updatedUser };
+  }, [currentUser]);
+
   // Reset to initial mock users
   const resetUsers = useCallback(() => {
     setUsers(INITIAL_USERS);
@@ -347,6 +371,7 @@ export function AuthProvider({ children }) {
     approveUser,
     rejectUser,
     logout,
+    updateUserProfile,
     resetUsers,
     setCurrentUser
   };

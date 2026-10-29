@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTickets } from '../../context/TicketContext';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from './Avatar';
+import UserProfileModal from './UserProfileModal';
 import { 
   LayoutGrid, 
   ListFilter, 
@@ -14,12 +15,14 @@ import {
   Clock, 
   CheckCircle2, 
   ShieldCheck,
-  LogOut 
+  LogOut,
+  ChevronRight
 } from 'lucide-react';
 
 export default function Sidebar({ adminTab = 'overview', setAdminTab }) {
   const { role, userTab, setUserTab, stats, currentUser, logout } = useTickets();
   const { pendingUsers = [] } = useAuth();
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   if (!role) return null;
 
@@ -212,21 +215,65 @@ export default function Sidebar({ adminTab = 'overview', setAdminTab }) {
         </div>
       )}
 
-      {/* Footer Profile & Logout */}
-      <div className="pt-4 border-t border-slate-200 flex flex-col gap-3">
-        <div className="flex items-center gap-3 px-2 py-1">
-          <Avatar
-            src={currentUser?.avatar}
-            name={currentUser?.name}
-            size="w-8 h-8"
-            className="ring-1 ring-slate-200"
-          />
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-slate-900 truncate">{currentUser?.name}</p>
-            <p className="text-[11px] text-slate-500 capitalize">{currentUser?.roleDisplay}</p>
+      {/* Footer Profile & Logout Option */}
+      <div className="pt-4 border-t border-slate-200 flex flex-col gap-2">
+        <div 
+          onClick={() => setIsProfileModalOpen(true)}
+          className="group flex items-center justify-between p-2 rounded-xl hover:bg-slate-200/70 cursor-pointer transition-all border border-transparent hover:border-slate-300/80 shadow-2xs"
+          title="Click to view profile or change photo"
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative shrink-0">
+              <Avatar
+                src={currentUser?.avatar}
+                name={currentUser?.name}
+                size="w-9 h-9"
+                className="ring-1 ring-slate-200"
+              />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-slate-900 text-white flex items-center justify-center opacity-85 group-hover:opacity-100 shadow-xs transition-opacity">
+                <Camera className="w-2.5 h-2.5" />
+              </div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-bold text-slate-900 truncate group-hover:text-sky-700 transition-colors">
+                {currentUser?.name}
+              </p>
+              <p className="text-[11px] text-slate-500 capitalize leading-tight truncate">
+                {currentUser?.roleDisplay || 'Campus User'}
+              </p>
+            </div>
           </div>
+          <ChevronRight className="w-4 h-4 text-slate-400 group-hover:text-slate-700 transition-colors shrink-0" />
+        </div>
+
+        {/* Action Controls: Change Photo & Direct Logout */}
+        <div className="flex items-center gap-1.5 px-0.5">
+          <button
+            type="button"
+            onClick={() => setIsProfileModalOpen(true)}
+            className="flex-1 py-1.5 px-2 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-semibold flex items-center justify-center gap-1.5 shadow-2xs transition-colors"
+          >
+            <Camera className="w-3 h-3 text-slate-600" />
+            <span>Profile & Photo</span>
+          </button>
+          
+          <button
+            type="button"
+            onClick={logout}
+            className="py-1.5 px-2.5 rounded-lg bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-700 text-[11px] font-semibold flex items-center justify-center gap-1 shadow-2xs transition-colors"
+            title="Log out of session"
+          >
+            <LogOut className="w-3 h-3" />
+            <span>Log out</span>
+          </button>
         </div>
       </div>
+
+      {/* User Profile & Image Modal */}
+      <UserProfileModal 
+        isOpen={isProfileModalOpen} 
+        onClose={() => setIsProfileModalOpen(false)} 
+      />
     </aside>
   );
 }
