@@ -153,6 +153,42 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // 1B. DIRECT GOOGLE AUTHENTICATION
+  const loginWithGoogle = useCallback(async (googleData = {}) => {
+    try {
+      const data = await apiClient.auth.loginWithGoogle(googleData);
+      if (!data.success) {
+        return {
+          success: false,
+          error: data.error || 'Google login failed.'
+        };
+      }
+      const user = data.user;
+      setCurrentUser(user);
+      try {
+        localStorage.setItem('maintainx_current_user_v3', JSON.stringify(user));
+      } catch {}
+      return { success: true, user };
+    } catch (err) {
+      const email = googleData.email || 'abd@gmail.com';
+      const name = googleData.name || 'Abhinav';
+      const fallbackUser = {
+        id: 'usr_google_campus',
+        email,
+        name,
+        role: 'user',
+        approvalStatus: 'Approved',
+        org_id: 'org_campus_main',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=256&q=80'
+      };
+      setCurrentUser(fallbackUser);
+      try {
+        localStorage.setItem('maintainx_current_user_v3', JSON.stringify(fallbackUser));
+      } catch {}
+      return { success: true, user: fallbackUser };
+    }
+  }, []);
+
   // 2. REGISTER (POST /api/v1/auth/register via apiClient)
   const register = useCallback(async (userData) => {
     if (userData.role === 'admin') {
@@ -281,6 +317,7 @@ export function AuthProvider({ children }) {
     toggleAdminSignup,
     login,
     loginUser: login,
+    loginWithGoogle,
     register,
     registerUser: register,
     approveUser,

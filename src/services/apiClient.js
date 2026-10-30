@@ -204,6 +204,11 @@ export const apiClient = {
       // Browser relies on HttpOnly smartfix_session cookie; do NOT persist JWT in localStorage
       return data;
     },
+    loginWithGoogle: async (googleData = {}) => {
+      const data = await apiClient.post('/api/v1/auth/google', googleData);
+      if (data?.csrfToken) setCsrfToken(data.csrfToken);
+      return data;
+    },
     logout: async () => {
       try {
         await apiClient.post('/api/v1/auth/logout');
