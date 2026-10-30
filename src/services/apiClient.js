@@ -245,6 +245,8 @@ export const apiClient = {
       apiClient.get(`/api/v1/tickets/${id}`),
     create: (ticketData) =>
       apiClient.post('/api/v1/tickets', ticketData),
+    verifyImage: (payload) =>
+      apiClient.post('/api/v1/tickets/verify-image', payload),
     claim: (id, version) =>
       apiClient.post(`/api/v1/tickets/${id}/claim`, { version }),
     techComplete: (id, resolutionNotes, version) =>

@@ -213,9 +213,237 @@
       "name": "Image Tester",
       "role": "user",
       "approvalStatus": "Approved"
+    },
+    {
+      "id": "usr_verify_test_1",
+      "org_id": "org_campus_main",
+      "email": "visualgate@campus.edu",
+      "name": "Visual Gate Tester",
+      "role": "user",
+      "approvalStatus": "Approved"
     }
   ],
   "tickets": [
+    {
+      "id": "TCK-C2B50521F6A8",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "title": "Hallway light is flickering in hallway",
+      "description": "Hallway light is flickering in hallway",
+      "category": "Electrical",
+      "priority": "Routine",
+      "urgency": "Routine",
+      "priorityScore": 40,
+      "isHazard": false,
+      "safetyOverride": false,
+      "status": "Assigned",
+      "techConfirmed": false,
+      "userConfirmed": false,
+      "location": "Campus Facilities",
+      "assignedTo": "Electrical Tech",
+      "assignedTechId": null,
+      "photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "fileKey": null,
+      "photoKey": null,
+      "reporterId": "usr_session_1",
+      "reporterName": "Session User",
+      "reporterEmail": "session_user@campus.edu",
+      "reportedBy": {
+        "id": "usr_session_1",
+        "name": "Session User",
+        "email": "session_user@campus.edu",
+        "role": "User"
+      },
+      "ragMatches": [
+        {
+          "id": "TICK-HIST-101",
+          "score": 0.0,
+          "search_mode": "keyword_fallback",
+          "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
+          "metadata": {
+            "id": "TICK-HIST-101",
+            "org_id": "public_base",
+            "title": "Cafeteria Sink Cold Water Pipe Leak",
+            "category": "Plumbing",
+            "urgency": "Routine",
+            "location": "Cafeteria Kitchen \u00b7 Main Prep Sink",
+            "building": "cafeteria",
+            "deviceTag": "PLUMB-SINK-CAF01",
+            "description": "Slow drip on cold water feed under counter. Replaced compression ring and tightened valve shutoff.",
+            "assignedTo": "Plumbing Tech",
+            "rootCause": "Degraded compression fitting due to thermal contraction.",
+            "fixApplied": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
+            "verified": true,
+            "resolvedAt": "2026-09-15T14:30:00Z"
+          }
+        },
+        {
+          "id": "TICK-HIST-102",
+          "score": 0.0,
+          "search_mode": "keyword_fallback",
+          "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
+          "metadata": {
+            "id": "TICK-HIST-102",
+            "org_id": "public_base",
+            "title": "Keller Science Server Room Breaker Trip",
+            "category": "Electrical",
+            "urgency": "Urgent",
+            "location": "Keller Science Center \u00b7 Server Room 204",
+            "building": "keller science center",
+            "deviceTag": "ELEC-PNL-SR204",
+            "description": "Sub-panel 40A circuit breaker tripped under heavy compute load. Reset breaker and rebalanced phase B.",
+            "assignedTo": "Electrical Tech",
+            "rootCause": "Phase imbalance causing transient amp spike on single leg.",
+            "fixApplied": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
+            "verified": true,
+            "resolvedAt": "2026-09-28T09:15:00Z"
+          }
+        },
+        {
+          "id": "TICK-HIST-103",
+          "score": 0.0,
+          "search_mode": "keyword_fallback",
+          "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
+          "metadata": {
+            "id": "TICK-HIST-103",
+            "org_id": "public_base",
+            "title": "Carrow Library Rooftop Chiller Noise",
+            "category": "HVAC",
+            "urgency": "Routine",
+            "location": "Carrow Library \u00b7 Study Hall Rooftop",
+            "building": "carrow library",
+            "deviceTag": "HVAC-CHILL-LIB01",
+            "description": "Chiller fan bearing chirping at high RPM. Lubricated bearing assembly and realigned fan shroud.",
+            "assignedTo": "HVAC Specialist",
+            "rootCause": "Dry bearing housing after hot summer run cycle.",
+            "fixApplied": "High-temp synthetic grease injected into bearing nipple.",
+            "verified": true,
+            "resolvedAt": "2026-10-04T16:45:00Z"
+          }
+        }
+      ],
+      "ragSearchMode": "keyword_fallback",
+      "reopenCount": 0,
+      "version": 1,
+      "createdAt": "2026-10-30T18:58:05.103988Z",
+      "updatedAt": "2026-10-30T18:58:05.103988Z",
+      "Status": "Assigned",
+      "Urgency": "Routine",
+      "TechConfirmed": "false",
+      "UserConfirmed": "false"
+    },
+    {
+      "id": "TCK-FFB76CEF81D3",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "title": "Faucet leak in bathroom sink",
+      "description": "Faucet leak in bathroom sink",
+      "category": "Plumbing",
+      "priority": "Routine",
+      "urgency": "Routine",
+      "priorityScore": 40,
+      "isHazard": false,
+      "safetyOverride": false,
+      "status": "Assigned",
+      "techConfirmed": false,
+      "userConfirmed": false,
+      "location": "Campus Facilities",
+      "assignedTo": "Plumbing Tech",
+      "assignedTechId": null,
+      "photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "fileKey": null,
+      "photoKey": null,
+      "reporterId": "usr_session_1",
+      "reporterName": "Session User",
+      "reporterEmail": "session_user@campus.edu",
+      "reportedBy": {
+        "id": "usr_session_1",
+        "name": "Session User",
+        "email": "session_user@campus.edu",
+        "role": "User"
+      },
+      "ragMatches": [
+        {
+          "id": "TICK-HIST-101",
+          "score": 0.4,
+          "search_mode": "keyword_fallback",
+          "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
+          "metadata": {
+            "id": "TICK-HIST-101",
+            "org_id": "public_base",
+            "title": "Cafeteria Sink Cold Water Pipe Leak",
+            "category": "Plumbing",
+            "urgency": "Routine",
+            "location": "Cafeteria Kitchen \u00b7 Main Prep Sink",
+            "building": "cafeteria",
+            "deviceTag": "PLUMB-SINK-CAF01",
+            "description": "Slow drip on cold water feed under counter. Replaced compression ring and tightened valve shutoff.",
+            "assignedTo": "Plumbing Tech",
+            "rootCause": "Degraded compression fitting due to thermal contraction.",
+            "fixApplied": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
+            "verified": true,
+            "resolvedAt": "2026-09-15T14:30:00Z"
+          }
+        },
+        {
+          "id": "TICK-HIST-102",
+          "score": 0.0,
+          "search_mode": "keyword_fallback",
+          "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
+          "metadata": {
+            "id": "TICK-HIST-102",
+            "org_id": "public_base",
+            "title": "Keller Science Server Room Breaker Trip",
+            "category": "Electrical",
+            "urgency": "Urgent",
+            "location": "Keller Science Center \u00b7 Server Room 204",
+            "building": "keller science center",
+            "deviceTag": "ELEC-PNL-SR204",
+            "description": "Sub-panel 40A circuit breaker tripped under heavy compute load. Reset breaker and rebalanced phase B.",
+            "assignedTo": "Electrical Tech",
+            "rootCause": "Phase imbalance causing transient amp spike on single leg.",
+            "fixApplied": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
+            "verified": true,
+            "resolvedAt": "2026-09-28T09:15:00Z"
+          }
+        },
+        {
+          "id": "TICK-HIST-103",
+          "score": 0.0,
+          "search_mode": "keyword_fallback",
+          "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
+          "metadata": {
+            "id": "TICK-HIST-103",
+            "org_id": "public_base",
+            "title": "Carrow Library Rooftop Chiller Noise",
+            "category": "HVAC",
+            "urgency": "Routine",
+            "location": "Carrow Library \u00b7 Study Hall Rooftop",
+            "building": "carrow library",
+            "deviceTag": "HVAC-CHILL-LIB01",
+            "description": "Chiller fan bearing chirping at high RPM. Lubricated bearing assembly and realigned fan shroud.",
+            "assignedTo": "HVAC Specialist",
+            "rootCause": "Dry bearing housing after hot summer run cycle.",
+            "fixApplied": "High-temp synthetic grease injected into bearing nipple.",
+            "verified": true,
+            "resolvedAt": "2026-10-04T16:45:00Z"
+          }
+        }
+      ],
+      "ragSearchMode": "keyword_fallback",
+      "reopenCount": 0,
+      "version": 1,
+      "createdAt": "2026-10-30T18:58:04.829205Z",
+      "updatedAt": "2026-10-30T18:58:04.829205Z",
+      "Status": "Assigned",
+      "Urgency": "Routine",
+      "TechConfirmed": "false",
+      "UserConfirmed": "false"
+    },
     {
       "id": "TCK-074BBB5878C9",
       "org_id": "org_campus_main",
@@ -655,116 +883,6 @@
       "Urgency": "Routine",
       "TechConfirmed": "false",
       "UserConfirmed": "false"
-    },
-    {
-      "id": "TCK-8F1DF059D605",
-      "org_id": "org_campus_main",
-      "orgId": "org_campus_main",
-      "title": "Ab 12 wifi not working",
-      "description": "ab 12 wifi not working",
-      "category": "IT",
-      "priority": "Routine",
-      "urgency": "Routine",
-      "priorityScore": 40,
-      "isHazard": false,
-      "safetyOverride": false,
-      "status": "Assigned",
-      "techConfirmed": false,
-      "userConfirmed": false,
-      "location": "Campus Facilities",
-      "assignedTo": "IT Support Specialist",
-      "assignedTechId": null,
-      "photo": "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=600&auto=format&fit=crop&q=80",
-      "fileKey": "uploads/org_campus_main/1793384850993_734f953635b6.jpg",
-      "photoKey": "uploads/org_campus_main/1793384850993_734f953635b6.jpg",
-      "reporterId": "usr_1793358539789_957",
-      "reporterName": "Abhinav",
-      "reporterEmail": "abd@gmail.com",
-      "reportedBy": {
-        "id": "usr_1793358539789_957",
-        "name": "Abhinav",
-        "email": "abd@gmail.com",
-        "role": "User"
-      },
-      "ragMatches": [
-        {
-          "id": "TICK-HIST-101",
-          "score": 0.0,
-          "search_mode": "keyword_fallback",
-          "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
-          "metadata": {
-            "id": "TICK-HIST-101",
-            "org_id": "public_base",
-            "title": "Cafeteria Sink Cold Water Pipe Leak",
-            "category": "Plumbing",
-            "urgency": "Routine",
-            "location": "Cafeteria Kitchen \u00b7 Main Prep Sink",
-            "building": "cafeteria",
-            "deviceTag": "PLUMB-SINK-CAF01",
-            "description": "Slow drip on cold water feed under counter. Replaced compression ring and tightened valve shutoff.",
-            "assignedTo": "Plumbing Tech",
-            "rootCause": "Degraded compression fitting due to thermal contraction.",
-            "fixApplied": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
-            "verified": true,
-            "resolvedAt": "2026-09-15T14:30:00Z"
-          }
-        },
-        {
-          "id": "TICK-HIST-102",
-          "score": 0.0,
-          "search_mode": "keyword_fallback",
-          "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
-          "metadata": {
-            "id": "TICK-HIST-102",
-            "org_id": "public_base",
-            "title": "Keller Science Server Room Breaker Trip",
-            "category": "Electrical",
-            "urgency": "Urgent",
-            "location": "Keller Science Center \u00b7 Server Room 204",
-            "building": "keller science center",
-            "deviceTag": "ELEC-PNL-SR204",
-            "description": "Sub-panel 40A circuit breaker tripped under heavy compute load. Reset breaker and rebalanced phase B.",
-            "assignedTo": "Electrical Tech",
-            "rootCause": "Phase imbalance causing transient amp spike on single leg.",
-            "fixApplied": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
-            "verified": true,
-            "resolvedAt": "2026-09-28T09:15:00Z"
-          }
-        },
-        {
-          "id": "TICK-HIST-103",
-          "score": 0.0,
-          "search_mode": "keyword_fallback",
-          "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
-          "metadata": {
-            "id": "TICK-HIST-103",
-            "org_id": "public_base",
-            "title": "Carrow Library Rooftop Chiller Noise",
-            "category": "HVAC",
-            "urgency": "Routine",
-            "location": "Carrow Library \u00b7 Study Hall Rooftop",
-            "building": "carrow library",
-            "deviceTag": "HVAC-CHILL-LIB01",
-            "description": "Chiller fan bearing chirping at high RPM. Lubricated bearing assembly and realigned fan shroud.",
-            "assignedTo": "HVAC Specialist",
-            "rootCause": "Dry bearing housing after hot summer run cycle.",
-            "fixApplied": "High-temp synthetic grease injected into bearing nipple.",
-            "verified": true,
-            "resolvedAt": "2026-10-04T16:45:00Z"
-          }
-        }
-      ],
-      "ragSearchMode": "keyword_fallback",
-      "reopenCount": 0,
-      "version": 1,
-      "createdAt": "2026-10-30T18:27:32.048212Z",
-      "updatedAt": "2026-10-30T18:27:32.048212Z",
-      "Status": "Assigned",
-      "Urgency": "Routine",
-      "TechConfirmed": "false",
-      "UserConfirmed": "false",
-      "image": "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=600&auto=format&fit=crop&q=80",
-      "imageUrl": "https://images.unsplash.com/photo-1544197150-b99a580bb7a8?w=600&auto=format&fit=crop&q=80"
     },
     {
       "id": "TCK-BC0DD034952D",
@@ -1639,6 +1757,118 @@
     }
   ],
   "audit_logs": [
+    {
+      "id": "aud_1793366888014",
+      "org_id": "org_gamma",
+      "ticket_id": "TCK-A61979434E6E",
+      "actor_id": "usr_tck_test",
+      "actor_email": "tck_test@org_gamma.com",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Electrical",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T18:58:07.982300Z"
+    },
+    {
+      "id": "aud_1793366885166",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-C2B50521F6A8",
+      "actor_id": "usr_session_1",
+      "actor_email": "session_user@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Electrical",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T18:58:05.139345Z"
+    },
+    {
+      "id": "aud_1793366884898",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-FFB76CEF81D3",
+      "actor_id": "usr_session_1",
+      "actor_email": "session_user@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Plumbing",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T18:58:04.871248Z"
+    },
+    {
+      "id": "aud_1793366876504",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-D96941447265",
+      "actor_id": "usr_img_test_1",
+      "actor_email": "imagetest@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "General",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T18:57:56.476143Z"
+    },
+    {
+      "id": "aud_1793366876212",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-92E1CD4F7CC4",
+      "actor_id": "usr_img_test_1",
+      "actor_email": "imagetest@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Plumbing",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T18:57:56.183931Z"
+    },
+    {
+      "id": "aud_1793366240984",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-A1A124190D73",
+      "actor_id": "usr_1793358539789_957",
+      "actor_email": "abd@gmail.com",
+      "actor_role": "user",
+      "action": "TICKET_DELETED",
+      "details": {},
+      "timestamp": "2026-10-30T18:47:20.951665Z"
+    },
+    {
+      "id": "aud_1793366237547",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-8F1DF059D605",
+      "actor_id": "usr_1793358539789_957",
+      "actor_email": "abd@gmail.com",
+      "actor_role": "user",
+      "action": "TICKET_DELETED",
+      "details": {},
+      "timestamp": "2026-10-30T18:47:17.509679Z"
+    },
+    {
+      "id": "aud_1793366225388",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-A1A124190D73",
+      "actor_id": "usr_1793358539789_957",
+      "actor_email": "abd@gmail.com",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "General",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T18:47:05.349476Z"
+    },
     {
       "id": "aud_1793366046710",
       "org_id": "org_gamma",

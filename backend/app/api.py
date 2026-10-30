@@ -591,6 +591,46 @@ def handle_api_request(
                 t["imageUrl"] = img
         return _json_response(200, {"success": True, "tickets": tickets, "count": len(tickets)}, req_origin)
 
+    # POST /api/v1/tickets/verify-image: Visual-Textual Verification Gate Endpoint
+    if (norm_path == "/api/v1/tickets/verify-image" or norm_path == "/api/tickets/verify-image") and method == "POST":
+        complaint = body.get("complaint") or body.get("description") or ""
+        image_data = body.get("image") or body.get("photo") or body.get("imageUrl") or ""
+        file_key = body.get("fileKey") or body.get("photoKey") or ""
+        mime_type = body.get("mimeType", "image/jpeg")
+
+        effective_img_b64 = image_data
+        if not effective_img_b64 and file_key:
+            s3_b64 = get_s3_object_base64(file_key, user.org_id)
+            effective_img_b64 = s3_b64 if s3_b64 else "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
+
+        triage = analyze_maintenance_fault(
+            complaint=complaint,
+            image_base64=effective_img_b64,
+            mime_type=mime_type
+        )
+
+        if triage.get("imageMatchesComplaint") is False:
+            warning_msg = triage.get("imageValidationWarning") or f"Photo Irrelevant: You described '{complaint[:40].strip()}', but the photo does not match the maintenance problem. Please upload a real photo of the broken equipment."
+            return _json_response(422, {
+                "success": False,
+                "warning": True,
+                "imageMatchesComplaint": False,
+                "message": warning_msg,
+                "error": warning_msg
+            }, req_origin)
+
+        return _json_response(200, {
+            "success": True,
+            "warning": False,
+            "imageMatchesComplaint": True,
+            "message": "Visual-textual verification passed.",
+            "triage": {
+                "title": triage.get("title"),
+                "category": triage.get("category"),
+                "urgency": triage.get("urgency")
+            }
+        }, req_origin)
+
     # POST /api/v1/tickets: Create ticket with mandatory image + server-side validation + AI triage
     if (norm_path == "/api/v1/tickets" or norm_path == "/api/tickets") and method == "POST":
         # Rate limit ticket creation per user to prevent flooding
@@ -653,6 +693,22 @@ def handle_api_request(
                 mime_type=effective_mime,
                 historical_matches=rag_matches
             )
+
+            # Strict Visual-Textual Verification Gate: Reject irrelevant photos immediately
+            if triage.get("imageMatchesComplaint") is False:
+                warning_msg = triage.get("imageValidationWarning") or f"Photo Irrelevant: You described '{complaint[:40].strip()}', but the photo does not match the maintenance problem. Please upload a real photo of the broken equipment."
+                if file_key:
+                    try:
+                        cleanup_orphaned_s3_object(file_key, user.org_id)
+                    except Exception:
+                        pass
+                return _json_response(422, {
+                    "success": False,
+                    "warning": True,
+                    "imageMatchesComplaint": False,
+                    "message": warning_msg,
+                    "error": warning_msg
+                }, req_origin)
 
             # 3. Phase 6 Requirement 4: Cryptographically collision-resistant ticket ID (e.g. TCK-3F8A1B9C4D2E)
             ticket_id = f"TCK-{secrets.token_hex(6).upper()}"

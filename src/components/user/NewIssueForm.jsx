@@ -39,9 +39,11 @@ export default function NewIssueForm({ onTicketCreated }) {
 
   // Submission & Multi-Stage RAG Loading
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentRagStep, setCurrentRagStep] = useState(0);
   const [aiStatusMessage, setAiStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [imageWarning, setImageWarning] = useState('');
   const [successTicket, setSuccessTicket] = useState(null);
 
   // Hidden camera & gallery inputs
@@ -161,11 +163,13 @@ export default function NewIssueForm({ onTicketCreated }) {
   };
 
   const handleCameraChange = (e) => {
+    setImageWarning('');
     const file = e.target.files?.[0];
     if (file) handleFile(file);
   };
 
   const handleGalleryChange = (e) => {
+    setImageWarning('');
     const file = e.target.files?.[0];
     if (file) handleFile(file);
   };
@@ -174,6 +178,7 @@ export default function NewIssueForm({ onTicketCreated }) {
     setImagePreview(null);
     setPhotoBase64(null);
     setImageFile(null);
+    setImageWarning('');
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (filePickerRef.current) filePickerRef.current.value = '';
   };
@@ -344,6 +349,8 @@ export default function NewIssueForm({ onTicketCreated }) {
     }
 
     setErrorMessage('');
+    setImageWarning('');
+    setIsSubmitting(true);
     setIsProcessing(true);
     setCurrentRagStep(1);
     setAiStatusMessage(RAG_STAGES[0].text);
@@ -401,6 +408,43 @@ export default function NewIssueForm({ onTicketCreated }) {
         }
       }
 
+      setCurrentRagStep(2);
+      setAiStatusMessage(RAG_STAGES[1].text);
+
+      // 2. Strict Visual-Textual Verification Gate (Phase 7): Reject irrelevant/unrelated photos before creation
+      try {
+        const verifyRes = await apiClient.tickets.verifyImage({
+          complaint: complaint.trim(),
+          image: base64DataUrl,
+          fileKey: s3FileKey,
+          mimeType: imageMimeType
+        });
+
+        if (verifyRes?.imageMatchesComplaint === false || verifyRes?.status === 422) {
+          setIsSubmitting(false);
+          setIsProcessing(false);
+          clearInterval(stepInterval);
+          setImageWarning(
+            verifyRes.message ||
+            verifyRes.imageValidationWarning ||
+            `Photo Irrelevant: You described '${complaint.trim()}', but the photo does not match the problem. Please upload a real photo of the broken equipment.`
+          );
+          return; // Prevent addTicket() from running entirely
+        }
+      } catch (verifyErr) {
+        if (verifyErr.status === 422 || verifyErr.data?.imageMatchesComplaint === false || verifyErr.data?.warning) {
+          setIsSubmitting(false);
+          setIsProcessing(false);
+          clearInterval(stepInterval);
+          setImageWarning(
+            verifyErr.data?.message ||
+            verifyErr.message ||
+            `Photo Irrelevant: You described '${complaint.trim()}', but the photo does not match the problem. Please upload a real photo of the broken equipment.`
+          );
+          return; // Prevent addTicket() from running entirely
+        }
+      }
+
       setCurrentRagStep(3);
       setAiStatusMessage(RAG_STAGES[2].text);
 
@@ -439,8 +483,19 @@ export default function NewIssueForm({ onTicketCreated }) {
     } catch (err) {
       clearInterval(stepInterval);
       console.error('Submission error:', err);
-      setErrorMessage(err.message || 'An error occurred during ticket creation. Please try again.');
+      if (err.status === 422 || err.data?.imageMatchesComplaint === false || err.data?.warning) {
+        setIsSubmitting(false);
+        setIsProcessing(false);
+        setImageWarning(
+          err.data?.message ||
+          err.message ||
+          `Photo Irrelevant: You described '${complaint.trim()}', but the photo does not match the problem. Please upload a real photo of the broken equipment.`
+        );
+      } else {
+        setErrorMessage(err.message || 'An error occurred during ticket creation. Please try again.');
+      }
     } finally {
+      setIsSubmitting(false);
       setIsProcessing(false);
       setCurrentRagStep(0);
       setAiStatusMessage('');
@@ -609,6 +664,59 @@ export default function NewIssueForm({ onTicketCreated }) {
             className="hidden"
             id="file-picker-input"
           />
+
+          {/* Prominent Visual Verification Rejection Alert Banner Right Above Upload Box */}
+          {imageWarning && (
+            <div className="bg-red-50 border-2 border-red-500 text-red-900 p-4 sm:p-5 rounded-2xl animate-slide-up flex items-start gap-3.5 shadow-sm">
+              <div className="w-10 h-10 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center shrink-0 text-red-600 mt-0.5">
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-extrabold text-sm text-red-950 font-['Plus_Jakarta_Sans'] flex items-center gap-1.5">
+                    Visual-Textual Verification Rejected
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setImageWarning('')}
+                    className="text-red-400 hover:text-red-800 p-1 rounded-lg transition-colors"
+                    aria-label="Dismiss warning"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+                <p className="text-xs sm:text-sm text-red-800 font-semibold mt-1.5 leading-relaxed">
+                  {imageWarning}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageWarning('');
+                      handleRemovePhoto();
+                      startLiveCamera('environment');
+                    }}
+                    className="h-8 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                  >
+                    <Camera className="w-3.5 h-3.5" />
+                    <span>Retake Photo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setImageWarning('');
+                      handleRemovePhoto();
+                      filePickerRef.current?.click();
+                    }}
+                    className="h-8 px-3 rounded-xl bg-white hover:bg-red-100 text-red-800 border border-red-300 text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5"
+                  >
+                    <ImagePlus className="w-3.5 h-3.5 text-red-700" />
+                    <span>Upload Different Image</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* IMAGE PREVIEW OR CAPTURE BUTTONS */}
           {!imagePreview ? (

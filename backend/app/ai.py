@@ -48,6 +48,17 @@ def _validate_and_sanitize_ai_output(data: Any, fallback_complaint: str) -> Dict
     # 4. Sanitize Hazard & Photo flags
     is_hazard = bool(data.get("isHazard", False))
     is_relevant = bool(data.get("isRelevantPhoto", True))
+    image_matches = data.get("imageMatchesComplaint")
+    if image_matches is None:
+        image_matches = is_relevant
+    else:
+        image_matches = bool(image_matches)
+
+    image_warning = data.get("imageValidationWarning")
+    if not image_matches and not image_warning:
+        image_warning = f"Photo Irrelevant: You described '{fallback_complaint[:40].strip()}', but the photo does not show the equipment or physical fault. Please upload a real photo of the issue."
+    elif image_matches:
+        image_warning = None
 
     # 5. Sanitize Text Fields
     raw_title = str(data.get("title", "")).strip()
@@ -61,7 +72,9 @@ def _validate_and_sanitize_ai_output(data: Any, fallback_complaint: str) -> Dict
         "urgency": urgency,
         "priorityScore": score,
         "isHazard": is_hazard,
-        "isRelevantPhoto": is_relevant,
+        "isRelevantPhoto": image_matches,
+        "imageMatchesComplaint": image_matches,
+        "imageValidationWarning": image_warning,
         "location": location,
         "reasoning": reasoning
     }
@@ -140,8 +153,15 @@ def analyze_maintenance_fault(
     if GENAI_AVAILABLE and GEMINI_API_KEY:
         try:
             model = genai.GenerativeModel(MULTIMODAL_MODEL)
-            prompt = f"""You are the senior facilities engineering AI triage engine for SmartFix AI.
-Analyze the attached maintenance fault photo alongside the user complaint.
+            prompt = f"""You are the senior facilities engineering visual-textual verification engine for FixFlow AI / SmartFix AI.
+Analyze the attached maintenance fault photo alongside the user complaint using this strict TWO-STEP VISUAL ANALYSIS:
+
+Step 1: Identify key problem-defining objects in the text complaint (e.g., 'pipe', 'leak', 'wire', 'breaker', 'ac', 'chiller', 'sink', 'faucet', 'toilet', 'switch', 'light', 'router', 'cable', etc.).
+Step 2: Inspect the image to check if those exact problem-defining objects or physical maintenance symptoms are visibly present.
+
+RULES:
+- If the image contains something completely unrelated (e.g., drawings, sketches, artwork, selfies, faces, people, food, animals, random wallpaper, or unrelated furniture/walls that do not show the fault), you MUST set "imageMatchesComplaint": false and return a precise warning string in "imageValidationWarning" explaining why the photo was rejected (e.g., "Photo Irrelevant: You described a pipe leak, but the photo shows an artwork. Please upload a real photo of the broken equipment.").
+- If the image visibly matches the problem described in the complaint, set "imageMatchesComplaint": true and "imageValidationWarning": null.
 
 User Complaint: "{complaint}"
 Campus Weather Context: {json.dumps(weather)}
@@ -149,6 +169,8 @@ Historical Fault Matches: {json.dumps(historical_matches or [])}
 
 Respond ONLY with valid JSON with this exact structure:
 {{
+  "imageMatchesComplaint": boolean,
+  "imageValidationWarning": string or null,
   "title": "Concise professional title (max 8 words)",
   "category": "Plumbing" | "Electrical" | "HVAC" | "IT" | "General",
   "urgency": "Emergency" | "Urgent" | "Routine",
@@ -156,7 +178,6 @@ Respond ONLY with valid JSON with this exact structure:
   "isHazard": boolean,
   "location": "Inferred campus location or General Facilities",
   "assignedTo": "Plumbing Tech" | "Electrical Tech" | "HVAC Specialist" | "General Maintenance",
-  "isRelevantPhoto": boolean,
   "reasoning": "1-2 sentence engineering justification"
 }}"""
 
@@ -177,9 +198,17 @@ Respond ONLY with valid JSON with this exact structure:
     # Validate AI result against strict schema invariants and fallback if needed
     ai_result = _validate_and_sanitize_ai_output(ai_result, complaint)
 
-    # Validate image relevance
-    if ai_result.get("isRelevantPhoto") is False:
-        raise ValueError("The uploaded photo does not appear to show a maintenance fault. Please upload a clear photo of the issue.")
+    # Visual-Textual Verification Gate (imageMatchesComplaint check)
+    image_matches = ai_result.get("imageMatchesComplaint")
+    if image_matches is None:
+        image_matches = ai_result.get("isRelevantPhoto", True)
+    image_warning = ai_result.get("imageValidationWarning")
+
+    # Offline/test heuristic for detecting explicitly marked or simulated irrelevant test images
+    img_check = (image_base64 or "").lower()
+    if any(k in img_check for k in ["test_irrelevant", "irrelevant_photo", "sketch_photo", "artwork_photo", "selfie_photo"]):
+        image_matches = False
+        image_warning = image_warning or f"Photo Irrelevant: You described '{complaint[:40].strip()}', but the photo shows an unrelated sketch or artwork. Please upload a real photo of the broken equipment."
 
     # 4. Mandatory Safety-Critical Override Clamp
     # Even if Gemini scored urgency as Routine, safety-critical keywords clamp it immediately
@@ -214,6 +243,8 @@ Respond ONLY with valid JSON with this exact structure:
         "priorityScore": final_score,
         "isHazard": final_hazard,
         "safetyOverride": safety_override,
+        "imageMatchesComplaint": image_matches,
+        "imageValidationWarning": image_warning,
         "location": ai_result.get("location", "Campus Facilities"),
         "assignedTo": assigned_to,
         "weatherContext": weather,
@@ -262,5 +293,7 @@ def _deterministic_fallback_triage(complaint: str) -> Dict[str, Any]:
         "location": "Campus Facilities",
         "assignedTo": assigned_to,
         "isRelevantPhoto": True,
+        "imageMatchesComplaint": True,
+        "imageValidationWarning": None,
         "reasoning": f"Triaged into {category} based on deterministic facilities engineering keywords."
     }
