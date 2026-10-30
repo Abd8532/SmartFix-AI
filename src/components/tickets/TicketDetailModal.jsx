@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTickets } from '../../context/TicketContext';
+import apiClient from '../../services/apiClient';
 import Modal from '../common/Modal';
 import Avatar from '../common/Avatar';
 import { 
@@ -35,8 +36,21 @@ export default function TicketDetailModal({ ticketId, onClose }) {
   const [showRejectionForm, setShowRejectionForm] = useState(false);
   const [rejectionInput, setRejectionInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [presignedViewUrl, setPresignedViewUrl] = useState(null);
+
+  useEffect(() => {
+    if (ticket?.fileKey && (!ticket.photo || ticket.photo.startsWith('s3://'))) {
+      apiClient.uploads.getViewUrl(ticket.fileKey)
+        .then((res) => {
+          if (res?.viewUrl) setPresignedViewUrl(res.viewUrl);
+        })
+        .catch(() => {});
+    }
+  }, [ticket?.fileKey, ticket?.photo]);
 
   if (!ticket) return null;
+
+  const displayPhoto = presignedViewUrl || (ticket.photo && !ticket.photo.startsWith('s3://') ? ticket.photo : null);
 
   const statusStyle = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.Open;
 
@@ -146,15 +160,15 @@ export default function TicketDetailModal({ ticketId, onClose }) {
         )}
 
         {/* Photo View */}
-        {ticket.photo && (
+        {displayPhoto && (
           <div className="rounded-2xl overflow-hidden border border-[#E6EFF5] bg-[#F5F7FA] relative max-h-80 flex items-center justify-center shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]">
             <img
-              src={ticket.photo}
+              src={displayPhoto}
               alt="Submitted fault documentation"
               className="w-full h-full object-contain max-h-80"
             />
             <a
-              href={ticket.photo}
+              href={displayPhoto}
               target="_blank"
               rel="noopener noreferrer"
               className="absolute top-3 right-3 h-10 px-4 rounded-xl bg-black/60 hover:bg-black/80 text-white text-xs font-semibold flex items-center gap-1.5 border border-white/20 shadow-sm transition-all duration-200 active:scale-[0.98]"

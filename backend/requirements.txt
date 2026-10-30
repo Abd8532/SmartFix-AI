@@ -1,4 +1,4 @@
-# AWS Lambda Backend Dependencies for FixFlow AI RAG Pipeline
+# AWS Lambda & Cloud Backend Dependencies for SmartFix AI
 google-generativeai>=0.8.3
 langchain>=0.3.0
 langchain-core>=0.3.0
@@ -7,3 +7,5 @@ pinecone-client>=5.0.1
 pydantic>=2.8.0
 urllib3>=2.0.0
 pillow>=10.4.0
+boto3>=1.34.0
+

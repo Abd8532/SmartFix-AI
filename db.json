@@ -83,6 +83,22 @@
       "org_id": "org_campus_main",
       "orgId": "org_campus_main",
       "passwordHash": "pbkdf2_sha256$100000$1594151903cccad11823cb77c1650a44$32fecb1ae4061d8aae349db2e0af3ea2350209208b020abb045a47af58add14b"
+    },
+    {
+      "id": "usr_1793358539789_957",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "name": "Abhinav",
+      "email": "abd@gmail.com",
+      "passwordHash": "pbkdf2_sha256$100000$a1753e95b078b68ca73046258beb430c$4fbc27d9dc11d049b47e18a1ada607f8dc3362208cd50a9b1624d94ed3b9cd43",
+      "role": "user",
+      "roleDisplay": "Campus User",
+      "specialty": null,
+      "approvalStatus": "Approved",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120",
+      "createdAt": "2026-10-30T16:38:59.924969Z",
+      "approvedAt": "2026-10-30T16:39:32.145701Z",
+      "approvedBy": "bpssarthak321@gmail.com"
     }
   ],
   "tickets": [],
@@ -94,6 +110,78 @@
     }
   ],
   "audit_logs": [
+    {
+      "id": "aud_1793358620966",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_LOGIN",
+      "details": {
+        "email": "abd@gmail.com",
+        "role": "user"
+      },
+      "timestamp": "2026-10-30T16:40:20.964050Z"
+    },
+    {
+      "id": "aud_1793358572193",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "adm_1793368640345_253",
+      "actor_email": "bpssarthak321@gmail.com",
+      "actor_role": "admin",
+      "action": "USER_APPROVED",
+      "details": {
+        "approvedUserId": "usr_1793358539789_957",
+        "email": "abd@gmail.com"
+      },
+      "timestamp": "2026-10-30T16:39:32.156699Z"
+    },
+    {
+      "id": "aud_1793358566862",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_LOGIN",
+      "details": {
+        "email": "bpssarthak321@gmail.com",
+        "role": "admin"
+      },
+      "timestamp": "2026-10-30T16:39:26.861017Z"
+    },
+    {
+      "id": "aud_1793358539958",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_REGISTERED",
+      "details": {
+        "userId": "usr_1793358539789_957",
+        "email": "abd@gmail.com",
+        "role": "user",
+        "specialty": null
+      },
+      "timestamp": "2026-10-30T16:38:59.934966Z"
+    },
+    {
+      "id": "aud_1793358469891",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_LOGIN",
+      "details": {
+        "email": "admin@campus.edu",
+        "role": "admin"
+      },
+      "timestamp": "2026-10-30T16:37:49.889955Z"
+    },
     {
       "id": "aud_1793375083201_265",
       "org_id": "org_campus_main",

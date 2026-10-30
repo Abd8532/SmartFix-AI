@@ -164,10 +164,25 @@ export const apiClient = {
       apiClient.delete(`/api/v1/tickets/${id}`)
   },
 
-  // Uploads
+  // Uploads & Private S3 Storage
   uploads: {
     presign: (fileData) =>
-      apiClient.post('/api/v1/uploads/presign', fileData)
+      apiClient.post('/api/v1/uploads/presign', fileData),
+    uploadToS3: async (uploadUrl, binaryData, mimeType) => {
+      const response = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': mimeType
+        },
+        body: binaryData
+      });
+      if (!response.ok) {
+        throw new Error(`S3 direct upload failed with status ${response.status}`);
+      }
+      return true;
+    },
+    getViewUrl: (fileKey) =>
+      apiClient.get(`/api/v1/uploads/presigned-view?key=${encodeURIComponent(fileKey)}`)
   }
 };
 

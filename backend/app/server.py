@@ -5,6 +5,7 @@ Proxy target for Vite development server (via vite.config.js).
 """
 import sys
 import os
+import json
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 
 # Ensure backend package is in python search path

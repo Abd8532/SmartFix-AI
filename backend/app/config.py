@@ -4,6 +4,7 @@ Centralizes security policies, database drivers, cloud credentials,
 and tenant boundary rules.
 """
 import os
+from typing import List, Optional
 
 # Environment mode: 'development', 'test', 'production'
 ENVIRONMENT = os.environ.get("ENVIRONMENT", os.environ.get("NODE_ENV", "development")).lower()
@@ -11,10 +12,10 @@ ENVIRONMENT = os.environ.get("ENVIRONMENT", os.environ.get("NODE_ENV", "developm
 # Security & JWT configuration
 JWT_SECRET = os.environ.get("JWT_SECRET", "")
 if ENVIRONMENT == "production":
-    if not JWT_SECRET or "super-secure" in JWT_SECRET or "do-not-use" in JWT_SECRET or "untrusted" in JWT_SECRET:
+    if not JWT_SECRET or "super-secure" in JWT_SECRET or "do-not-use" in JWT_SECRET or "untrusted" in JWT_SECRET or len(JWT_SECRET) < 32:
         raise ValueError(
             "CRITICAL SECURITY CONFIGURATION ERROR: Production deployment requires a dedicated, "
-            "cryptographically random JWT_SECRET environment variable."
+            "cryptographically random JWT_SECRET environment variable of at least 32 characters."
         )
 elif not JWT_SECRET:
     # Deterministic development secret for local running only
@@ -78,3 +79,74 @@ ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]
 # Storage Path (for local multi-tenant persistence)
 DATA_DIR = os.environ.get("DATA_DIR", os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 DB_FILE_PATH = os.path.join(DATA_DIR, "db.json")
+
+
+def validate_production_config(
+    env: Optional[str] = None,
+    backend: Optional[str] = None,
+    table_name: Optional[str] = None,
+    bucket_name: Optional[str] = None,
+    origins: Optional[List[str]] = None,
+    jwt_sec: Optional[str] = None
+) -> bool:
+    """
+    Validates production readiness invariants:
+    1. Rejects DATA_BACKEND != 'dynamodb' (fails startup if file storage is configured in production).
+    2. Validates DynamoDB table name configuration.
+    3. Validates S3 private bucket configuration.
+    4. Enforces strong JWT secrets.
+    5. Rejects wildcard ('*') and unsafe insecure/development CORS origins in production.
+    """
+    active_env = (env or ENVIRONMENT).lower()
+    if active_env != "production":
+        return True
+
+    active_backend = (backend or DATA_BACKEND).lower()
+    active_table = table_name or DYNAMODB_TABLE_NAME
+    active_bucket = bucket_name or S3_BUCKET_NAME
+    active_origins = origins if origins is not None else ALLOWED_ORIGINS
+    active_secret = jwt_sec or JWT_SECRET
+
+    errors = []
+
+    # 1. Enforce DynamoDB storage in production
+    if active_backend != "dynamodb":
+        errors.append(
+            f"DATA_BACKEND is configured as '{active_backend}'. "
+            "Production deployments strictly require DATA_BACKEND='dynamodb'. Local file storage is forbidden."
+        )
+
+    if not active_table or not active_table.strip():
+        errors.append("DYNAMODB_TABLE_NAME must be specified for production deployment.")
+
+    # 2. Enforce S3 bucket configuration
+    if not active_bucket or not active_bucket.strip():
+        errors.append("S3_BUCKET_NAME must be specified for secure attachment storage.")
+
+    # 3. Enforce strong JWT secret
+    if not active_secret or len(active_secret) < 32 or any(k in active_secret for k in ["dev-local", "untrusted", "do-not-use", "super-secure"]):
+        errors.append(
+            "JWT_SECRET must be a cryptographically random secret of at least 32 characters in production."
+        )
+
+    # 4. Reject wildcard and unsafe CORS origins
+    if not active_origins:
+        errors.append("ALLOWED_ORIGINS cannot be empty in production.")
+    for o in active_origins:
+        if o == "*":
+            errors.append("CORS wildcard '*' is strictly prohibited in production environments.")
+        elif o.startswith("http://"):
+            errors.append(f"Insecure HTTP origin '{o}' is prohibited in production; HTTPS is required.")
+        elif "localhost" in o or "127.0.0.1" in o:
+            errors.append(f"Local development origin '{o}' is prohibited in production configuration.")
+
+    if errors:
+        msg = "CRITICAL PRODUCTION CONFIGURATION ERRORS:\n" + "\n".join(f"  - {err}" for err in errors)
+        raise ValueError(msg)
+
+    return True
+
+
+# Enforce validation on module load when running in production
+if ENVIRONMENT == "production":
+    validate_production_config()

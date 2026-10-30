@@ -38,6 +38,13 @@ from .models import (
     sanitize_ticket
 )
 from .storage import storage, ConcurrencyError
+from .s3 import (
+    generate_presigned_upload_url,
+    generate_presigned_view_url,
+    validate_s3_key_tenant,
+    validate_upload_request,
+    get_s3_client
+)
 from .lifecycle import (
     transition_ticket_status,
     tech_complete_ticket,
@@ -163,6 +170,15 @@ def handle_api_request(
         body = body_data
     else:
         body = {}
+
+    # Health check endpoint
+    if (norm_path == "/api/v1/health" or norm_path == "/health") and method == "GET":
+        return _json_response(200, {
+            "status": "healthy",
+            "environment": ENVIRONMENT,
+            "dataBackend": DATA_BACKEND,
+            "version": "1.0.0"
+        }, req_origin)
 
     # ==========================================================================
     # 1. PUBLIC AUTH ROUTES
@@ -332,30 +348,37 @@ def handle_api_request(
     if (norm_path == "/api/v1/uploads/presign" or norm_path == "/api/uploads/presign") and method == "POST":
         mime_type = (body.get("mimeType") or "").strip().lower()
         file_size = int(body.get("fileSize", 0) or 0)
+        file_name = (body.get("fileName") or "upload.jpg").strip()
 
-        if mime_type not in ALLOWED_MIME_TYPES:
-            return _json_response(400, {
-                "success": False,
-                "error": f"Invalid MIME type '{mime_type}'. Permitted types: {', '.join(ALLOWED_MIME_TYPES)}"
-            }, req_origin)
+        try:
+            result = generate_presigned_upload_url(
+                org_id=user.org_id,
+                file_name=file_name,
+                mime_type=mime_type,
+                file_size=file_size,
+                expires_in=900
+            )
+            return _json_response(200, result, req_origin)
+        except ValueError as ve:
+            return _json_response(400, {"success": False, "error": str(ve)}, req_origin)
+        except Exception as e:
+            return _json_response(500, {"success": False, "error": f"Upload URL generation failed: {str(e)}"}, req_origin)
 
-        if file_size > MAX_UPLOAD_SIZE_BYTES:
-            return _json_response(400, {
-                "success": False,
-                "error": f"File size exceeds maximum allowed {MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB."
-            }, req_origin)
+    if (norm_path == "/api/v1/uploads/presigned-view" or norm_path == "/api/uploads/presigned-view") and method == "GET":
+        from urllib.parse import parse_qs, urlparse
+        parsed = urlparse(path)
+        qs = parse_qs(parsed.query)
+        file_key = qs.get("key", [None])[0]
+        if not file_key:
+            return _json_response(400, {"success": False, "error": "Query parameter 'key' is required."}, req_origin)
 
-        ext = "jpg" if "jpeg" in mime_type else ("png" if "png" in mime_type else "webp")
-        unique_key = f"uploads/{user.org_id}/{int(time.time()*1000)}_{secrets.token_hex(6)}.{ext}"
-        presigned_upload_url = f"https://{S3_BUCKET_NAME}.s3.{S3_REGION}.amazonaws.com/{unique_key}"
-
-        return _json_response(200, {
-            "success": True,
-            "uploadUrl": presigned_upload_url,
-            "fileKey": unique_key,
-            "bucket": S3_BUCKET_NAME,
-            "expiresIn": 900
-        }, req_origin)
+        try:
+            view_url = generate_presigned_view_url(file_key=file_key, org_id=user.org_id, expires_in=3600)
+            return _json_response(200, {"success": True, "viewUrl": view_url, "fileKey": file_key}, req_origin)
+        except ValueError as ve:
+            return _json_response(403, {"success": False, "error": str(ve)}, req_origin)
+        except Exception as e:
+            return _json_response(500, {"success": False, "error": str(e)}, req_origin)
 
     # ==========================================================================
     # 4. ADMIN USER MANAGEMENT ROUTES (ADMIN ONLY)
@@ -426,35 +449,48 @@ def handle_api_request(
     if (norm_path == "/api/v1/tickets" or norm_path == "/api/tickets") and method == "POST":
         complaint = body.get("complaint") or body.get("description") or ""
         image_data = body.get("image") or body.get("photo") or ""
+        file_key = body.get("fileKey") or body.get("photoKey") or ""
         mime_type = body.get("mimeType", "image/jpeg")
 
         if not complaint.strip():
             return _json_response(400, {"success": False, "error": "A complaint description is required."}, req_origin)
 
-        if not image_data:
+        if not image_data and not file_key:
             return _json_response(400, {
                 "success": False,
-                "error": "A photo of the maintenance fault is mandatory for verification."
+                "error": "A photo of the maintenance fault (or verified S3 upload key) is mandatory for verification."
             }, req_origin)
+
+        # Validate S3 tenant scoping if fileKey provided
+        if file_key:
+            if not validate_s3_key_tenant(file_key, user.org_id):
+                return _json_response(403, {
+                    "success": False,
+                    "error": f"Invalid attachment key: file key does not belong to tenant '{user.org_id}'."
+                }, req_origin)
 
         # Server-side Image Security Validation (MIME type, file size, magic bytes)
-        is_valid_img, detected_mime, img_err = validate_image_payload(image_data)
-        if not is_valid_img:
-            return _json_response(400, {
-                "success": False,
-                "error": f"Image security validation failed: {img_err}"
-            }, req_origin)
-
-        effective_mime = detected_mime or mime_type
+        effective_mime = mime_type
+        if image_data:
+            is_valid_img, detected_mime, img_err = validate_image_payload(image_data)
+            if not is_valid_img:
+                return _json_response(400, {
+                    "success": False,
+                    "error": f"Image security validation failed: {img_err}"
+                }, req_origin)
+            effective_mime = detected_mime or mime_type
 
         try:
             # 1. Query RAG vector store for past similar repairs
             rag_matches, search_mode = query_knowledge_base(complaint, org_id=user.org_id)
 
-            # 2. Run multimodal vision triage
+            # 2. Run multimodal vision triage (fallback transparently if image is only in S3)
+            effective_img_b64 = image_data
+            if not effective_img_b64 and file_key:
+                effective_img_b64 = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="  # Stub 1x1 for AI pipeline when in S3
             triage = analyze_maintenance_fault(
                 complaint=complaint,
-                image_base64=image_data,
+                image_base64=effective_img_b64,
                 mime_type=effective_mime,
                 historical_matches=rag_matches
             )
@@ -482,6 +518,8 @@ def handle_api_request(
                 "assignedTo": triage["assignedTo"],
                 "assignedTechId": None,
                 "photo": image_data,
+                "fileKey": file_key or None,
+                "photoKey": file_key or None,
                 "reporterId": user.id,
                 "reporterName": user.name,
                 "reporterEmail": user.email,

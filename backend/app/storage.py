@@ -479,6 +479,38 @@ class DynamoDBRepository(BaseRepository):
         self.table_name = table_name
         self._table = None
 
+    def validate_table(self) -> Dict[str, Any]:
+        """
+        Validates DynamoDB table status and required indexes for production readiness.
+        Requires table status to be ACTIVE and index GSI1 to be present.
+        """
+        try:
+            import boto3
+            client = boto3.client("dynamodb")
+            desc = client.describe_table(TableName=self.table_name)
+            table_meta = desc.get("Table", {})
+            status = table_meta.get("TableStatus")
+            if status != "ACTIVE":
+                raise ValueError(
+                    f"DynamoDB table '{self.table_name}' status is '{status}', expected 'ACTIVE'."
+                )
+
+            gsi_list = [g.get("IndexName") for g in table_meta.get("GlobalSecondaryIndexes", [])]
+            if "GSI1" not in gsi_list:
+                raise ValueError(
+                    f"DynamoDB table '{self.table_name}' is missing required secondary index 'GSI1'. "
+                    f"Existing GSIs: {gsi_list}"
+                )
+
+            return {
+                "valid": True,
+                "tableName": self.table_name,
+                "status": status,
+                "indexes": gsi_list
+            }
+        except Exception as e:
+            raise RuntimeError(f"DynamoDB schema validation failed: {str(e)}")
+
     def _get_table(self):
         if self._table is None:
             try:
@@ -718,6 +750,11 @@ class DynamoDBRepository(BaseRepository):
 # REPOSITORY SINGLETON FACTORY
 # ==============================================================================
 def get_repository() -> BaseRepository:
+    if ENVIRONMENT == "production" and DATA_BACKEND != "dynamodb":
+        raise ValueError(
+            f"CRITICAL CONFIGURATION ERROR: ENVIRONMENT is 'production', but DATA_BACKEND is '{DATA_BACKEND}'. "
+            "Production deployments strictly require DATA_BACKEND='dynamodb'. Local file storage is forbidden."
+        )
     if DATA_BACKEND == "dynamodb":
         return DynamoDBRepository()
     return JsonFileRepository()

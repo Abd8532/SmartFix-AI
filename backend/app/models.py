@@ -41,11 +41,17 @@ class Specialty:
 
 
 def sanitize_user(user_dict: Dict[str, Any]) -> Dict[str, Any]:
-    """Return user dict without password or sensitive hash fields."""
+    """Return user dict without password or sensitive hash/secret fields."""
     safe = dict(user_dict)
     safe.pop("password", None)
     safe.pop("passwordHash", None)
     safe.pop("password_hash", None)
+    safe.pop("salt", None)
+    safe.pop("secret", None)
+    safe.pop("api_key", None)
+    safe.pop("apiKey", None)
+    safe.pop("aws_secret_access_key", None)
+    safe.pop("aws_access_key_id", None)
     return safe
 
 

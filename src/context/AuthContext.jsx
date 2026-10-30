@@ -175,10 +175,18 @@ export function AuthProvider({ children }) {
     try {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
       localStorage.removeItem('maintainx_tickets_v1');
+      localStorage.removeItem('maintainx_tickets_v3');
       localStorage.removeItem('maintainx_tickets');
       localStorage.removeItem('maintainx_role_v1');
       localStorage.removeItem('maintainx_jwt_token_v1');
       localStorage.removeItem('maintainx_active_user');
+      // Clean up all scoped ticket caches across tenants/users
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('maintainx_tickets_') || key.startsWith('maintainx_'))) {
+          localStorage.removeItem(key);
+        }
+      }
     } catch {}
   }, []);
 

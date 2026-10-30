@@ -125,12 +125,15 @@ export function TicketProvider({ children }) {
     }
   });
 
-  // Active tickets state - never flash stale data from logged-out or another user
+  // Active tickets state - strictly scoped by organization ID and user ID to prevent cross-tenant/cross-user leaks
   const [tickets, setTickets] = useState(() => {
     try {
-      const activeUser = localStorage.getItem('maintainx_current_user_v3');
-      if (!activeUser) return [];
-      const saved = localStorage.getItem(STORAGE_KEYS.TICKETS);
+      const activeUserStr = localStorage.getItem('maintainx_current_user_v3');
+      if (!activeUserStr) return [];
+      const activeUser = JSON.parse(activeUserStr);
+      if (!activeUser?.id || !activeUser?.org_id) return [];
+      const scopedKey = `maintainx_tickets_${activeUser.org_id}_${activeUser.id}`;
+      const saved = localStorage.getItem(scopedKey);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
@@ -138,7 +141,7 @@ export function TicketProvider({ children }) {
         }
       }
     } catch (e) {
-      console.warn('Failed reading tickets from storage:', e);
+      console.warn('Failed reading scoped tickets from storage:', e);
     }
     return [];
   });
@@ -185,12 +188,20 @@ export function TicketProvider({ children }) {
     }
   }, [token]);
 
-  // Clear cached tickets immediately on account/organisation switch or logout (Requirement 5)
+  // Clear cached tickets immediately on account/organisation switch or logout (Phase 4 requirement 3)
   useEffect(() => {
     setTickets([]);
     setSelectedTicketId(null);
     try {
       localStorage.removeItem(STORAGE_KEYS.TICKETS);
+      if (!currentUser) {
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('maintainx_tickets_')) {
+            localStorage.removeItem(k);
+          }
+        }
+      }
     } catch {}
 
     if (token && currentUser) {
@@ -208,16 +219,17 @@ export function TicketProvider({ children }) {
     }
   }, [token, currentUser, fetchTickets]);
 
-  // Persist tickets cache locally only when active user is logged in
+  // Persist tickets cache locally scoped by tenant and user ID
   useEffect(() => {
-    if (currentUser && tickets.length > 0) {
+    if (currentUser?.id && currentUser?.org_id && tickets.length > 0) {
       try {
-        localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+        const scopedKey = `maintainx_tickets_${currentUser.org_id}_${currentUser.id}`;
+        localStorage.setItem(scopedKey, JSON.stringify(tickets));
       } catch (e) {
-        console.warn('Failed saving tickets to storage:', e);
+        console.warn('Failed saving tickets to scoped storage:', e);
       }
     }
-  }, [tickets, currentUser]);
+  }, [tickets, currentUser?.id, currentUser?.org_id]);
 
   // Persist user tab
   useEffect(() => {
@@ -263,6 +275,7 @@ export function TicketProvider({ children }) {
         category: newTicketData.category,
         urgency: newTicketData.urgency || newTicketData.priority,
         image: newTicketData.photo || newTicketData.image || null,
+        fileKey: newTicketData.fileKey || newTicketData.photoKey || null,
         mimeType: newTicketData.mimeType || 'image/jpeg'
       };
 
@@ -492,7 +505,12 @@ export function TicketProvider({ children }) {
 
   const resetMockData = () => {
     setTickets([]);
-    localStorage.removeItem(STORAGE_KEYS.TICKETS);
+    try {
+      if (currentUser?.id && currentUser?.org_id) {
+        localStorage.removeItem(`maintainx_tickets_${currentUser.org_id}_${currentUser.id}`);
+      }
+      localStorage.removeItem(STORAGE_KEYS.TICKETS);
+    } catch {}
     addToast({
       type: 'info',
       title: 'Database Reset',
