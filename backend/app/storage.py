@@ -256,7 +256,7 @@ class JsonFileRepository(BaseRepository):
         with _lock:
             data = self._read_data()
             for u in data["users"]:
-                if u.get("id") == user_id:
+                if str(u.get("id")) == str(user_id) or str(u.get("email", "")).lower() == str(user_id).lower():
                     if org_id and (u.get("org_id") or u.get("orgId")) != org_id:
                         continue
                     return dict(u)

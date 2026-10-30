@@ -25,6 +25,9 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
+// Unified approval check helper
+const isUserApproved = (u) => !u ? false : (u.approved === true || u.isApproved === true || u.status === 'Approved' || u.role === 'admin');
+
 export default function AdminDashboard({ onSelectTicket, activeTab = 'overview', setActiveTab }) {
   const { 
     tickets, 
@@ -39,13 +42,20 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
 
   const { 
     users = [], 
-    pendingUsers = [], 
-    approvedUsers = [], 
     approveUser, 
     rejectUser, 
     allowAdminSignup, 
     toggleAdminSignup 
   } = useAuth();
+
+  // Instant reactive partitioning using unified isUserApproved helper
+  const pendingUsers = useMemo(() => {
+    return (users || []).filter((u) => !isUserApproved(u));
+  }, [users]);
+
+  const approvedUsers = useMemo(() => {
+    return (users || []).filter((u) => isUserApproved(u));
+  }, [users]);
 
   const [internalTab, setInternalTab] = useState(activeTab);
   const currentTab = activeTab || internalTab;

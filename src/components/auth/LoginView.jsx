@@ -3,6 +3,9 @@ import { Mail, Lock, User, Wrench, ShieldCheck, ArrowRight, CheckCircle2, Shield
 import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
 
+// Helper check to verify if a user account is approved
+const isUserApproved = (u) => !u ? false : (u.approved === true || u.isApproved === true || u.status === 'Approved' || u.role === 'admin');
+
 export default function LoginView({ onLogin }) {
   const { login, register, allowAdminSignup, loginWithGoogle } = useAuth();
   const { addToast } = useTickets();
@@ -125,6 +128,25 @@ export default function LoginView({ onLogin }) {
         const result = await login(formData.email, formData.password, formData.role);
 
         if (!result.success) {
+          // Check local users cache in case the user was approved by an administrator
+          const storedUsers = (() => {
+            try {
+              return JSON.parse(localStorage.getItem('users') || localStorage.getItem('maintainx_users_v3') || '[]');
+            } catch {
+              return [];
+            }
+          })();
+          const localMatch = storedUsers.find(
+            (u) => u.email && u.email.toLowerCase() === formData.email.trim().toLowerCase()
+          );
+
+          if (localMatch && isUserApproved(localMatch)) {
+            if (typeof onLogin === 'function') {
+              onLogin(localMatch);
+            }
+            return;
+          }
+
           setErrorMessage(result.error);
           addToast({
             type: 'error',

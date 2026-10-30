@@ -16,8 +16,15 @@ function AppContent() {
   const [activeModalTicketId, setActiveModalTicketId] = useState(null);
   const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'approvals' | 'requests' | 'hazards' | 'audit' | 'settings'
 
-  // 1. Unauthenticated or Pending Approval Check
-  const isApproved = currentUser && currentUser.approvalStatus === 'Approved';
+  // 1. Unauthenticated or Pending Approval Check (unified approval flags)
+  const isApproved = currentUser && (
+    currentUser.approved === true ||
+    currentUser.isApproved === true ||
+    currentUser.status === 'Approved' ||
+    currentUser.approvalStatus === 'Approved' ||
+    currentUser.accountStatus === 'active' ||
+    currentUser.role === 'admin'
+  );
   if (!currentUser || !isApproved) {
     return (
       <>
