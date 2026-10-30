@@ -5,7 +5,7 @@ import { useTickets } from '../../context/TicketContext';
 
 // Admin Auth Validation Login & Registration Portal
 export default function LoginView({ onLogin }) {
-  const { login, register } = useAuth();
+  const { login, register, allowAdminSignup } = useAuth();
   const { addToast } = useTickets();
 
   const [isSignUp, setIsSignUp] = useState(false);
@@ -21,12 +21,22 @@ export default function LoginView({ onLogin }) {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Auto-reset role to 'user' if Admin registration was selected but is locked
+  React.useEffect(() => {
+    if (isSignUp && formData.role === 'admin' && !allowAdminSignup) {
+      setFormData((prev) => ({ ...prev, role: 'user' }));
+    }
+  }, [isSignUp, allowAdminSignup, formData.role]);
+
   const handleRoleSelect = (roleKey) => {
     setErrorMessage('');
     setSuccessMessage('');
 
     if (isSignUp && roleKey === 'admin') {
-      return; // Public administrator registration is strictly prohibited
+      if (!allowAdminSignup) {
+        setErrorMessage('Admin sign-up is disabled by the system administrator.');
+        return;
+      }
     }
 
     setFormData((prev) => ({
@@ -44,11 +54,13 @@ export default function LoginView({ onLogin }) {
 
     try {
       if (isSignUp) {
-        // 1. REGISTRATION: Strictly consumer and technician roles only (Admin registration blocked)
+        // Dynamic Administrator Sign-Up validation
         if (formData.role === 'admin') {
-          setErrorMessage('Security Restriction: Public administrator registration is prohibited.');
-          setIsSubmitting(false);
-          return;
+          if (!allowAdminSignup) {
+            setErrorMessage('Administrator registration is currently locked by system security settings.');
+            setIsSubmitting(false);
+            return;
+          }
         }
 
         const result = await register({
@@ -64,12 +76,21 @@ export default function LoginView({ onLogin }) {
           return;
         }
 
-        setSuccessMessage('Account created successfully. Please wait for an Administrator to approve your account before logging in.');
-        addToast({
-          type: 'info',
-          title: 'Registration Pending Approval',
-          message: 'Account created. Please wait for an Administrator to approve your account.'
-        });
+        if (formData.role === 'admin') {
+          setSuccessMessage('Administrator account created and approved. You can now log in immediately.');
+          addToast({
+            type: 'success',
+            title: 'Admin Account Created',
+            message: 'Administrator account provisioned. You can now log in immediately.'
+          });
+        } else {
+          setSuccessMessage('Account created successfully. Please wait for an Administrator to approve your account before logging in.');
+          addToast({
+            type: 'info',
+            title: 'Registration Pending Approval',
+            message: 'Account created. Please wait for an Administrator to approve your account.'
+          });
+        }
 
         setFormData((prev) => ({ ...prev, password: '' }));
         setIsSignUp(false); // Switch to login view with success banner
@@ -146,33 +167,82 @@ export default function LoginView({ onLogin }) {
               {isSignUp ? 'I am registering as' : 'Choose Role / Account Type'}
             </label>
             {isSignUp ? (
-              // Sign-up: Strictly Consumer or Technician (Public Admin registration prohibited)
-              <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
-                <button
-                  type="button"
-                  onClick={() => handleRoleSelect('user')}
-                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                    formData.role === 'user'
-                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <User className="w-4 h-4" />
-                  <span>Campus User</span>
-                </button>
+              // Sign-up: Consumer, Technician, and Dynamic Administrator Gating
+              <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+                  <button
+                    type="button"
+                    onClick={() => handleRoleSelect('user')}
+                    className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                      formData.role === 'user'
+                        ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    <span className="truncate">User</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => handleRoleSelect('technician')}
-                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                    formData.role === 'technician'
-                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <Wrench className="w-4 h-4" />
-                  <span>Field Technician</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => handleRoleSelect('technician')}
+                    className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                      formData.role === 'technician'
+                        ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    <Wrench className="w-4 h-4" />
+                    <span className="truncate">Technician</span>
+                  </button>
+
+                  {allowAdminSignup ? (
+                    <button
+                      type="button"
+                      onClick={() => handleRoleSelect('admin')}
+                      className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                        formData.role === 'admin'
+                          ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      <ShieldCheck className="w-4 h-4 text-[#2D60FF]" />
+                      <span className="truncate">Admin</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      title="Admin sign-up is disabled by the system administrator."
+                      className="h-11 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 text-slate-400 bg-slate-100 border border-dashed border-slate-300 opacity-60 cursor-not-allowed"
+                    >
+                      <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="truncate">Admin</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Role Specific Registration Helper Notes */}
+                {formData.role === 'admin' ? (
+                  <div className="text-xs text-[#2D60FF] bg-[#E7EDFF] p-3 rounded-2xl border border-[#2D60FF]/30 font-medium flex items-start gap-2 animate-fade-in">
+                    <ShieldCheck className="w-4 h-4 text-[#2D60FF] shrink-0 mt-0.5" />
+                    <span><strong>Administrator Registration Enabled:</strong> New administrator accounts are provisioned with immediate portal access.</span>
+                  </div>
+                ) : !allowAdminSignup ? (
+                  <div className="space-y-1.5">
+                    <p className="text-xs text-[#FFBB38] bg-[#FFF5D9] p-3 rounded-2xl border border-[#FFBB38]/30 font-medium">
+                      🔒 <strong>Strict Admin Gating:</strong> New accounts require administrator verification and approval before dashboard access is unlocked.
+                    </p>
+                    <div className="text-[11px] text-slate-500 bg-slate-100 p-2.5 rounded-2xl border border-slate-200 font-medium flex items-center gap-2">
+                      <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span>Admin sign-up is disabled by the system administrator.</span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#FFBB38] bg-[#FFF5D9] p-3 rounded-2xl border border-[#FFBB38]/30 font-medium">
+                    🔒 <strong>Strict Admin Gating:</strong> New accounts require administrator verification and approval before dashboard access is unlocked.
+                  </p>
+                )}
               </div>
             ) : (
               // Login: Quick role filter
@@ -216,12 +286,6 @@ export default function LoginView({ onLogin }) {
                   <span>Admin</span>
                 </button>
               </div>
-            )}
-
-            {isSignUp && (
-              <p className="text-xs text-[#FFBB38] mt-2 bg-[#FFF5D9] p-3 rounded-2xl border border-[#FFBB38]/30 font-medium">
-                🔒 <strong>Strict Admin Gating:</strong> New accounts require administrator verification and approval before dashboard access is unlocked.
-              </p>
             )}
           </div>
 

@@ -286,6 +286,15 @@ def handle_api_request(
             "user": safe_user
         }, req_origin, extra_headers=cookie_headers)
 
+    if norm_path in ("/api/v1/settings", "/api/settings") and method == "GET":
+        allow_admin = storage.get_setting("allow_admin_signup", True)
+        return _json_response(200, {
+            "success": True,
+            "settings": {
+                "allowAdminSignup": bool(allow_admin)
+            }
+        }, req_origin)
+
     if (norm_path == "/api/v1/auth/register" or norm_path == "/api/register") and method == "POST":
         # Rate limit registrations to prevent automated account creation abuse
         client_tag = headers.get("Origin", "global")
@@ -299,12 +308,14 @@ def handle_api_request(
         specialty = body.get("specialty") if role == "technician" else None
         org_id = (body.get("org_id") or body.get("orgId") or "").strip()
 
-        # Requirement 1: Public registration as administrator is strictly prohibited
+        # Dynamic Administrator Sign-Up Security Check
         if role == "admin":
-            return _json_response(403, {
-                "success": False,
-                "error": "Security Restriction: Public administrator registration is prohibited. Administrator accounts must be provisioned internally."
-            }, req_origin)
+            allow_admin = storage.get_setting("allow_admin_signup", True)
+            if not allow_admin:
+                return _json_response(403, {
+                    "success": False,
+                    "error": "Administrator registration is currently locked by system security settings."
+                }, req_origin)
 
         # Requirement 2: Reject missing or unknown organization membership in production
         if not org_id:
@@ -334,7 +345,8 @@ def handle_api_request(
                 "error": "An account with this email already exists."
             }, req_origin)
 
-        prefix = "tech" if role == "technician" else "usr"
+        is_admin_reg = (role == "admin")
+        prefix = "adm" if is_admin_reg else ("tech" if role == "technician" else "usr")
         user_id = f"{prefix}_{int(datetime.utcnow().timestamp()*1000)}_{secrets.randbelow(1000)}"
 
         new_user = {
@@ -345,13 +357,17 @@ def handle_api_request(
             "email": email,
             "passwordHash": hash_password(password),
             "role": role,
-            "roleDisplay": "Field Technician" if role == "technician" else "Campus User",
+            "roleDisplay": "Administrator" if is_admin_reg else ("Field Technician" if role == "technician" else "Campus User"),
             "specialty": specialty,
-            "approvalStatus": "Pending",  # Strict Admin Gating
+            "approvalStatus": "Approved" if is_admin_reg else "Pending",  # Admins auto-approved if registration is enabled
+            "approved": True if is_admin_reg else False,
+            "status": "approved" if is_admin_reg else "pending",
             "avatar": (
-                "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120"
+                "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120"
+                if is_admin_reg else
+                ("https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120"
                 if role == "technician" else
-                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120"
+                "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120")
             ),
             "createdAt": datetime.utcnow().isoformat() + "Z"
         }
@@ -360,12 +376,18 @@ def handle_api_request(
         record_audit_event(
             action="USER_REGISTERED",
             org_id=org_id,
-            details={"userId": user_id, "email": email, "role": role, "specialty": specialty}
+            details={"userId": user_id, "email": email, "role": role, "specialty": specialty, "approved": is_admin_reg}
+        )
+
+        success_msg = (
+            "Administrator account created and approved. You can now log in immediately."
+            if is_admin_reg else
+            "Account created. Please wait for an administrator to approve your account."
         )
 
         return _json_response(201, {
             "success": True,
-            "message": "Account created. Please wait for an administrator to approve your account.",
+            "message": success_msg,
             "user": saved
         }, req_origin)
 
@@ -630,6 +652,42 @@ def handle_api_request(
             details={"rejectedUserId": target_id, "email": target.get("email")}
         )
         return _json_response(200, {"success": True, "user": saved}, req_origin)
+
+    # Admin System & Security Settings (e.g. Dynamic Admin Sign-Up Toggle)
+    if norm_path in ("/api/v1/admin/settings", "/api/admin/settings"):
+        if not user.is_admin():
+            return _json_response(403, {"success": False, "error": "Administrative permissions required."}, req_origin)
+
+        if method == "GET":
+            allow_admin = storage.get_setting("allow_admin_signup", True)
+            return _json_response(200, {
+                "success": True,
+                "settings": {
+                    "allowAdminSignup": bool(allow_admin)
+                }
+            }, req_origin)
+
+        if method in ("PATCH", "POST", "PUT"):
+            allow_signup = body.get("allowAdminSignup")
+            if allow_signup is None:
+                allow_signup = body.get("allow_admin_signup")
+            if allow_signup is not None:
+                storage.save_setting("allow_admin_signup", bool(allow_signup))
+
+            updated_val = storage.get_setting("allow_admin_signup", True)
+            record_audit_event(
+                action="ADMIN_SETTINGS_UPDATED",
+                org_id=user.org_id,
+                actor=user,
+                details={"allowAdminSignup": bool(updated_val)}
+            )
+            return _json_response(200, {
+                "success": True,
+                "message": "System settings updated successfully.",
+                "settings": {
+                    "allowAdminSignup": bool(updated_val)
+                }
+            }, req_origin)
 
     # ==========================================================================
     # 5. TICKET ENDPOINTS (STRICT TENANT ISOLATION & QUEUE SEPARATION)

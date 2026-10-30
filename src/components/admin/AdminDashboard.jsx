@@ -46,7 +46,9 @@ import {
   Zap,
   SlidersHorizontal,
   FileText,
-  ClipboardCheck
+  ClipboardCheck,
+  Lock,
+  Unlock
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { STATUS_CONFIG, CATEGORIES, PRIORITIES } from '../../types/mockData';
@@ -63,7 +65,33 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     fetchAuditLogs,
     isLoading
   } = useTickets();
-  const { users = [], pendingUsers = [], approvedUsers = [], approveUser, rejectUser } = useAuth();
+  const { 
+    users = [], 
+    pendingUsers = [], 
+    approvedUsers = [], 
+    approveUser, 
+    rejectUser,
+    allowAdminSignup,
+    toggleAdminSignup
+  } = useAuth();
+
+  const handleAdminSignupToggle = async (e) => {
+    const nextVal = e.target.checked;
+    await toggleAdminSignup(nextVal);
+    if (!nextVal) {
+      addToast({
+        type: 'warning',
+        title: 'Security Setting Updated',
+        message: 'Admin registration locked for outside users'
+      });
+    } else {
+      addToast({
+        type: 'success',
+        title: 'Security Setting Updated',
+        message: 'Admin registration enabled for new administrators'
+      });
+    }
+  };
 
   const [internalTab, setInternalTab] = useState(activeTab);
   const currentTab = activeTab || internalTab;
@@ -272,6 +300,42 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
         <p className="text-sm text-slate-500 font-medium mt-2 max-w-xl mx-auto leading-relaxed">
           Live campus maintenance requests, automatically routed and ready for review.
         </p>
+
+        {/* System Security & Admin Sign-Up Header Control */}
+        <div className="mt-5 p-3.5 px-4 sm:px-5 rounded-2xl bg-white border border-[#E6EFF5] shadow-xs flex items-center justify-between gap-4 text-xs max-w-2xl mx-auto text-left">
+          <div className="flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
+              allowAdminSignup ? 'bg-[#E7EDFF] text-[#2D60FF]' : 'bg-amber-100 text-amber-700'
+            }`}>
+              <ShieldAlert className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Allow New Administrator Sign-Ups</span>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
+                  allowAdminSignup ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
+                }`}>
+                  {allowAdminSignup ? 'Sign-Up Enabled' : 'Locked'}
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium hidden sm:block mt-0.5">
+                {allowAdminSignup
+                  ? 'Outside users can register as Administrator directly from the portal.'
+                  : 'Administrator registration is locked by system security settings.'}
+              </p>
+            </div>
+          </div>
+
+          <label className="relative inline-flex items-center cursor-pointer shrink-0" title="Toggle Administrator Sign-Up">
+            <input
+              type="checkbox"
+              checked={Boolean(allowAdminSignup)}
+              onChange={handleAdminSignupToggle}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2D60FF]"></div>
+          </label>
+        </div>
       </div>
 
       {/* PENDING APPROVALS NOTICE (Visible in Overview if there are pending users) */}
@@ -1335,6 +1399,75 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
             <p className="text-sm font-medium text-slate-500 mt-1">
               Authoritative backend configuration, multi-tenant isolation, and dual-approval facilities policies.
             </p>
+          </div>
+
+          {/* System & Security Settings Panel */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E6EFF5]">
+              <div className="flex items-center gap-3">
+                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-xs ${
+                  allowAdminSignup ? 'bg-[#E7EDFF] text-[#2D60FF]' : 'bg-amber-100 text-amber-700'
+                }`}>
+                  <ShieldAlert className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans'] flex items-center gap-2">
+                    <span>System & Security Settings</span>
+                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                      allowAdminSignup ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'
+                    }`}>
+                      {allowAdminSignup ? 'Admin Sign-Up Open' : 'Admin Sign-Up Locked'}
+                    </span>
+                  </h3>
+                  <p className="text-xs font-medium text-slate-500">
+                    Control identity governance, account provisioning policies, and external registration gates.
+                  </p>
+                </div>
+              </div>
+
+              {/* Status pill */}
+              <div className="flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-[#F5F7FA] border border-[#DFEAF2] text-xs font-semibold text-slate-700">
+                {allowAdminSignup ? (
+                  <>
+                    <Unlock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>Public Registration: Allowed</span>
+                  </>
+                ) : (
+                  <>
+                    <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Public Registration: Blocked</span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Interactive Toggle Switch Row */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+              <div className="pr-4">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="w-4 h-4 text-[#2D60FF]" />
+                  <label htmlFor="admin-signup-settings-toggle" className="text-xs font-bold text-slate-900 font-['Plus_Jakarta_Sans'] cursor-pointer">
+                    Allow New Administrator Sign-Ups
+                  </label>
+                </div>
+                <p className="text-xs font-medium text-slate-500 mt-1 leading-relaxed">
+                  When enabled, prospective administrators can register directly via the portal. When disabled, the Admin tab on the sign-up page is locked and requests are strictly rejected.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    id="admin-signup-settings-toggle"
+                    type="checkbox"
+                    checked={Boolean(allowAdminSignup)}
+                    onChange={handleAdminSignupToggle}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2D60FF]"></div>
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* 1. Secure Backend Architecture Card */}

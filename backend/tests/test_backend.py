@@ -118,6 +118,7 @@ class TestFixFlowSecurityAndLifecycle(unittest.TestCase):
     # TEST 1: User cannot register as administrator
     # ==========================================================================
     def test_user_cannot_register_as_admin(self):
+        self.storage.save_setting("allow_admin_signup", False)
         req_body = {
             "email": "attacker@campusa.edu",
             "password": "secretpassword",
@@ -132,7 +133,7 @@ class TestFixFlowSecurityAndLifecycle(unittest.TestCase):
         self.assertEqual(res["statusCode"], 403)
         body = json.loads(res["body"])
         self.assertFalse(body["success"])
-        self.assertIn("Public administrator registration is prohibited", body["error"])
+        self.assertIn("Administrator registration is currently locked", body["error"])
 
     # ==========================================================================
     # TEST 2: Tenant Isolation — Consumer cannot read another organisation's tickets

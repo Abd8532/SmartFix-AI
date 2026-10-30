@@ -119,6 +119,16 @@ class BaseRepository(ABC):
         """List audit records for the specified organization."""
         pass
 
+    @abstractmethod
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        """Retrieve a global or organization configuration setting."""
+        pass
+
+    @abstractmethod
+    def save_setting(self, key: str, value: Any) -> Any:
+        """Persist a global or organization configuration setting."""
+        pass
+
 
 # ==============================================================================
 # JSON FILE ADAPTER (LOCAL DEVELOPMENT & TESTING)
@@ -175,6 +185,8 @@ class JsonFileRepository(BaseRepository):
             data["tickets"] = []
         if "audit_logs" not in data or not isinstance(data["audit_logs"], list):
             data["audit_logs"] = []
+        if "settings" not in data or not isinstance(data["settings"], dict):
+            data["settings"] = {}
 
         return data
 
@@ -487,6 +499,21 @@ class JsonFileRepository(BaseRepository):
                 if (log.get("org_id") or log.get("orgId")) == org_id
             ]
             return results[:limit]
+
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        with _lock:
+            data = self._read_data()
+            settings = data.get("settings", {})
+            return settings.get(key, default)
+
+    def save_setting(self, key: str, value: Any) -> Any:
+        with _lock:
+            data = self._read_data()
+            if "settings" not in data or not isinstance(data["settings"], dict):
+                data["settings"] = {}
+            data["settings"][key] = value
+            self._write_data(data)
+            return value
 
 
 # ==============================================================================
@@ -810,6 +837,32 @@ class DynamoDBRepository(BaseRepository):
             return res.get("Items", [])
         except Exception as e:
             raise RuntimeError(f"DynamoDB list audit logs failed: {e}")
+
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        table = self._get_table()
+        try:
+            res = table.get_item(Key={"PK": "SETTINGS#GLOBAL", "SK": f"SETTING#{key}"})
+            item = res.get("Item")
+            if item is not None and "value" in item:
+                return item["value"]
+            return default
+        except Exception:
+            return default
+
+    def save_setting(self, key: str, value: Any) -> Any:
+        table = self._get_table()
+        try:
+            item = {
+                "PK": "SETTINGS#GLOBAL",
+                "SK": f"SETTING#{key}",
+                "key": key,
+                "value": value,
+                "updatedAt": datetime.utcnow().isoformat() + "Z"
+            }
+            table.put_item(Item=item)
+            return value
+        except Exception as e:
+            raise RuntimeError(f"DynamoDB save setting failed: {e}")
 
 
 # ==============================================================================

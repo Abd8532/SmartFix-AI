@@ -312,6 +312,12 @@ export const apiClient = {
       const q = ticketId ? `&ticket_id=${encodeURIComponent(ticketId)}` : '';
       return apiClient.get(`/api/v1/uploads/presigned-view?key=${encodeURIComponent(fileKey)}${q}`);
     }
+  },
+
+  // Dynamic System & Security Settings
+  settings: {
+    get: () => apiClient.get('/api/v1/settings'),
+    update: (settingsData) => apiClient.patch('/api/v1/admin/settings', settingsData)
   }
 };
 

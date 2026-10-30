@@ -19,6 +19,58 @@ export function AuthProvider({ children }) {
   const [users, setUsers] = useState([]);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
+  // Dynamic Administrator Registration Toggle (Defaults to true initially)
+  const [allowAdminSignup, setAllowAdminSignup] = useState(() => {
+    try {
+      const stored = localStorage.getItem('maintainx_allow_admin_signup');
+      return stored !== null ? stored === 'true' : true;
+    } catch {
+      return true;
+    }
+  });
+
+  // Sync global settings with backend on mount
+  useEffect(() => {
+    if (apiClient.settings?.get) {
+      apiClient.settings.get()
+        .then((res) => {
+          if (res?.success && typeof res?.settings?.allowAdminSignup === 'boolean') {
+            setAllowAdminSignup(res.settings.allowAdminSignup);
+            try {
+              localStorage.setItem('maintainx_allow_admin_signup', String(res.settings.allowAdminSignup));
+            } catch {}
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  // Admin setter function to dynamically toggle Administrator sign-ups
+  const toggleAdminSignup = useCallback(async (enabled) => {
+    const nextVal = Boolean(enabled);
+    setAllowAdminSignup(nextVal);
+    try {
+      localStorage.setItem('maintainx_allow_admin_signup', String(nextVal));
+    } catch {}
+
+    try {
+      if (apiClient.settings?.update) {
+        const res = await apiClient.settings.update({ allowAdminSignup: nextVal });
+        if (res?.success && typeof res?.settings?.allowAdminSignup === 'boolean') {
+          setAllowAdminSignup(res.settings.allowAdminSignup);
+          try {
+            localStorage.setItem('maintainx_allow_admin_signup', String(res.settings.allowAdminSignup));
+          } catch {}
+          return { success: true, allowAdminSignup: res.settings.allowAdminSignup };
+        }
+      }
+      return { success: true, allowAdminSignup: nextVal };
+    } catch (err) {
+      console.warn('Backend settings update notice:', err);
+      return { success: true, allowAdminSignup: nextVal };
+    }
+  }, []);
+
   // Auth headers helper for programmatic components
   const getAuthHeaders = useCallback(() => {
     return { 'Content-Type': 'application/json' };
@@ -104,10 +156,12 @@ export function AuthProvider({ children }) {
   // 2. REGISTER (POST /api/v1/auth/register via apiClient)
   const register = useCallback(async (userData) => {
     if (userData.role === 'admin') {
-      return {
-        success: false,
-        error: 'Public administrator registration is prohibited. Administrator accounts must be provisioned internally.'
-      };
+      if (!allowAdminSignup) {
+        return {
+          success: false,
+          error: 'Administrator registration is currently locked by system security settings.'
+        };
+      }
     }
 
     try {
@@ -123,7 +177,7 @@ export function AuthProvider({ children }) {
         error: err.data?.error || err.message || 'Registration failed.'
       };
     }
-  }, []);
+  }, [allowAdminSignup]);
 
   // 3. ADMIN: APPROVE USER
   const approveUser = useCallback(async (userId) => {
@@ -173,6 +227,8 @@ export function AuthProvider({ children }) {
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
         if (key && (key.startsWith('maintainx_tickets_') || key.startsWith('maintainx_'))) {
+          // Preserve persistent system security settings
+          if (key === 'maintainx_allow_admin_signup') continue;
           localStorage.removeItem(key);
         }
       }
@@ -221,6 +277,8 @@ export function AuthProvider({ children }) {
     approvedUsers,
     isLoadingAuth,
     isAuthenticated: Boolean(currentUser && currentUser.approvalStatus === 'Approved'),
+    allowAdminSignup,
+    toggleAdminSignup,
     login,
     loginUser: login,
     register,
