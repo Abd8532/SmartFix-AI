@@ -534,7 +534,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
                   <p className="text-xs font-semibold text-[#FF4B4A] flex items-center gap-1.5">
                     <span>Critical / emergency</span>
                   </p>
-                  <p className="text-3xl font-extrabold text-[#FF4B4A] mt-2 font-['Plus_Jakarta_Sans'] tracking-tight">{stats.critical || 1}</p>
+                  <p className="text-3xl font-extrabold text-[#FF4B4A] mt-2 font-['Plus_Jakarta_Sans'] tracking-tight">{stats.critical}</p>
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-[#FFE0EB] flex items-center justify-center text-[#FF4B4A] group-hover:scale-105 transition-transform">
                   <AlertTriangle className="w-6 h-6" />
