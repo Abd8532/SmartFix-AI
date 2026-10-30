@@ -4,8 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import WorkspaceSidebar from '../common/WorkspaceSidebar';
 import DashboardHeroBanner from '../common/DashboardHeroBanner';
 import NeetCodeTicketTable from '../tickets/NeetCodeTicketTable';
-import SlaPriorityRingWidget from '../common/SlaPriorityRingWidget';
-import ActivityCalendarWidget from '../common/ActivityCalendarWidget';
 import confetti from 'canvas-confetti';
 
 export default function TechnicianDashboard({ onSelectTicket }) {
@@ -149,8 +147,8 @@ export default function TechnicianDashboard({ onSelectTicket }) {
 
   return (
     <div className="w-full max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* 1. Left Sidebar (lg:col-span-2) */}
-      <div className="lg:col-span-2">
+      {/* 1. Left Sidebar (lg:col-span-3 xl:col-span-2) */}
+      <div className="lg:col-span-3 xl:col-span-2">
         <WorkspaceSidebar
           currentView={activeFeatureFilter === 'rag-history' ? 'rag-history' : 'all-tickets'}
           onSelectView={(view) => {
@@ -167,8 +165,8 @@ export default function TechnicianDashboard({ onSelectTicket }) {
         />
       </div>
 
-      {/* 2. Center Main Content (lg:col-span-7) */}
-      <main className="lg:col-span-7 min-w-0 space-y-6">
+      {/* 2. Center Main Content (lg:col-span-9 xl:col-span-10) */}
+      <main className="lg:col-span-9 xl:col-span-10 min-w-0 space-y-6">
         {/* Top Category Feature Cards, Hero Banner Card, Search Toolbar */}
         <DashboardHeroBanner
           title="Technician Queue"
@@ -195,16 +193,6 @@ export default function TechnicianDashboard({ onSelectTicket }) {
           }
         />
       </main>
-
-      {/* 3. Right Sidebar Widgets (lg:col-span-3 space-y-6) */}
-      <div className="lg:col-span-3 space-y-6">
-        <SlaPriorityRingWidget
-          stats={deptStats}
-          tickets={myDepartmentTickets}
-        />
-
-        <ActivityCalendarWidget />
-      </div>
     </div>
   );
 }

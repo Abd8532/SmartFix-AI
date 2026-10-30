@@ -4,8 +4,6 @@ import { useAuth } from '../../context/AuthContext';
 import WorkspaceSidebar from '../common/WorkspaceSidebar';
 import DashboardHeroBanner from '../common/DashboardHeroBanner';
 import NeetCodeTicketTable from '../tickets/NeetCodeTicketTable';
-import SlaPriorityRingWidget from '../common/SlaPriorityRingWidget';
-import ActivityCalendarWidget from '../common/ActivityCalendarWidget';
 import NewIssueForm from './NewIssueForm';
 import { History, Sparkles, Layers, ArrowLeft } from 'lucide-react';
 
@@ -125,8 +123,8 @@ export default function UserView({ onSelectTicket }) {
 
   return (
     <div className="w-full max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* 1. Left Sidebar (lg:col-span-2) */}
-      <div className="lg:col-span-2">
+      {/* 1. Left Sidebar (lg:col-span-3 xl:col-span-2) */}
+      <div className="lg:col-span-3 xl:col-span-2">
         <WorkspaceSidebar
           currentView={userTab === 'new-issue' ? 'new-issue' : (activeFeatureFilter === 'rag-history' ? 'rag-history' : 'all-tickets')}
           onSelectView={handleSelectView}
@@ -137,8 +135,8 @@ export default function UserView({ onSelectTicket }) {
         />
       </div>
 
-      {/* 2. Center Main Content (lg:col-span-7) */}
-      <main className="lg:col-span-7 min-w-0 space-y-6">
+      {/* 2. Center Main Content (lg:col-span-9 xl:col-span-10) */}
+      <main className="lg:col-span-9 xl:col-span-10 min-w-0 space-y-6">
         {userTab === 'new-issue' ? (
           <div>
             <div className="flex items-center gap-2 mb-4">
@@ -186,16 +184,6 @@ export default function UserView({ onSelectTicket }) {
           </div>
         )}
       </main>
-
-      {/* 3. Right Sidebar Widgets (lg:col-span-3 space-y-6) */}
-      <div className="lg:col-span-3 space-y-6">
-        <SlaPriorityRingWidget
-          stats={userStats}
-          tickets={myTickets}
-        />
-
-        <ActivityCalendarWidget />
-      </div>
     </div>
   );
 }
