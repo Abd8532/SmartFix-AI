@@ -1,137 +1,252 @@
-# SmartFix AI — Secure Backend Foundation (Phase 1)
+# SmartFix AI — Authoritative Backend Architecture (Phase 2)
 
-This directory contains the authoritative Python backend for **SmartFix AI**, implementing enterprise multi-tenancy, strict organization data isolation, cryptographically secure authentication, dual-approval state machine enforcement, and trusted RAG ingestion.
+SmartFix AI is an enterprise multi-tenant maintenance operations platform. The Python backend is the **single authoritative source of truth** for all business logic, state transitions, security controls, multimodal AI triage, and persistence. The legacy Vite-hosted Node.js backend has been completely decommissioned.
 
 ---
 
-## 1. Modular Architecture Overview
+## 1. System Architecture & Topology
+
+```
+┌─────────────────────────────────┐
+│     React 19 Frontend (SPA)     │
+│  (src/services/apiClient.js)    │
+└────────────────┬────────────────┘
+                 │
+                 │ /api/v1/* (Bearer JWT)
+                 ▼
+┌────────────────────────────────────────────────────────┐
+│               Python 3.11 Backend                      │
+│                                                        │
+│  ┌──────────────────────────────────────────────────┐  │
+│  │ app.api (Authoritative REST Router & Gateway)   │  │
+│  └───────┬──────────────┬──────────────┬────────────┘  │
+│          │              │              │               │
+│          ▼              ▼              ▼               │
+│   ┌─────────────┐┌─────────────┐┌──────────────┐       │
+│   │  app.auth   ││app.lifecycle││    app.ai    │       │
+│   │(PBKDF2/JWT/ ││(State Mach. ││ (Multimodal  │       │
+│   │ Rate Limit) ││ Anti-Imp.)  ││ Vision RAG)  │       │
+│   └─────────────┘└─────────────┘└──────────────┘       │
+│          │              │              │               │
+│          └──────────────┼──────────────┘               │
+│                         ▼                              │
+│              ┌────────────────────┐                    │
+│              │    app.storage     │                    │
+│              │  (BaseRepository)  │                    │
+│              └──────────┬─────────┘                    │
+└─────────────────────────┼──────────────────────────────┘
+                          │
+            ┌─────────────┴─────────────┐
+            ▼                           ▼
+┌───────────────────────┐   ┌───────────────────────┐
+│  JsonFileRepository   │   │  DynamoDBRepository   │
+│  (Active Local Dev)   │   │  (AWS Cloud-Ready)    │
+│       db.json         │   │   Single-Table Design │
+└───────────────────────┘   └───────────────────────┘
+```
+
+---
+
+## 2. Directory Structure
 
 ```
 backend/
 ├── app/
 │   ├── __init__.py           # Package definition
-│   ├── config.py             # Centralized environment variables, defaults & constants
-│   ├── models.py             # Domain models, TicketStatus, UserRole, Specialty
-│   ├── auth.py               # PBKDF2-SHA256 password hashing (100k rounds), JWT verification
-│   ├── storage.py            # Multi-tenant repository with strict org_id boundary isolation
-│   ├── lifecycle.py          # State machine, safety overrides, dual-approval, consumer reopen
-│   ├── rag.py                # Semantic embeddings (text-embedding-004), trusted completed ingestion
-│   ├── ai.py                 # Multimodal Gemini 1.5 vision triage & Open-Meteo weather context
-│   ├── audit.py              # Immutable audit logging service
-│   └── api.py                # REST API router & AWS API Gateway proxy handler
+│   ├── config.py             # Configuration, env vars, production secret guardrails
+│   ├── models.py             # Data classes, TicketStatus, UserRole, Specialties
+│   ├── auth.py               # PBKDF2-SHA256, JWT generation/validation, Cognito verification, rate limiting
+│   ├── storage.py            # BaseRepository interface, JsonFileRepository & DynamoDBRepository adapters
+│   ├── lifecycle.py          # State machine, anti-impersonation, safety overrides, dual approval
+│   ├── rag.py                # Semantic embeddings (text-embedding-004), verified-repair gating
+│   ├── ai.py                 # Gemini 1.5 Flash multimodal vision analysis & Open-Meteo context
+│   ├── audit.py              # Immutable multi-tenant audit trail service
+│   ├── api.py                # Central REST router for HTTP & AWS Lambda events
+│   └── server.py             # Built-in lightweight HTTP server for local development
 ├── tests/
 │   ├── __init__.py
-│   └── test_backend.py       # 9 comprehensive authorization & workflow unit tests
-├── lambda_function.py        # AWS Lambda entrypoint adapting API Gateway events to app.api
-└── requirements.txt          # Python runtime dependencies
+│   ├── test_backend.py       # Core unit & lifecycle invariants test suite (9 tests)
+│   └── test_phase2_integration.py # End-to-end API router integration suite (12 tests)
+├── lambda_function.py        # AWS Lambda proxy handler
+├── requirements.txt          # Production dependencies
+└── README.md                 # Architecture and operations guide
 ```
 
 ---
 
-## 2. Core Security & Workflow Invariants
+## 3. Local Development Setup
 
-1. **Derived Identity Claims**:
-   - The backend never trusts client-supplied `user_id`, `org_id`, or `role` fields.
-   - All claims are derived strictly from cryptographically verified JWT bearer tokens (`AuthenticatedUser`).
-2. **Public Admin Registration Block**:
-   - Public registration endpoints reject `admin` role requests (`HTTP 403 Forbidden`). Administrator accounts can only be created by an existing authenticated administrator or seeded securely.
-3. **Multi-Tenant Organization Boundary**:
-   - Every user, technician, ticket, repair record, and audit log belongs to an `org_id`.
-   - Queries and mutations across different organizations are strictly prohibited and isolated.
-4. **Deterministic Safety-Critical Priority Overrides**:
-   - High-risk hazards (natural gas leaks, electrical sparking, active fires, live high-voltage conductors, structural collapse) automatically clamp urgency to `Emergency`, set `isHazard: true`, and force `priorityScore >= 95`.
-   - These overrides cannot be downgraded by client input or heuristic AI triage.
-5. **Authoritative Dual Approval**:
-   - Work orders cannot jump directly to `Completed`.
-   - A ticket transitions from `Assigned` / `In Progress` $\rightarrow$ `Pending User Verification` only when the assigned field technician completes work and supplies repair resolution notes.
-   - The ticket transitions to `Completed` only when the reporting consumer verifies and confirms the repair.
-   - If the consumer rejects the repair, a mandatory rejection reason is required, and the ticket is immediately reopened back to `In Progress`.
-6. **Trusted RAG Ingestion Gating**:
-   - Unverified complaints or ongoing repairs are never ingested into vector knowledge.
-   - Only tickets with verified dual approval (`status == Completed`, `techConfirmed == True`, `userConfirmed == True`) are embedded and ingested into Pinecone / historical memory.
-7. **Immutable Audit Trail**:
-   - Every registration, approval, ticket creation, status update, dual sign-off, rejection, and deletion produces an immutable audit record with timestamps, actors, targets, and metadata.
-
----
-
-## 3. Environment Variables
-
-Configure these in AWS Lambda under **Configuration $\rightarrow$ Environment variables**, or in your local `.env`:
-
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `JWT_SECRET` | Secret key used for signing and verifying JWT tokens | *(Required in Production)* |
-| `JWT_EXPIRATION_HOURS` | Lifetime of issued JWT tokens | `24` |
-| `DATA_BACKEND` | Storage backend driver (`file` or `memory`) | `file` |
-| `DB_FILE_PATH` | Path to persistent JSON database | `db.json` |
-| `GEMINI_API_KEY` | Google AI Studio API Key for multimodal triage & embeddings | *(Optional / Server-side)* |
-| `PINECONE_API_KEY` | Pinecone Serverless API Key for vector RAG | *(Optional / Server-side)* |
-| `PINECONE_INDEX_NAME` | Pinecone index name | `fixflow-maintenance-tickets` |
-| `AIRTABLE_API_KEY` | Optional Airtable sync token | *(Optional / Server-side)* |
-| `AIRTABLE_BASE_ID` | Optional Airtable Base ID | `app32PCGpVp4lBamC` |
-| `AIRTABLE_TABLE_NAME` | Optional Airtable Table Name | `tblyhV3Zxyw2wWzww` |
-
----
-
-## 4. REST API Reference
-
-All requests expect `Authorization: Bearer <jwt_token>` except public auth endpoints.
-
-### Authentication Endpoints
-- `POST /api/v1/auth/register` — Register a new `user` or `technician` account (gated by admin approval).
-- `POST /api/v1/auth/login` — Authenticate using email and password, returning JWT access token.
-- `GET /api/v1/auth/me` — Return verified claims of current user.
-
-### Admin Endpoints
-- `GET /api/v1/admin/pending-users` — Retrieve users awaiting registration approval.
-- `POST /api/v1/admin/approve-user` — Approve a pending account.
-- `POST /api/v1/admin/reject-user` — Reject and remove a pending registration.
-- `GET /api/v1/audit-logs` — Retrieve immutable audit trail for the tenant organisation.
-
-### Ticket Lifecycle Endpoints
-- `GET /api/v1/tickets` — List organisation-isolated tickets (filtered by department for technicians).
-- `POST /api/v1/tickets` — Create a work order with AI triage, weather context, and safety overrides.
-- `GET /api/v1/tickets/:id` — Get ticket details.
-- `POST /api/v1/tickets/:id/tech-complete` — Technician submits repair notes and marks fixed (`Pending User Verification`).
-- `POST /api/v1/tickets/:id/verify-closure` — Consumer verifies physical repair and completes ticket (triggers RAG ingestion).
-- `POST /api/v1/tickets/:id/reject-closure` — Consumer rejects repair with reason; reopens ticket to `In Progress`.
-- `POST /api/v1/tickets/:id/status` — State machine transition (e.g. `In Progress`).
-- `DELETE /api/v1/tickets/:id` — Delete a work order (Admin or reporter only).
-
----
-
-## 5. Verification & Testing
-
-Run the Python unit and authorization test suite:
+### A. Run the Authoritative Python Server
+No heavy external application servers are required for local development. The project includes a standard-library `ThreadingHTTPServer` configured in `backend/app/server.py` and wrapped by `run_backend.py`.
 
 ```bash
+# From the project root:
+python run_backend.py
+```
+This starts the backend on `http://127.0.0.1:8000`.
+
+### B. Run the Frontend with Vite Proxy
+The development server in `vite.config.js` proxies all `/api` requests directly to `http://127.0.0.1:8000`:
+
+```bash
+npm run dev
+```
+
+The frontend client in `src/services/apiClient.js` automatically manages JWT authentication tokens and attaches them to all outgoing requests.
+
+---
+
+## 4. Multi-Tenant Persistence
+
+The storage layer implements the `BaseRepository` interface with strict `org_id` boundaries:
+
+1. **`JsonFileRepository` (Active Locally)**:
+   - Stores tenant data inside `db.json`.
+   - Used by default during local development (`DATA_BACKEND=file`).
+   - Automatically seeds default administrators, technicians, and campus users if the database is uninitialized.
+
+2. **`DynamoDBRepository` (AWS Cloud-Ready)**:
+   - Fully implemented enterprise single-table design.
+   - Partition Key: `PK = ORG#<org_id>` for hard physical data isolation.
+   - Sort Keys:
+     - `USER#<user_id>`
+     - `TICKET#<ticket_id>`
+     - `AUDIT#<timestamp>#<audit_id>`
+   - Global Secondary Index (GSI): `GSI1PK = EMAIL#<email>` for fast $O(1)$ user authentication queries.
+   - Activated in AWS environments by setting `DATA_BACKEND=dynamodb` and `DYNAMODB_TABLE_NAME=<table-name>`.
+
+---
+
+## 5. Security & Authentication Guardrails
+
+- **Cryptographic Password Security**: Passwords are hashed using salted PBKDF2-SHA256 with 100,000 rounds. Legacy plaintext passwords and insecure fallbacks have been completely removed.
+- **Mandatory Expiration (`exp`)**: Every JWT token requires an explicit expiration claim. Expired or forged tokens are rejected immediately with `HTTP 401`.
+- **Amazon Cognito Integration**: Seamlessly validates Cognito ID and Access tokens by verifying issuer (`iss`), audience/client ID (`aud`/`client_id`), and token usage claims.
+- **Login Rate Limiting**: Enforces a strict threshold of 5 failed login attempts per 15-minute sliding window per identifier, returning `HTTP 429 Too Many Requests`.
+- **Generic Auth Failures**: Invalid credentials return a generic `Invalid email or password.` message to prevent account enumeration.
+- **Production Guardrails**: In production (`ENVIRONMENT=production`), the application terminates immediately on startup if a default or insecure `JWT_SECRET` is detected.
+- **Credential Segregation**: All third-party credentials (`GEMINI_API_KEY`, `PINECONE_API_KEY`, `AIRTABLE_API_KEY`) reside exclusively in server-side environment variables and are never bundled into client assets.
+
+---
+
+## 6. Authoritative State Machine & Anti-Impersonation
+
+The ticket lifecycle strictly enforces dual approval:
+
+```
+[Open / Assigned] 
+       │
+       ▼ (Tech starts work / claims ticket)
+[In Progress]
+       │
+       ▼ (Assigned Tech submits repair with resolutionNotes)
+[Pending User Verification]
+       │
+       ├──► (Consumer confirms repair on site) ──► [Completed] ──► Ingest to Trusted RAG
+       │
+       └──► (Consumer rejects repair with rejectionReason) 
+                   │
+                   ▼ (Reopen count increments, techConfirmed resets)
+             [In Progress]
+```
+
+- **No Direct Jump to Completed**: Any attempt to set status directly to `Completed` via `PATCH /status` is rejected with `HTTP 400 Bad Request`.
+- **Anti-Impersonation for Tech Confirmation**: Only the technician assigned to the ticket can call `/tech-complete`. Administrators and other technicians cannot impersonate this confirmation.
+- **Anti-Impersonation for Consumer Verification & Rejection**: Only the original reporting consumer can call `/verify-closure` or `/reject-closure`. Administrators and other users are blocked.
+- **Consumer Rejection Tracking**: Consumer rejection mandates a `rejectionReason`, increments `reopenCount`, and preserves the original ticket identifier.
+
+---
+
+## 7. REST API Reference
+
+All protected routes mandate `Authorization: Bearer <jwt_token>`.
+
+### Authentication
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/auth/login` | Authenticate user, returns JWT and user profile |
+| `POST` | `/api/v1/auth/register` | Register new user/technician (pending admin approval) |
+| `GET` | `/api/v1/auth/me` | Fetch authenticated user profile |
+
+### Administration (Admin Only)
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/admin/users` | List tenant users and pending registrations |
+| `POST` | `/api/v1/admin/users/:id/approve` | Approve a pending user account |
+| `POST` | `/api/v1/admin/users/:id/reject` | Reject a pending user account |
+| `GET` | `/api/v1/audit-logs` | Retrieve tenant audit logs (returns `auditLogs` & `audit_logs`) |
+
+### Work Orders / Tickets
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/v1/tickets` | List tenant tickets scoped to caller's role |
+| `POST` | `/api/v1/tickets` | Create work order (with photo, AI triage, safety override) |
+| `GET` | `/api/v1/tickets/:id` | Get work order details (scoped to owner/assignee/admin) |
+| `PATCH` | `/api/v1/tickets/:id/status` | Authoritative status transition (e.g. `In Progress`) |
+| `POST` | `/api/v1/tickets/:id/tech-complete` | Tech marks complete with `{ resolutionNotes: "..." }` |
+| `POST` | `/api/v1/tickets/:id/verify-closure`| Consumer confirms physical fix; closes ticket |
+| `POST` | `/api/v1/tickets/:id/reject-closure`| Consumer rejects fix with `{ rejectionReason: "..." }` |
+| `DELETE`| `/api/v1/tickets/:id` | Delete ticket (Admin or reporter only) |
+
+---
+
+## 8. Test Suite & Verification
+
+The test suite runs under the Python standard library `unittest` framework:
+
+```bash
+# Run all 21 unit and integration tests:
 python -m unittest discover -s backend/tests -p "test_*.py" -v
 ```
 
-All 9 tests verify:
+The 21 tests validate:
+- Unauthenticated requests rejected (`401`).
+- Consumer cannot fetch another consumer's ticket (`403`).
+- Technician cannot fetch another technician's private work order (`403`).
+- Technician cannot complete an unassigned ticket (`403`).
+- Administrator cannot impersonate consumer verification (`403`).
+- Consumer cannot confirm another user's ticket (`403`).
+- Rejection reason is persisted in database (`200`).
+- Rejection reopens the same ticket with incremented `reopenCount`.
+- Dual approval flow required for `Completed` status.
+- Direct status transition to `Completed` is prohibited (`400`).
+- Cross-tenant audit logs are completely inaccessible across organizations.
+- Forged JWT signatures and expired tokens are rejected (`401`).
 - Public admin registration blockage.
-- Cross-tenant organization data isolation.
-- Unassigned technician work order sign-off prevention.
-- Direct jump to `Completed` transition rejection.
-- Dual-approval completion.
-- Consumer rejection reopening with mandatory reason.
 - Deterministic safety hazard auto-escalation.
-- Unverified ticket RAG ingestion rejection.
-- Salted PBKDF2 password hashing verification.
+- Untrusted tickets rejected from RAG vector ingestion.
+- PBKDF2 password hashing integrity.
 
 ---
 
-## 6. AWS Lambda Deployment
+## 9. AWS Lambda & API Gateway Deployment
 
-### Packaging:
+### Packaging
 ```bash
-pip install -r requirements.txt -t package/
-cp -r app package/
-cp lambda_function.py package/
-cd package && zip -r ../smartfix_backend.zip . && cd ..
+# 1. Prepare deployment package directory
+mkdir package
+pip install -r backend/requirements.txt -t package/
+cp -r backend/app package/
+cp backend/lambda_function.py package/
+
+# 2. Create deployment zip
+cd package
+zip -r ../smartfix_backend.zip .
+cd ..
 ```
 
-1. Create a Lambda function with runtime **Python 3.11**.
-2. Set the handler to `lambda_function.lambda_handler`.
-3. Configure an **API Gateway HTTP API** proxying all routes (`ANY /{proxy+}`) to the Lambda function.
-4. Configure required environment variables (`JWT_SECRET`, `GEMINI_API_KEY`, etc.).
+### AWS Deployment Steps:
+1. **AWS Lambda**:
+   - Runtime: Python 3.11
+   - Handler: `lambda_function.lambda_handler`
+   - Memory: 512 MB, Timeout: 30 seconds
+2. **Environment Variables**:
+   - `ENVIRONMENT=production`
+   - `JWT_SECRET=<secure-random-64-char-string>`
+   - `DATA_BACKEND=dynamodb`
+   - `DYNAMODB_TABLE_NAME=SmartFixMaintenance`
+   - `GEMINI_API_KEY=<gemini-api-key>`
+3. **Amazon API Gateway**:
+   - Create an HTTP API with a catch-all route: `ANY /{proxy+}`
+   - Integration: AWS Lambda proxy integration pointing to your function
+   - Enable CORS with allowed origins, headers (`Content-Type,Authorization`), and methods (`GET,POST,PUT,PATCH,DELETE,OPTIONS`).

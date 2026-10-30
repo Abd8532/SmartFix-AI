@@ -1,6 +1,12 @@
 """
-Lifecycle, State Machine, Safety Overrides & Dual Approval Engine for FixFlow AI
+Lifecycle, State Machine, Safety Overrides & Dual Approval Engine for SmartFix AI
 Authoritative rules for ticket state transitions, safety clamps, and dual confirmation.
+Enforces that:
+- Direct status transitions to Completed are strictly prohibited.
+- Administrators cannot impersonate technician or consumer confirmations.
+- Only the assigned technician can complete a repair; unassigned completion is blocked.
+- Only the reporting consumer can verify closure or reject and reopen the ticket.
+- Rejection reason is persistently recorded and increments reopen count.
 """
 import re
 from typing import Dict, Any, Tuple
@@ -50,39 +56,23 @@ def evaluate_safety_critical(
     if triggered:
         return TicketPriority.EMERGENCY, max(requested_score, 95), True, True
 
-    # If requested is already Emergency or is_hazard is True, preserve it
     final_is_hazard = is_hazard or requested_priority == TicketPriority.EMERGENCY
     return requested_priority, requested_score, final_is_hazard, False
 
 
 def can_technician_work_on_ticket(ticket: Dict[str, Any], user: AuthenticatedUser) -> bool:
     """
-    Enforce that a technician cannot confirm or complete a ticket they are not assigned to.
-    Admin can oversee all tickets in the organization.
+    Checks if a technician is authorized to work on this ticket.
+    A technician can only complete or modify a ticket if it is assigned to them.
     """
-    if user.is_admin():
-        return True
-
     if not user.is_technician():
         return False
 
     assigned_tech_id = ticket.get("assignedTechId")
-    if assigned_tech_id and assigned_tech_id == user.id:
-        return True
-
-    # Check department / specialty match
-    cat = (ticket.get("category") or "").strip().lower()
-    user_spec = (user.specialty or "").strip().lower()
-    assigned_to = (ticket.get("assignedTo") or "").strip().lower()
-
-    if assigned_tech_id and assigned_tech_id != user.id:
-        # Assigned specifically to someone else
+    if not assigned_tech_id:
         return False
 
-    if user_spec == "general" or not user_spec:
-        return True
-
-    return cat == user_spec or user_spec in assigned_to
+    return assigned_tech_id == user.id
 
 
 def transition_ticket_status(
@@ -96,12 +86,27 @@ def transition_ticket_status(
     """
     current_status = ticket.get("status") or TicketStatus.ASSIGNED
 
-    if new_status == TicketStatus.COMPLETED:
+    if new_status == TicketStatus.COMPLETED or new_status == "Done":
         raise ValueError("Direct transition to Completed is prohibited. Dual approval is strictly enforced.")
 
     if new_status == TicketStatus.IN_PROGRESS:
-        if not can_technician_work_on_ticket(ticket, actor) and not actor.is_admin():
-            raise PermissionError("Only the assigned technician or administrator can mark a ticket In Progress.")
+        if actor.is_technician():
+            assigned_tech_id = ticket.get("assignedTechId")
+            cat = (ticket.get("category") or "").strip().lower()
+            user_spec = (actor.specialty or "").strip().lower()
+
+            if assigned_tech_id and assigned_tech_id != actor.id:
+                raise PermissionError("Access Denied: Work order is assigned to another technician.")
+
+            # If unassigned, technician claims the ticket on starting work if specialty matches
+            if not assigned_tech_id:
+                if user_spec != "general" and user_spec and cat != user_spec:
+                    raise PermissionError(f"Access Denied: Ticket category '{ticket.get('category')}' does not match your specialty '{actor.specialty}'.")
+                ticket["assignedTechId"] = actor.id
+                ticket["assignedTo"] = actor.name
+
+        elif not actor.is_admin():
+            raise PermissionError("Only an assigned technician or administrator can mark a ticket In Progress.")
 
         ticket["status"] = TicketStatus.IN_PROGRESS
         ticket["Status"] = TicketStatus.IN_PROGRESS
@@ -127,10 +132,15 @@ def tech_complete_ticket(
     """
     Step 1 of Dual Approval:
     Technician certifies the fix is applied and provides resolution notes.
-    Advances ticket to 'Pending User Verification'.
+    Administrators CANNOT impersonate technician confirmation.
+    Technicians CANNOT complete an unassigned ticket.
     """
-    if not can_technician_work_on_ticket(ticket, actor):
-        raise PermissionError("Access Denied: You are not assigned to this work order.")
+    if not actor.is_technician():
+        raise PermissionError("Only an assigned field technician can complete repairs. Administrators cannot impersonate technician confirmation.")
+
+    assigned_tech_id = ticket.get("assignedTechId")
+    if not assigned_tech_id or assigned_tech_id != actor.id:
+        raise PermissionError("Access Denied: Technician cannot complete an unassigned ticket or a ticket assigned to another technician.")
 
     if not resolution_notes or not resolution_notes.strip():
         raise ValueError("Resolution notes are required when marking a work order as resolved.")
@@ -143,7 +153,7 @@ def tech_complete_ticket(
     ticket["resolvedAt"] = now_iso
     ticket["updatedAt"] = now_iso
 
-    # If consumer had somehow pre-confirmed, both are now confirmed
+    # Advance to 'Pending User Verification' unless consumer had somehow confirmed
     if ticket.get("userConfirmed"):
         ticket["status"] = TicketStatus.COMPLETED
         ticket["Status"] = TicketStatus.COMPLETED
@@ -160,12 +170,20 @@ def consumer_verify_closure(
 ) -> Dict[str, Any]:
     """
     Step 2 of Dual Approval:
-    Consumer (reporter) confirms the repair on site.
-    Both confirmations met -> ticket becomes 'Completed'.
+    Reporting consumer confirms physical repair on site.
+    Administrators CANNOT impersonate consumer confirmation.
+    Other consumers CANNOT confirm another person's ticket.
     """
     reporter_id = ticket.get("reporterId") or ticket.get("reportedBy", {}).get("id")
-    if not actor.is_admin() and reporter_id != actor.id and actor.email.lower() != (ticket.get("reporterEmail") or "").lower():
-        raise PermissionError("Only the user who reported this maintenance fault can verify its resolution.")
+    reporter_email = (ticket.get("reporterEmail") or ticket.get("reportedBy", {}).get("email") or "").lower()
+    actor_email = (actor.email or "").lower()
+
+    # Strictly require reporter identity
+    if actor.id != reporter_id and actor_email != reporter_email:
+        raise PermissionError(
+            "Access Denied: Only the reporting consumer can verify and close this work order. "
+            "Administrators and other users cannot impersonate consumer confirmation."
+        )
 
     if not ticket.get("techConfirmed"):
         raise ValueError("Ticket cannot be marked Completed before technician completion and resolution notes.")
@@ -188,40 +206,36 @@ def consumer_reject_closure(
 ) -> Dict[str, Any]:
     """
     Consumer Rejection & Reopening:
-    If consumer finds the fault is still unresolved, they reject the closure with a mandatory reason.
+    Reporting consumer rejects unsatisfactory repair with a mandatory reason.
+    Administrators CANNOT impersonate consumer rejection.
     Resets technician confirmation, increments reopen count, reverts status to 'In Progress'.
     """
     reporter_id = ticket.get("reporterId") or ticket.get("reportedBy", {}).get("id")
-    if not actor.is_admin() and reporter_id != actor.id and actor.email.lower() != (ticket.get("reporterEmail") or "").lower():
-        raise PermissionError("Only the user who reported this fault can reject and reopen the work order.")
+    reporter_email = (ticket.get("reporterEmail") or ticket.get("reportedBy", {}).get("email") or "").lower()
+    actor_email = (actor.email or "").lower()
 
-    if ticket.get("status") != TicketStatus.PENDING_USER_VERIFICATION and not ticket.get("techConfirmed"):
-        raise ValueError("Only tickets pending verification can be rejected and reopened.")
+    if actor.id != reporter_id and actor_email != reporter_email:
+        raise PermissionError(
+            "Access Denied: Only the reporting consumer can reject and reopen this work order. "
+            "Administrators cannot impersonate consumer rejection."
+        )
 
     if not rejection_reason or not rejection_reason.strip():
-        raise ValueError("A clear rejection reason is required to reopen the work order.")
+        raise ValueError("A rejection reason is mandatory to reopen this work order.")
+
+    if ticket.get("status") != TicketStatus.PENDING_USER_VERIFICATION and not ticket.get("techConfirmed"):
+        raise ValueError("Only work orders pending user verification can be rejected.")
 
     now_iso = datetime.utcnow().isoformat() + "Z"
-    reopen_count = int(ticket.get("reopenCount", 0)) + 1
-
     ticket["techConfirmed"] = False
     ticket["TechConfirmed"] = "false"
     ticket["userConfirmed"] = False
     ticket["UserConfirmed"] = "false"
     ticket["status"] = TicketStatus.IN_PROGRESS
     ticket["Status"] = TicketStatus.IN_PROGRESS
-    ticket["reopenCount"] = reopen_count
+    ticket["reopenCount"] = (ticket.get("reopenCount") or 0) + 1
     ticket["lastRejectionReason"] = rejection_reason.strip()
+    ticket["rejectionReason"] = rejection_reason.strip()
     ticket["updatedAt"] = now_iso
-
-    # Append to resolution history
-    history = ticket.get("reopenHistory", [])
-    history.append({
-        "reopenedAt": now_iso,
-        "rejectedBy": actor.name or actor.email,
-        "reason": rejection_reason.strip(),
-        "cycle": reopen_count
-    })
-    ticket["reopenHistory"] = history
 
     return ticket

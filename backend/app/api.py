@@ -1,6 +1,8 @@
 """
-REST API Router & Request Handler for FixFlow AI
-Serves standard HTTP requests and AWS Lambda API Gateway proxy events.
+REST API Router & Request Handler for SmartFix AI
+Serves standard HTTP requests, local development servers, and AWS Lambda API Gateway proxy events.
+Authoritative routing with strict JWT verification, multi-tenant isolation,
+and dual-approval state machine enforcement.
 """
 import json
 import secrets
@@ -13,6 +15,9 @@ from .auth import (
     hash_password,
     verify_password,
     create_access_token,
+    check_rate_limit,
+    record_failed_login,
+    reset_failed_login,
     AuthenticatedUser
 )
 from .models import (
@@ -88,36 +93,43 @@ def handle_api_request(
         email = body.get("email", "").strip().lower()
         password = body.get("password", "")
 
+        # Rate Limiting Check
+        is_allowed, rate_err = check_rate_limit(email)
+        if not is_allowed:
+            return _json_response(429, {
+                "success": False,
+                "error": rate_err
+            })
+
         user = storage.get_user_by_email(email)
         if not user:
-            return _json_response(200, {
+            record_failed_login(email)
+            return _json_response(401, {
                 "success": False,
-                "error": "Invalid email or password. Please verify your credentials."
+                "error": "Invalid email or password."
             })
 
         stored_hash = user.get("passwordHash") or user.get("password") or ""
         if not verify_password(password, stored_hash):
-            return _json_response(200, {
+            record_failed_login(email)
+            return _json_response(401, {
                 "success": False,
-                "error": "Invalid email or password. Please verify your credentials."
+                "error": "Invalid email or password."
             })
 
-        # Upgrade plain password to PBKDF2 hash on successful login if needed
-        if not stored_hash.startswith("pbkdf2_sha256$"):
-            user["passwordHash"] = hash_password(password)
-            user.pop("password", None)
-            storage.save_user(user)
+        # Login successful - reset rate limit
+        reset_failed_login(email)
 
         # Check approval status
         if user.get("approvalStatus") == "Pending" and user.get("role") != "admin":
-            return _json_response(200, {
+            return _json_response(403, {
                 "success": False,
                 "status": "Pending",
                 "error": "Access Denied: Your account is pending administrator approval."
             })
 
         if user.get("approvalStatus") == "Rejected":
-            return _json_response(200, {
+            return _json_response(403, {
                 "success": False,
                 "status": "Rejected",
                 "error": "Access Denied: Your registration was rejected by an administrator."
@@ -221,7 +233,7 @@ def handle_api_request(
         return _json_response(200, {"success": True, "user": sanitize_user(u_data)})
 
     # ==========================================================================
-    # 3. ADMIN USER MANAGEMENT ROUTES
+    # 3. ADMIN USER MANAGEMENT ROUTES (ADMIN ONLY)
     # ==========================================================================
     if norm_path == "/api/v1/admin/users" and method == "GET":
         if not user.is_admin():
@@ -327,6 +339,7 @@ def handle_api_request(
                 "userConfirmed": False,
                 "location": triage["location"],
                 "assignedTo": triage["assignedTo"],
+                "assignedTechId": None,
                 "photo": image_data,
                 "reporterId": user.id,
                 "reporterName": user.name,
@@ -377,8 +390,26 @@ def handle_api_request(
         ticket = storage.get_ticket(ticket_id, user.org_id)
 
         if not ticket:
-            # 404 / 403 to prevent cross-tenant enumeration
             return _json_response(404, {"success": False, "error": "Ticket not found or access denied."})
+
+        # Consumer Isolation: Consumers may retrieve only tickets they reported
+        if user.is_consumer():
+            rep_id = ticket.get("reporterId") or ticket.get("reportedBy", {}).get("id")
+            rep_email = (ticket.get("reporterEmail") or ticket.get("reportedBy", {}).get("email") or "").lower()
+            if rep_id != user.id and rep_email != user.email.lower():
+                return _json_response(403, {
+                    "success": False,
+                    "error": "Access Denied: Consumers may retrieve only tickets they reported."
+                })
+
+        # Technician Isolation: Technicians cannot fetch another technician's private ticket
+        if user.is_technician():
+            assigned_tech_id = ticket.get("assignedTechId")
+            if assigned_tech_id and assigned_tech_id != user.id:
+                return _json_response(403, {
+                    "success": False,
+                    "error": "Access Denied: You are not assigned to this work order."
+                })
 
         # GET /api/v1/tickets/:id
         if norm_path == f"/api/v1/tickets/{ticket_id}" and method == "GET":
@@ -404,9 +435,9 @@ def handle_api_request(
                     "error": str(e)
                 })
 
-        # POST /api/v1/tickets/:id/tech-complete
+        # POST /api/v1/tickets/:id/tech-complete (Contract: resolutionNotes)
         if norm_path == f"/api/v1/tickets/{ticket_id}/tech-complete" and method == "POST":
-            notes = body.get("resolutionNotes") or body.get("notes") or ""
+            notes = body.get("resolutionNotes") or body.get("resolution_notes") or body.get("notes") or ""
             try:
                 updated = tech_complete_ticket(ticket, user, notes)
                 saved = storage.save_ticket(updated, user.org_id)
@@ -453,9 +484,9 @@ def handle_api_request(
                     "error": str(e)
                 })
 
-        # POST /api/v1/tickets/:id/reject-closure (Consumer rejection + Reopening)
+        # POST /api/v1/tickets/:id/reject-closure (Contract: rejectionReason)
         if norm_path == f"/api/v1/tickets/{ticket_id}/reject-closure" and method == "POST":
-            reason = body.get("rejectionReason") or body.get("reason") or ""
+            reason = body.get("rejectionReason") or body.get("rejection_reason") or body.get("reason") or ""
             try:
                 updated = consumer_reject_closure(ticket, user, reason)
                 saved = storage.save_ticket(updated, user.org_id)
@@ -479,7 +510,6 @@ def handle_api_request(
 
         # DELETE /api/v1/tickets/:id
         if norm_path == f"/api/v1/tickets/{ticket_id}" and method == "DELETE":
-            # Only admin or ticket reporter can delete
             is_owner = ticket.get("reporterId") == user.id
             if not user.is_admin() and not is_owner:
                 return _json_response(403, {"success": False, "error": "Only an administrator or the reporter can delete this ticket."})
@@ -494,12 +524,13 @@ def handle_api_request(
             return _json_response(200, {"success": True, "message": f"Ticket #{ticket_id} deleted."})
 
     # ==========================================================================
-    # 5. AUDIT LOGS ENDPOINT (/api/v1/audit-logs)
+    # 5. AUDIT LOGS ENDPOINT (/api/v1/audit-logs) (ADMIN ONLY)
     # ==========================================================================
     if (norm_path == "/api/v1/audit-logs" or norm_path == "/api/audit-logs") and method == "GET":
         if not user.is_admin():
             return _json_response(403, {"success": False, "error": "Administrative permissions required to view audit logs."})
         logs = storage.list_audit_logs(user.org_id)
-        return _json_response(200, {"success": True, "auditLogs": logs})
+        # Return both auditLogs and audit_logs for frontend contract compatibility
+        return _json_response(200, {"success": True, "auditLogs": logs, "audit_logs": logs})
 
     return _json_response(404, {"success": False, "error": f"Endpoint not found: {method} {norm_path}"})

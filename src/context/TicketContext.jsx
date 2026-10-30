@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './AuthContext';
+import apiClient from '../services/apiClient';
 
 const TicketContext = createContext(null);
 
@@ -52,12 +53,14 @@ function normalizeTicketRecord(ticket) {
     userConfirmed: isUserConfirmed,
     UserConfirmed: isUserConfirmed ? 'true' : 'false',
     assignedTo: ticket.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : 'General Maintenance'),
+    assignedTechId: ticket.assignedTechId || null,
     photo: ticket.photo || ticket.Photo || null,
     createdAt,
     updatedAt: ticket.updatedAt || ticket.UpdatedAt || createdAt,
     resolvedAt: ticket.resolvedAt || ticket.ResolvedAt || null,
     resolutionNotes: ticket.resolutionNotes || ticket.ResolutionNotes || null,
-    rejectionReason: ticket.rejectionReason || ticket.RejectionReason || null,
+    rejectionReason: ticket.rejectionReason || ticket.RejectionReason || ticket.lastRejectionReason || null,
+    reopenCount: ticket.reopenCount || 0,
     isHazard: Boolean(ticket.isHazard),
     isRecurring: Boolean(ticket.isRecurring),
     recurringFixSummary: ticket.recurringFixSummary || null,
@@ -108,7 +111,6 @@ export function isUserTicket(ticket, user) {
 export function TicketProvider({ children }) {
   const auth = useAuth();
   const token = auth?.token || null;
-  const getAuthHeaders = auth?.getAuthHeaders;
   const role = auth?.currentUser?.approvalStatus === 'Approved' ? auth.currentUser.role : null;
   const currentUser = auth?.currentUser || null;
 
@@ -162,36 +164,24 @@ export function TicketProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // 1. READ: Fetch isolated tickets from authoritative backend
+  // 1. READ: Fetch isolated tickets from authoritative Python backend
   const fetchTickets = useCallback(async () => {
-    if (!token || !getAuthHeaders) {
-      return;
-    }
+    if (!token) return;
 
     try {
-      const response = await fetch('/api/v1/tickets', {
-        headers: getAuthHeaders()
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          // Token expired or invalid
-          return;
-        }
-        throw new Error(`Tickets fetch failed: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await apiClient.tickets.list();
       if (Array.isArray(data.tickets)) {
         const normalized = data.tickets.map(normalizeTicketRecord).filter(Boolean);
         setTickets(normalized);
       }
     } catch (error) {
-      console.warn('Backend tickets sync error:', error);
+      if (error.status !== 401) {
+        console.warn('Backend tickets sync error:', error);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [token, getAuthHeaders]);
+  }, [token]);
 
   // Initial fetch and continuous real-time polling
   useEffect(() => {
@@ -240,9 +230,9 @@ export function TicketProvider({ children }) {
     });
   };
 
-  // 2. CREATE: Submit new issue to authoritative backend API
+  // 2. CREATE: Submit new issue to authoritative backend API via apiClient
   const addTicket = async (newTicketData) => {
-    if (!token || !getAuthHeaders) {
+    if (!token) {
       throw new Error('Authentication required to submit maintenance request.');
     }
 
@@ -258,18 +248,7 @@ export function TicketProvider({ children }) {
         mimeType: newTicketData.mimeType || 'image/jpeg'
       };
 
-      const response = await fetch('/api/v1/tickets', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || data.message || `Creation failed (${response.status})`);
-      }
-
+      const data = await apiClient.tickets.create(payload);
       const created = normalizeTicketRecord(data.ticket);
       setTickets((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
 
@@ -287,7 +266,7 @@ export function TicketProvider({ children }) {
       addToast({
         type: 'error',
         title: 'Submission Error',
-        message: err.message || 'Could not dispatch work order to backend.'
+        message: err.data?.error || err.message || 'Could not dispatch work order to backend.'
       });
       throw err;
     }
@@ -295,30 +274,19 @@ export function TicketProvider({ children }) {
 
   const createTicket = addTicket;
 
-  // 3. TECHNICIAN SIGN-OFF: Mark work as completed by technician
+  // 3. TECHNICIAN SIGN-OFF: Mark work as completed by technician (Contract: resolutionNotes)
   const techCompleteTicket = async (ticketId, resolutionNotes = '') => {
-    if (!token || !getAuthHeaders) return;
+    if (!token) return;
 
     try {
-      const response = await fetch(`/api/v1/tickets/${ticketId}/tech-complete`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ resolution_notes: resolutionNotes })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Technician sign-off failed.');
-      }
-
+      const data = await apiClient.tickets.techComplete(ticketId, resolutionNotes);
       const updated = normalizeTicketRecord(data.ticket);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
 
       addToast({
         type: 'info',
         title: 'Repair Sign-off Recorded',
-        message: 'Ticket sent to reporting user for final verification.'
+        message: 'Ticket sent to reporting consumer for final verification.'
       });
       return updated;
     } catch (err) {
@@ -326,7 +294,7 @@ export function TicketProvider({ children }) {
       addToast({
         type: 'error',
         title: 'Sign-off Failed',
-        message: err.message || 'Failed to record technician resolution.'
+        message: err.data?.error || err.message || 'Failed to record technician resolution.'
       });
       throw err;
     }
@@ -334,20 +302,10 @@ export function TicketProvider({ children }) {
 
   // 4. USER VERIFICATION: Confirm physical repair & complete ticket (triggers trusted RAG)
   const verifyTicketClosure = async (ticketId) => {
-    if (!token || !getAuthHeaders) return;
+    if (!token) return;
 
     try {
-      const response = await fetch(`/api/v1/tickets/${ticketId}/verify-closure`, {
-        method: 'POST',
-        headers: getAuthHeaders()
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Verification failed.');
-      }
-
+      const data = await apiClient.tickets.verifyClosure(ticketId);
       const updated = normalizeTicketRecord(data.ticket);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
 
@@ -362,15 +320,15 @@ export function TicketProvider({ children }) {
       addToast({
         type: 'error',
         title: 'Verification Failed',
-        message: err.message || 'Failed to complete ticket verification.'
+        message: err.data?.error || err.message || 'Failed to complete ticket verification.'
       });
       throw err;
     }
   };
 
-  // 5. USER REJECTION: Reject unsatisfactory repair & reopen ticket with reason
+  // 5. USER REJECTION: Reject unsatisfactory repair & reopen ticket with reason (Contract: rejectionReason)
   const rejectTicketClosure = async (ticketId, rejectionReason) => {
-    if (!token || !getAuthHeaders) return;
+    if (!token) return;
 
     if (!rejectionReason || !rejectionReason.trim()) {
       addToast({
@@ -382,18 +340,7 @@ export function TicketProvider({ children }) {
     }
 
     try {
-      const response = await fetch(`/api/v1/tickets/${ticketId}/reject-closure`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ rejection_reason: rejectionReason.trim() })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Rejection failed.');
-      }
-
+      const data = await apiClient.tickets.rejectClosure(ticketId, rejectionReason.trim());
       const updated = normalizeTicketRecord(data.ticket);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
 
@@ -408,7 +355,7 @@ export function TicketProvider({ children }) {
       addToast({
         type: 'error',
         title: 'Rejection Error',
-        message: err.message || 'Could not reject ticket.'
+        message: err.data?.error || err.message || 'Could not reject ticket.'
       });
       throw err;
     }
@@ -423,9 +370,9 @@ export function TicketProvider({ children }) {
     }
   };
 
-  // 6. UPDATE STATUS: General status transitions (e.g. In Progress)
+  // 6. UPDATE STATUS: General status transitions using PATCH (Contract: PATCH /api/v1/tickets/:id/status)
   const updateTicketStatus = async (ticketId, newStatus, resolutionNotes = '') => {
-    if (!token || !getAuthHeaders) return;
+    if (!token) return;
 
     // Backend state machine strictly blocks jumping directly to Completed
     if (newStatus === 'Done' || newStatus === 'Completed') {
@@ -438,21 +385,7 @@ export function TicketProvider({ children }) {
     }
 
     try {
-      const response = await fetch(`/api/v1/tickets/${ticketId}/status`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          status: newStatus,
-          resolution_notes: resolutionNotes
-        })
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Status update failed.');
-      }
-
+      const data = await apiClient.tickets.updateStatus(ticketId, newStatus, resolutionNotes);
       const updated = normalizeTicketRecord(data.ticket);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
 
@@ -467,27 +400,17 @@ export function TicketProvider({ children }) {
       addToast({
         type: 'error',
         title: 'Update Failed',
-        message: err.message || 'Failed to update ticket status.'
+        message: err.data?.error || err.message || 'Failed to update ticket status.'
       });
     }
   };
 
-  // 7. DELETE: Permanent ticket removal
+  // 7. DELETE: Permanent ticket removal (Contract: DELETE /api/v1/tickets/:id)
   const deleteTicket = async (ticketId) => {
-    if (!token || !getAuthHeaders) return;
+    if (!token) return;
 
     try {
-      const response = await fetch(`/api/v1/tickets/${ticketId}`, {
-        method: 'DELETE',
-        headers: getAuthHeaders()
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Delete failed.');
-      }
-
+      await apiClient.tickets.delete(ticketId);
       setTickets((prev) => prev.filter((t) => t.id !== ticketId));
 
       addToast({
@@ -500,22 +423,18 @@ export function TicketProvider({ children }) {
       addToast({
         type: 'error',
         title: 'Delete Failed',
-        message: err.message || 'Could not delete ticket.'
+        message: err.data?.error || err.message || 'Could not delete ticket.'
       });
     }
   };
 
-  // 8. AUDIT LOGS: Retrieve immutable audit trail for organisation
+  // 8. AUDIT LOGS: Retrieve immutable audit trail (Contract: consistent auditLogs field)
   const fetchAuditLogs = async () => {
-    if (!token || !getAuthHeaders) return [];
+    if (!token) return [];
 
     try {
-      const response = await fetch('/api/v1/audit-logs', {
-        headers: getAuthHeaders()
-      });
-      if (!response.ok) return [];
-      const data = await response.json();
-      return data.audit_logs || [];
+      const data = await apiClient.admin.getAuditLogs();
+      return data.auditLogs || data.audit_logs || [];
     } catch (err) {
       console.warn('fetchAuditLogs error:', err);
       return [];
@@ -585,9 +504,6 @@ export function TicketProvider({ children }) {
     setUserTab,
     tickets,
     isLoading,
-    isAirtableConnected: false, // Legacy Airtable replaced with Authoritative Backend
-    airtablePat: '',
-    setAirtablePat: () => {},
     fetchTickets,
     stats,
     toasts,

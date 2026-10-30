@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "backend": "python run_backend.py",
+    "test:backend": "python -m unittest discover -s backend/tests -p \"test_*.py\" -v",
     "build": "vite build",
     "preview": "vite preview"
   },

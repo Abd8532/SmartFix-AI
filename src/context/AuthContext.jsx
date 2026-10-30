@@ -1,20 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import apiClient, { getToken, setToken as saveTokenToStorage, clearToken } from '../services/apiClient';
 
 const AuthContext = createContext(null);
 
 const STORAGE_KEYS = {
-  TOKEN: 'maintainx_jwt_token_v3',
   CURRENT_USER: 'maintainx_current_user_v3'
 };
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() => {
-    try {
-      return localStorage.getItem(STORAGE_KEYS.TOKEN) || null;
-    } catch {
-      return null;
-    }
-  });
+  const [token, setTokenState] = useState(() => getToken());
 
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -33,47 +27,45 @@ export function AuthProvider({ children }) {
 
   const [users, setUsers] = useState([]);
 
-  // Auth headers helper
+  // Auth headers helper for components that need headers directly
   const getAuthHeaders = useCallback(() => {
     const headers = { 'Content-Type': 'application/json' };
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`;
+    const currentTok = token || getToken();
+    if (currentTok) {
+      headers['Authorization'] = `Bearer ${currentTok}`;
     }
     return headers;
   }, [token]);
 
-  // Sync current user session on mount
+  // Sync current user session on mount using centralized API client
   useEffect(() => {
-    if (!token) return;
+    const currentTok = token || getToken();
+    if (!currentTok) return;
 
-    fetch('/api/v1/auth/me', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then((res) => (res.ok ? res.json() : null))
+    apiClient.auth.getMe()
       .then((data) => {
         if (data && data.success && data.user) {
           setCurrentUser(data.user);
           localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(data.user));
-        } else if (data && !data.success) {
-          // Token invalid or expired -> logout
+        } else {
           logout();
         }
       })
-      .catch(() => {});
+      .catch((err) => {
+        if (err.status === 401 || err.status === 403) {
+          logout();
+        }
+      });
   }, [token]);
 
   // Fetch tenant users for admin
   const syncUsers = useCallback(async () => {
-    if (!token || currentUser?.role !== 'admin') return;
+    const currentTok = token || getToken();
+    if (!currentTok || currentUser?.role !== 'admin') return;
     try {
-      const res = await fetch('/api/v1/admin/users', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && Array.isArray(data.users)) {
-          setUsers(data.users);
-        }
+      const data = await apiClient.admin.getUsers();
+      if (data.success && Array.isArray(data.users)) {
+        setUsers(data.users);
       }
     } catch {}
   }, [token, currentUser]);
@@ -86,17 +78,12 @@ export function AuthProvider({ children }) {
     }
   }, [syncUsers, currentUser]);
 
-  // 1. LOGIN (POST /api/v1/auth/login)
+  // 1. LOGIN (POST /api/v1/auth/login via apiClient)
   const login = useCallback(async (email, password) => {
     try {
-      const res = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
-      const data = await res.json();
+      const data = await apiClient.auth.login(email, password);
 
-      if (!res.ok || !data.success) {
+      if (!data.success) {
         return {
           success: false,
           status: data.status || 'Error',
@@ -107,11 +94,11 @@ export function AuthProvider({ children }) {
       const receivedToken = data.token;
       const user = data.user;
 
-      setToken(receivedToken);
+      saveTokenToStorage(receivedToken);
+      setTokenState(receivedToken);
       setCurrentUser(user);
 
       try {
-        localStorage.setItem(STORAGE_KEYS.TOKEN, receivedToken);
         localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
       } catch (e) {
         console.warn('Storage write failed:', e);
@@ -121,14 +108,14 @@ export function AuthProvider({ children }) {
     } catch (err) {
       return {
         success: false,
-        error: 'Unable to connect to authentication server. Please check your network connection.'
+        status: err.data?.status || 'Error',
+        error: err.data?.error || err.message || 'Unable to authenticate with backend.'
       };
     }
   }, []);
 
-  // 2. REGISTER (POST /api/v1/auth/register)
+  // 2. REGISTER (POST /api/v1/auth/register via apiClient)
   const register = useCallback(async (userData) => {
-    // Client-side guard against admin sign-up
     if (userData.role === 'admin') {
       return {
         success: false,
@@ -137,20 +124,7 @@ export function AuthProvider({ children }) {
     }
 
     try {
-      const res = await fetch('/api/v1/auth/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userData)
-      });
-      const data = await res.json();
-
-      if (!res.ok || !data.success) {
-        return {
-          success: false,
-          error: data.error || 'Registration failed.'
-        };
-      }
-
+      const data = await apiClient.auth.register(userData);
       return {
         success: true,
         user: data.user,
@@ -159,63 +133,45 @@ export function AuthProvider({ children }) {
     } catch (err) {
       return {
         success: false,
-        error: 'Failed to connect to registration server.'
+        error: err.data?.error || err.message || 'Registration failed.'
       };
     }
   }, []);
 
   // 3. ADMIN: APPROVE USER
   const approveUser = useCallback(async (userId) => {
-    if (!token) return { success: false, error: 'Unauthorized' };
     try {
-      const res = await fetch(`/api/v1/admin/users/${userId}/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ userId })
-      });
-      const data = await res.json();
+      const data = await apiClient.admin.approveUser(userId);
       if (data.success) {
         setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, approvalStatus: 'Approved' } : u)));
         return { success: true, user: data.user };
       }
       return { success: false, error: data.error };
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: err.data?.error || err.message };
     }
-  }, [token]);
+  }, []);
 
   // 4. ADMIN: REJECT USER
   const rejectUser = useCallback(async (userId) => {
-    if (!token) return { success: false, error: 'Unauthorized' };
     try {
-      const res = await fetch(`/api/v1/admin/users/${userId}/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({ userId })
-      });
-      const data = await res.json();
+      const data = await apiClient.admin.rejectUser(userId);
       if (data.success) {
         setUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, approvalStatus: 'Rejected' } : u)));
         return { success: true, user: data.user };
       }
       return { success: false, error: data.error };
     } catch (err) {
-      return { success: false, error: err.message };
+      return { success: false, error: err.data?.error || err.message };
     }
-  }, [token]);
+  }, []);
 
   // 5. LOGOUT
   const logout = useCallback(() => {
-    setToken(null);
+    clearToken();
+    setTokenState(null);
     setCurrentUser(null);
     try {
-      localStorage.removeItem(STORAGE_KEYS.TOKEN);
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
     } catch {}
   }, []);

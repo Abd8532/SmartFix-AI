@@ -12,6 +12,8 @@ import shutil
 # Ensure backend root is on sys.path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+import app.api
+import app.audit
 from app.auth import (
     hash_password,
     verify_password,
@@ -40,6 +42,11 @@ class TestFixFlowSecurityAndLifecycle(unittest.TestCase):
         self.test_dir = tempfile.mkdtemp()
         self.db_path = os.path.join(self.test_dir, "test_db.json")
         self.storage = StorageRepository(db_path=self.db_path)
+
+        self.orig_api_storage = app.api.storage
+        self.orig_audit_storage = app.audit.storage
+        app.api.storage = self.storage
+        app.audit.storage = self.storage
 
         # Seed sample organization & test users
         self.org_a = "org_campus_a"
@@ -103,7 +110,9 @@ class TestFixFlowSecurityAndLifecycle(unittest.TestCase):
         })
 
     def tearDown(self):
-        shutil.rmtree(self.test_dir)
+        app.api.storage = self.orig_api_storage
+        app.audit.storage = self.orig_audit_storage
+        shutil.rmtree(self.test_dir, ignore_errors=True)
 
     # ==========================================================================
     # TEST 1: User cannot register as administrator
