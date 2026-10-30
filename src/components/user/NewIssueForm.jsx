@@ -725,9 +725,6 @@ export default function NewIssueForm({ onTicketCreated }) {
                 <p className="text-base font-bold text-slate-900 font-['Plus_Jakarta_Sans']">
                   Take a Photo or Upload Fault Image
                 </p>
-                <p className="text-xs text-slate-500 font-medium mt-1 max-w-xs">
-                  Native rear camera on mobile phones (<code className="font-mono text-slate-700 text-xs">capture="environment"</code>) or file picker on desktop.
-                </p>
 
                 <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
                   <button
