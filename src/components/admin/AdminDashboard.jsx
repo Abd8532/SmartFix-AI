@@ -59,10 +59,8 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     stats, 
     addToast,
     fetchTickets,
-    isAirtableConnected,
-    airtablePat,
-    setAirtablePat,
-    resetMockData
+    resetMockData,
+    fetchAuditLogs
   } = useTickets();
   const { users, pendingUsers, approvedUsers, approveUser, rejectUser } = useAuth();
 
@@ -82,17 +80,29 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
   // Hazard Queue specific filter
   const [hazardFilter, setHazardFilter] = useState('All'); // 'All' | 'Critical' | 'Urgent'
 
-  // Settings State
-  const [geminiKey, setGeminiKey] = useState(() => {
-    return localStorage.getItem('maintainx_gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY || '';
-  });
-  const [geminiModel, setGeminiModel] = useState(() => {
-    return localStorage.getItem('maintainx_gemini_model') || 'auto';
-  });
-  const [showKey, setShowKey] = useState(false);
-  const [patInput, setPatInput] = useState(airtablePat || '');
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [testingAi, setTestingAi] = useState(false);
+  // Audit Trail State
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+
+  const loadAuditLogs = async () => {
+    if (typeof fetchAuditLogs === 'function') {
+      setLoadingAudit(true);
+      try {
+        const logs = await fetchAuditLogs();
+        setAuditLogs(logs);
+      } finally {
+        setLoadingAudit(false);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (currentTab === 'audit') {
+      loadAuditLogs();
+    }
+  }, [currentTab]);
+
+  // Operational Policies State
   const [policies, setPolicies] = useState({
     strictGating: true,
     dualApproval: true,
@@ -216,95 +226,20 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     });
   };
 
-  // Live Airtable manual sync trigger
-  const handleSyncAirtable = async () => {
-    setIsSyncing(true);
-    try {
-      if (typeof fetchTickets === 'function') {
-        await fetchTickets();
-      }
-      addToast({
-        type: 'success',
-        title: 'Airtable Sync Complete',
-        message: 'Tickets refreshed from Airtable Base app32PCGpVp4lBamC.'
-      });
-    } catch (err) {
-      addToast({
-        type: 'error',
-        title: 'Sync Failed',
-        message: err.message || 'Could not fetch from Airtable.'
-      });
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // Save Gemini Configuration
-  const handleSaveGemini = (e) => {
-    e.preventDefault();
-    const trimmed = geminiKey.trim();
-    if (trimmed) {
-      localStorage.setItem('maintainx_gemini_api_key', trimmed);
-    } else {
-      localStorage.removeItem('maintainx_gemini_api_key');
-    }
-    localStorage.setItem('maintainx_gemini_model', geminiModel);
+  // Export Audit Trail as JSON file
+  const handleExportAuditJson = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(auditLogs, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.setAttribute("href", dataStr);
+    downloadAnchor.setAttribute("download", `smartfixflow-audit-trail-${new Date().toISOString().split('T')[0]}.json`);
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    downloadAnchor.remove();
     addToast({
       type: 'success',
-      title: 'AI Settings Saved',
-      message: `Gemini configuration updated. Active model: ${geminiModel}.`
+      title: 'Audit Export Complete',
+      message: `Exported ${auditLogs.length} audit records to JSON file.`
     });
-  };
-
-  // Save Airtable PAT Token
-  const handleSavePat = (e) => {
-    e.preventDefault();
-    const trimmed = patInput.trim();
-    if (trimmed) {
-      localStorage.setItem('maintainx_airtable_pat_v1', trimmed);
-      if (setAirtablePat) setAirtablePat(trimmed);
-    } else {
-      localStorage.removeItem('maintainx_airtable_pat_v1');
-      if (setAirtablePat) setAirtablePat('');
-    }
-    addToast({
-      type: 'success',
-      title: 'Airtable Credentials Saved',
-      message: 'Personal Access Token updated.'
-    });
-  };
-
-  // Test Gemini Connection
-  const handleTestAi = async () => {
-    const key = geminiKey.trim() || import.meta.env.VITE_GEMINI_API_KEY || localStorage.getItem('maintainx_gemini_api_key');
-    if (!key) {
-      addToast({
-        type: 'warning',
-        title: 'No API Key Configured',
-        message: 'Please enter a Google Gemini API Key first.'
-      });
-      return;
-    }
-    setTestingAi(true);
-    try {
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${key}`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-      const data = await res.json();
-      const count = data.models?.length || 0;
-      addToast({
-        type: 'success',
-        title: 'Gemini AI Live & Verified!',
-        message: `Successfully connected to Google AI Studio (${count} models active).`
-      });
-    } catch (err) {
-      addToast({
-        type: 'error',
-        title: 'Gemini Verification Error',
-        message: err.message || 'Failed to connect to Google Gemini API.'
-      });
-    } finally {
-      setTestingAi(false);
-    }
   };
 
   // Clear all maintenance work orders
@@ -1248,7 +1183,119 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 5: SETTINGS & OPERATIONS CONFIGURATION                                */}
+      {/* TAB 5: AUDIT TRAIL (IMMUTABLE LOGS)                                      */}
+      {/* ========================================================================= */}
+      {currentTab === 'audit' && (
+        <div className="space-y-6 animate-slide-up max-w-5xl text-slate-900">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 font-['Plus_Jakarta_Sans']">
+                <FileText className="w-6 h-6 text-[#2D60FF]" />
+                <span>Immutable System Audit Trail</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+                Real-time security log: Account registrations, admin approvals, ticket mutations, and dual-sign-offs.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={loadAuditLogs}
+                disabled={loadingAudit}
+                className="h-11 px-4 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all flex items-center gap-1.5 shadow-xs"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${loadingAudit ? 'animate-spin' : ''}`} />
+                <span>Refresh</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExportAuditJson}
+                className="h-11 px-4 rounded-2xl bg-[#E7EDFF] hover:bg-[#2D60FF]/15 text-[#2D60FF] text-xs font-semibold border border-[#2D60FF]/30 transition-all flex items-center gap-1.5 shadow-xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Audit JSON</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-[#E6EFF5] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
+            <div className="px-6 py-4 border-b border-[#E6EFF5] flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">
+                Audit Records ({auditLogs.length})
+              </h3>
+              <span className="text-xs text-slate-400 font-medium">Tenant: org_campus_main</span>
+            </div>
+
+            {auditLogs.length === 0 ? (
+              <EmptyState
+                icon={ClipboardCheck}
+                title="No audit events recorded"
+                subtitle="Actions like signups, approvals, status updates, and dual confirmations will appear here."
+              />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-[#F5F7FA] text-slate-500 border-b border-[#E6EFF5] text-xs font-semibold">
+                    <tr>
+                      <th className="px-6 py-4 font-bold">Timestamp</th>
+                      <th className="px-4 py-4 font-bold">Action</th>
+                      <th className="px-4 py-4 font-bold">Target</th>
+                      <th className="px-4 py-4 font-bold">Actor</th>
+                      <th className="px-6 py-4 font-bold">Details</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#E6EFF5]">
+                    {auditLogs.map((log) => {
+                      let actionColor = "bg-slate-100 text-slate-700";
+                      if (log.action.includes('USER_APPROVED') || log.action.includes('TECH_CONFIRM')) {
+                        actionColor = "bg-emerald-50 text-emerald-700 border border-emerald-300";
+                      } else if (log.action.includes('USER_CONFIRM')) {
+                        actionColor = "bg-teal-50 text-teal-700 border border-teal-300";
+                      } else if (log.action.includes('REJECTED')) {
+                        actionColor = "bg-rose-50 text-rose-700 border border-rose-300";
+                      } else if (log.action.includes('CREATED')) {
+                        actionColor = "bg-blue-50 text-blue-700 border border-blue-300";
+                      }
+
+                      return (
+                        <tr key={log.id} className="hover:bg-[#F5F7FA]/75 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
+                            {new Date(log.timestamp).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${actionColor}`}>
+                              {log.action}
+                            </span>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap font-mono text-slate-800 font-semibold">
+                            {log.target_id || '—'}
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap text-slate-700">
+                            <span className="font-semibold">{log.actor_role}</span>
+                            <span className="text-slate-400 font-mono text-[10px] block">{log.actor_id}</span>
+                          </td>
+                          <td className="px-6 py-4 text-slate-600 max-w-xs truncate">
+                            {log.details ? (
+                              <span className="font-mono text-[11px] text-slate-700">
+                                {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
+                              </span>
+                            ) : '—'}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 6: SETTINGS & OPERATIONS CONFIGURATION                                */}
       {/* ========================================================================= */}
       {currentTab === 'settings' && (
         <div className="space-y-6 animate-slide-up max-w-4xl text-slate-900">
@@ -1256,153 +1303,57 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
           <div>
             <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 font-['Plus_Jakarta_Sans']">
               <SettingsIcon className="w-6 h-6 text-[#2D60FF]" />
-              <span>Facilities Operations & System Settings</span>
+              <span>Facilities Operations & Secure Foundation</span>
             </h2>
             <p className="text-sm font-medium text-slate-500 mt-1">
-              Configure multimodal AI models, live Airtable sync credentials, and dual-approval facilities policies.
+              Authoritative backend configuration, multi-tenant isolation, and dual-approval facilities policies.
             </p>
           </div>
 
-          {/* 1. Google Gemini AI Engine Configuration Card */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#E7EDFF] text-[#2D60FF] flex items-center justify-center shadow-xs">
-                  <Sparkles className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Google Gemini Multimodal AI Engine</h3>
-                  <p className="text-xs font-medium text-slate-500">Auto-extracts priority, category, and location from fault photos.</p>
-                </div>
+          {/* 1. Secure Backend Architecture Card */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-[#E7EDFF] text-[#2D60FF] flex items-center justify-center shadow-xs">
+                <ShieldCheck className="w-5 h-5" />
               </div>
-
-              <button
-                type="button"
-                onClick={handleTestAi}
-                disabled={testingAi}
-                className="h-11 px-4 rounded-2xl bg-[#E7EDFF] hover:bg-[#2D60FF]/15 text-[#2D60FF] text-xs font-semibold border border-[#2D60FF]/30 transition-all duration-200 active:scale-[0.98] flex items-center gap-1.5"
-              >
-                {testingAi ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
-                <span>{testingAi ? 'Testing...' : 'Test AI Connection'}</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleSaveGemini} className="space-y-4 pt-2">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="text-xs font-bold text-slate-900">Google Gemini API Key</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowKey(!showKey)}
-                      className="text-xs font-medium text-slate-500 hover:text-slate-900 flex items-center gap-1"
-                    >
-                      {showKey ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                      <span>{showKey ? 'Hide' : 'Show'}</span>
-                    </button>
-                  </div>
-                  <input
-                    type={showKey ? 'text' : 'password'}
-                    value={geminiKey}
-                    onChange={(e) => setGeminiKey(e.target.value)}
-                    placeholder="AIzaSy..."
-                    className="w-full h-11 px-4 rounded-2xl border border-[#DFEAF2] bg-[#F5F7FA] text-xs font-mono text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
-                  />
-                  <p className="text-xs font-medium text-slate-500 mt-1">Stored securely in your browser localStorage.</p>
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-slate-900 mb-1 block">Active Gemini Model</label>
-                  <Select value={geminiModel} onValueChange={(val) => setGeminiModel(val)}>
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Auto-detect (gemini-2.5-flash / 2.0-flash)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="auto">Auto-detect (gemini-2.5-flash / 2.0-flash)</SelectItem>
-                      <SelectItem value="gemini-2.5-flash">Gemini 2.5 Flash (Recommended)</SelectItem>
-                      <SelectItem value="gemini-2.0-flash">Gemini 2.0 Flash</SelectItem>
-                      <SelectItem value="gemini-1.5-flash-latest">Gemini 1.5 Flash Latest</SelectItem>
-                      <SelectItem value="gemini-1.5-flash">Gemini 1.5 Flash (Legacy)</SelectItem>
-                      <SelectItem value="gemini-1.5-pro">Gemini 1.5 Pro</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs font-medium text-slate-500 mt-1">Sequential multi-model fallback automatically active.</p>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-1">
-                <button
-                  type="submit"
-                  className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white font-bold text-xs shadow-md shadow-[#2D60FF]/25 transition-all duration-200 active:scale-[0.98]"
-                >
-                  Save AI Configuration
-                </button>
-              </div>
-            </form>
-          </div>
-
-          {/* 2. Live Airtable Database Sync Card */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-[#DCFAF8] text-[#16DBCC] flex items-center justify-center shadow-xs">
-                  <Database className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Live Airtable Central Database</h3>
-                  <p className="text-xs font-medium text-slate-500">Base ID: <code className="font-mono text-slate-900 font-bold">app32PCGpVp4lBamC</code> · Table: <code className="font-mono text-slate-900 font-bold">tblyhV3Zxyw2wWzww</code></p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                  isAirtableConnected 
-                    ? 'bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30'
-                    : 'bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30'
-                }`}>
-                  <span className={`w-2 h-2 rounded-full ${isAirtableConnected ? 'bg-[#16DBCC]' : 'bg-[#FFBB38]'}`} />
-                  <span>{isAirtableConnected ? 'Live Connected' : 'Local Storage Fallback'}</span>
-                </span>
-
-                <button
-                  type="button"
-                  onClick={handleSyncAirtable}
-                  disabled={isSyncing}
-                  className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all duration-200 active:scale-[0.98] flex items-center gap-1.5 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
-                >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                  <span>{isSyncing ? 'Syncing...' : 'Sync Now'}</span>
-                </button>
-              </div>
-            </div>
-
-            <form onSubmit={handleSavePat} className="space-y-3 pt-1">
               <div>
-                <label className="text-xs font-bold text-slate-900 mb-1 block">Airtable Personal Access Token (PAT)</label>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={patInput}
-                    onChange={(e) => setPatInput(e.target.value)}
-                    placeholder="patXXXXXXXXXXXXXX..."
-                    className="flex-1 h-11 px-4 rounded-2xl border border-[#DFEAF2] bg-[#F5F7FA] text-slate-900 placeholder-slate-400 text-xs font-mono focus:bg-white focus:outline-none focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
-                  />
-                  <button
-                    type="submit"
-                    className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white font-semibold text-xs transition-all duration-200 active:scale-[0.98] shadow-sm"
-                  >
-                    Update PAT
-                  </button>
-                </div>
+                <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Authoritative Multi-Tenant Platform</h3>
+                <p className="text-xs font-medium text-slate-500">Security claims derived strictly from verified JWT tokens.</p>
               </div>
-            </form>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+              <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+                <p className="text-slate-400 font-semibold uppercase text-[10px]">Active Organisation</p>
+                <p className="text-sm font-bold text-slate-900 mt-0.5 font-mono">org_campus_main</p>
+                <p className="text-[11px] text-slate-500 mt-1">Strict multi-tenant data boundary isolation</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+                <p className="text-slate-400 font-semibold uppercase text-[10px]">Password Protection</p>
+                <p className="text-sm font-bold text-emerald-700 mt-0.5">PBKDF2-HMAC-SHA256</p>
+                <p className="text-[11px] text-slate-500 mt-1">100k iterations with 16-byte cryptographically secure salt</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+                <p className="text-slate-400 font-semibold uppercase text-[10px]">RAG Vector Search</p>
+                <p className="text-sm font-bold text-[#2D60FF] mt-0.5">text-embedding-004 + Fallback</p>
+                <p className="text-[11px] text-slate-500 mt-1">Ingestion gated strictly on dual-verified completion</p>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+                <p className="text-slate-400 font-semibold uppercase text-[10px]">Safety Priority Overrides</p>
+                <p className="text-sm font-bold text-red-600 mt-0.5">Deterministic Guardrails</p>
+                <p className="text-[11px] text-slate-500 mt-1">Gas leaks, sparking, live wires clamp to Emergency Hazard</p>
+              </div>
+            </div>
           </div>
 
-          {/* 3. Operational Policies Card */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] space-y-4">
+          {/* 2. Operational Policies Card */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-['Plus_Jakarta_Sans']">
               <ShieldCheck className="w-4 h-4 text-[#2D60FF]" />
-              <span>Campus Facilities & Dual-Approval Policies</span>
+              <span>Campus Facilities Policies</span>
             </h3>
 
             <div className="space-y-3 divide-y divide-[#E6EFF5]">
@@ -1422,7 +1373,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
               <div className="flex items-center justify-between pt-3">
                 <div>
                   <p className="text-xs font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Two-Party Dual Confirmation</p>
-                  <p className="text-xs font-medium text-slate-500">Work orders cannot be closed until reporting user confirms physical repair after technician marks fixed.</p>
+                  <p className="text-xs font-medium text-slate-500">Work orders cannot be closed until reporting consumer verifies physical repair after technician signs off.</p>
                 </div>
                 <input
                   type="checkbox"
@@ -1435,7 +1386,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
               <div className="flex items-center justify-between pt-3">
                 <div>
                   <p className="text-xs font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Emergency Hazard Auto-Escalation</p>
-                  <p className="text-xs font-medium text-slate-500">Automatically flag high-voltage and pressurized water complaints with HAZARD status.</p>
+                  <p className="text-xs font-medium text-slate-500">Automatically flag electrical, gas, and pressurized water complaints with non-downgradable Emergency status.</p>
                 </div>
                 <input
                   type="checkbox"
@@ -1447,8 +1398,8 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
             </div>
           </div>
 
-          {/* 4. Data Backup & Reset */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] space-y-4">
+          {/* 3. Data Backup & Reset */}
+          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-['Plus_Jakarta_Sans']">
               <Database className="w-4 h-4 text-[#2D60FF]" />
               <span>Data Management & Maintenance</span>
@@ -1458,7 +1409,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
               <button
                 type="button"
                 onClick={handleExportJson}
-                className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all duration-200 active:scale-[0.98] flex items-center gap-2 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
+                className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all flex items-center gap-2 shadow-xs"
               >
                 <Download className="w-4 h-4 text-slate-500" />
                 <span>Export All Tickets (JSON)</span>
@@ -1466,8 +1417,17 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
 
               <button
                 type="button"
+                onClick={handleExportAuditJson}
+                className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all flex items-center gap-2 shadow-xs"
+              >
+                <Download className="w-4 h-4 text-slate-500" />
+                <span>Export Audit Logs (JSON)</span>
+              </button>
+
+              <button
+                type="button"
                 onClick={handleResetData}
-                className="h-11 px-5 rounded-2xl bg-[#FFE0EB] hover:bg-rose-100 text-[#FF4B4A] text-xs font-semibold border border-[#FF4B4A]/30 transition-all duration-200 active:scale-[0.98] flex items-center gap-2 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
+                className="h-11 px-5 rounded-2xl bg-[#FFE0EB] hover:bg-rose-100 text-[#FF4B4A] text-xs font-semibold border border-[#FF4B4A]/30 transition-all flex items-center gap-2 shadow-xs"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Clear All Work Orders</span>

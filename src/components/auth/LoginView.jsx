@@ -12,9 +12,9 @@ export default function LoginView({ onLogin }) {
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [formData, setFormData] = useState({
-    name: 'Campus User',
-    email: 'user@campus.edu',
-    password: 'password',
+    name: '',
+    email: '',
+    password: '',
     role: 'user',
     specialty: 'Plumbing'
   });
@@ -25,40 +25,15 @@ export default function LoginView({ onLogin }) {
     setErrorMessage('');
     setSuccessMessage('');
 
-    if (!isSignUp) {
-      // In Login mode, auto-fill standard credentials for the selected role for seamless switching
-      if (roleKey === 'admin') {
-        setFormData({
-          name: 'Master Administrator',
-          email: 'admin@campus.edu',
-          password: 'admin123',
-          role: 'admin'
-        });
-      } else if (roleKey === 'technician') {
-        setFormData({
-          name: 'Marcus Vance',
-          email: 'tech@campus.edu',
-          password: 'password',
-          role: 'technician',
-          specialty: 'Plumbing'
-        });
-      } else {
-        setFormData({
-          name: 'Campus User',
-          email: 'user@campus.edu',
-          password: 'password',
-          role: 'user',
-          specialty: 'Plumbing'
-        });
-      }
-    } else {
-      // In Sign-up mode, update selected registration role
-      setFormData((prev) => ({
-        ...prev,
-        role: roleKey,
-        specialty: roleKey === 'technician' ? (prev.specialty || 'Plumbing') : prev.specialty
-      }));
+    if (isSignUp && roleKey === 'admin') {
+      return; // Public administrator registration is strictly prohibited
     }
+
+    setFormData((prev) => ({
+      ...prev,
+      role: roleKey,
+      specialty: roleKey === 'technician' ? (prev.specialty || 'Plumbing') : prev.specialty
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -69,7 +44,13 @@ export default function LoginView({ onLogin }) {
 
     try {
       if (isSignUp) {
-        // 1. REGISTRATION: Conditional approval based on selected role via shared /api/register
+        // 1. REGISTRATION: Strictly consumer and technician roles only (Admin registration blocked)
+        if (formData.role === 'admin') {
+          setErrorMessage('Security Restriction: Public administrator registration is prohibited.');
+          setIsSubmitting(false);
+          return;
+        }
+
         const result = await register({
           name: formData.name,
           email: formData.email,
@@ -83,23 +64,12 @@ export default function LoginView({ onLogin }) {
           return;
         }
 
-        // If registered as admin -> automatically approved!
-        if (formData.role === 'admin') {
-          setSuccessMessage('Administrator account created and automatically approved! You can now log in.');
-          addToast({
-            type: 'success',
-            title: 'Admin Registered & Approved',
-            message: 'Welcome! Your administrator account is ready. Please log in.'
-          });
-        } else {
-          // user or technician -> pending approval
-          setSuccessMessage('Account created successfully. Please wait for an Administrator to approve your account before logging in.');
-          addToast({
-            type: 'info',
-            title: 'Registration Pending Approval',
-            message: 'Account created. Please wait for an Administrator to approve your account.'
-          });
-        }
+        setSuccessMessage('Account created successfully. Please wait for an Administrator to approve your account before logging in.');
+        addToast({
+          type: 'info',
+          title: 'Registration Pending Approval',
+          message: 'Account created. Please wait for an Administrator to approve your account.'
+        });
 
         setFormData((prev) => ({ ...prev, password: '' }));
         setIsSignUp(false); // Switch to login view with success banner
@@ -170,63 +140,88 @@ export default function LoginView({ onLogin }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          {/* Role Selector: User, Technician, and Admin */}
+          {/* Role Selector */}
           <div>
             <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider font-['Plus_Jakarta_Sans']">
               {isSignUp ? 'I am registering as' : 'Choose Role / Account Type'}
             </label>
-            <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
-              <button
-                type="button"
-                onClick={() => handleRoleSelect('user')}
-                className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                  formData.role === 'user'
-                    ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <User className="w-4 h-4" />
-                <span>User</span>
-              </button>
+            {isSignUp ? (
+              // Sign-up: Strictly Consumer or Technician (Public Admin registration prohibited)
+              <div className="grid grid-cols-2 gap-2 p-1.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect('user')}
+                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                    formData.role === 'user'
+                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span>Campus User</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => handleRoleSelect('technician')}
-                className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                  formData.role === 'technician'
-                    ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <Wrench className="w-4 h-4" />
-                <span>Technician</span>
-              </button>
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect('technician')}
+                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                    formData.role === 'technician'
+                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Wrench className="w-4 h-4" />
+                  <span>Field Technician</span>
+                </button>
+              </div>
+            ) : (
+              // Login: Quick role filter
+              <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect('user')}
+                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                    formData.role === 'user'
+                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <User className="w-4 h-4" />
+                  <span>User</span>
+                </button>
 
-              <button
-                type="button"
-                onClick={() => handleRoleSelect('admin')}
-                className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                  formData.role === 'admin'
-                    ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                    : 'text-slate-500 hover:text-slate-900'
-                }`}
-              >
-                <ShieldCheck className="w-4 h-4" />
-                <span>Admin</span>
-              </button>
-            </div>
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect('technician')}
+                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                    formData.role === 'technician'
+                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <Wrench className="w-4 h-4" />
+                  <span>Technician</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleRoleSelect('admin')}
+                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                    formData.role === 'admin'
+                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
+                      : 'text-slate-500 hover:text-slate-900'
+                  }`}
+                >
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Admin</span>
+                </button>
+              </div>
+            )}
 
             {isSignUp && (
-              formData.role === 'admin' ? (
-                <p className="text-xs text-[#16DBCC] mt-2 bg-[#DCFAF8] p-3 rounded-2xl border border-[#16DBCC]/30 flex items-center gap-2 font-medium">
-                  <CheckCircle2 className="w-4 h-4 text-[#16DBCC] shrink-0" />
-                  <span>⚡ <strong>Auto-Approved:</strong> Admin accounts are immediately approved and granted management access.</span>
-                </p>
-              ) : (
-                <p className="text-xs text-[#FFBB38] mt-2 bg-[#FFF5D9] p-3 rounded-2xl border border-[#FFBB38]/30 font-medium">
-                  🔒 <strong>Strict Admin Gating:</strong> New accounts will require verification from an Administrator before you can log in.
-                </p>
-              )
+              <p className="text-xs text-[#FFBB38] mt-2 bg-[#FFF5D9] p-3 rounded-2xl border border-[#FFBB38]/30 font-medium">
+                🔒 <strong>Strict Admin Gating:</strong> New accounts require administrator verification and approval before dashboard access is unlocked.
+              </p>
             )}
           </div>
 

@@ -1,54 +1,38 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import { INITIAL_TICKETS } from '../types/mockData';
 import { useAuth } from './AuthContext';
 
 const TicketContext = createContext(null);
 
-// Your exact Airtable endpoint
-const AIRTABLE_BASE_ID = 'app32PCGpVp4lBamC';
-const AIRTABLE_TABLE_ID = 'tblyhV3Zxyw2wWzww';
-const AIRTABLE_URL = `https://api.airtable.com/v0/${AIRTABLE_BASE_ID}/${AIRTABLE_TABLE_ID}`;
-
 const STORAGE_KEYS = {
   TICKETS: 'maintainx_tickets_v1',
   CURRENT_ROLE: 'maintainx_role_v1',
-  USER_TAB: 'maintainx_user_tab_v1',
-  AIRTABLE_PAT: 'maintainx_airtable_pat_v1'
+  USER_TAB: 'maintainx_user_tab_v1'
 };
 
-// Formats an Airtable record into frontend state format while keeping Airtable field keys accessible
-function formatAirtableRecord(record) {
-  const fields = record.fields || {};
-  const isTechConfirmed = fields.TechConfirmed === 'true' || fields.TechConfirmed === true || fields.techConfirmed === true;
-  const isUserConfirmed = fields.UserConfirmed === 'true' || fields.UserConfirmed === true || fields.userConfirmed === true;
+// Formats backend ticket record for frontend UI compatibility
+function normalizeTicketRecord(ticket) {
+  if (!ticket) return null;
 
-  const rawStatus = fields.Status || fields.status || 'Assigned';
+  const rawStatus = ticket.status || ticket.Status || 'Assigned';
   let status = rawStatus;
   if (rawStatus === 'Open') status = 'Assigned';
   if (rawStatus === 'Done') status = 'Completed';
 
-  // Photo can be an attachment array from Airtable or direct url string
-  let photoUrl = null;
-  if (Array.isArray(fields.Photo) && fields.Photo.length > 0) {
-    photoUrl = fields.Photo[0]?.url || fields.Photo[0]?.thumbnails?.large?.url || null;
-  } else if (typeof fields.Photo === 'string') {
-    photoUrl = fields.Photo;
-  } else if (fields.photo) {
-    photoUrl = fields.photo;
-  }
+  const isTechConfirmed = Boolean(ticket.techConfirmed || ticket.TechConfirmed === true || ticket.TechConfirmed === 'true');
+  const isUserConfirmed = Boolean(ticket.userConfirmed || ticket.UserConfirmed === true || ticket.UserConfirmed === 'true');
 
-  const category = fields.Category || fields.category || 'General';
-  const urgency = fields.Urgency || fields.urgency || fields.priority || 'Moderate';
-  const title = fields.Title || fields.title || 'Maintenance Request';
-  const description = fields.Description || fields.description || '';
-  const location = fields.Location || fields.location || 'Campus Facilities';
-  const createdAt = fields.CreatedAt || fields.createdAt || record.createdTime || new Date().toISOString();
-  const reporterEmail = fields.ReporterEmail || fields.Email || fields.reporterEmail || null;
-  const reporterName = fields.ReporterName || fields.reporterName || 'Alex Rivera';
-  const reporterId = fields.ReporterId || fields.reporterId || 'usr_1';
+  const title = ticket.title || ticket.Title || 'Maintenance Request';
+  const description = ticket.description || ticket.Description || '';
+  const category = ticket.category || ticket.Category || 'General';
+  const urgency = ticket.urgency || ticket.Urgency || ticket.priority || 'Moderate';
+  const location = ticket.location || ticket.Location || 'Campus Facilities';
+  const createdAt = ticket.createdAt || ticket.CreatedAt || new Date().toISOString();
+  const reporterId = ticket.reporterId || ticket.reportedBy?.id || 'usr_anonymous';
+  const reporterName = ticket.reporterName || ticket.reportedBy?.name || 'Campus Reporter';
+  const reporterEmail = ticket.reporterEmail || ticket.reportedBy?.email || 'reporter@campus.edu';
 
   return {
-    id: record.id,
+    id: ticket.id,
     title,
     Title: title,
     description,
@@ -58,6 +42,7 @@ function formatAirtableRecord(record) {
     urgency,
     Urgency: urgency,
     priority: urgency === 'Emergency' ? 'Emergency' : urgency === 'Urgent' ? 'Urgent' : 'Routine',
+    priorityScore: ticket.priorityScore ?? (urgency === 'Emergency' ? 95 : urgency === 'Urgent' ? 70 : 40),
     status,
     Status: status,
     location,
@@ -66,22 +51,28 @@ function formatAirtableRecord(record) {
     TechConfirmed: isTechConfirmed ? 'true' : 'false',
     userConfirmed: isUserConfirmed,
     UserConfirmed: isUserConfirmed ? 'true' : 'false',
-    assignedTo: fields.AssignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : 'General Maintenance'),
-    photo: photoUrl,
+    assignedTo: ticket.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : 'General Maintenance'),
+    photo: ticket.photo || ticket.Photo || null,
     createdAt,
-    updatedAt: fields.UpdatedAt || fields.updatedAt || createdAt,
+    updatedAt: ticket.updatedAt || ticket.UpdatedAt || createdAt,
+    resolvedAt: ticket.resolvedAt || ticket.ResolvedAt || null,
+    resolutionNotes: ticket.resolutionNotes || ticket.ResolutionNotes || null,
+    rejectionReason: ticket.rejectionReason || ticket.RejectionReason || null,
+    isHazard: Boolean(ticket.isHazard),
+    isRecurring: Boolean(ticket.isRecurring),
+    recurringFixSummary: ticket.recurringFixSummary || null,
+    safetyPrecautions: ticket.safetyPrecautions || null,
+    org_id: ticket.org_id || 'org_campus_main',
     reportedBy: {
       id: reporterId,
       name: reporterName,
-      email: reporterEmail || 'alex@campus.edu',
-      role: 'User',
-      avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
+      email: reporterEmail,
+      role: ticket.reportedBy?.role || 'User',
+      avatar: ticket.reportedBy?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80'
     },
     reporterId,
     reporterEmail,
-    reporterName,
-    isAirtable: true,
-    ...fields
+    reporterName
   };
 }
 
@@ -116,14 +107,11 @@ export function isUserTicket(ticket, user) {
 
 export function TicketProvider({ children }) {
   const auth = useAuth();
+  const token = auth?.token || null;
+  const getAuthHeaders = auth?.getAuthHeaders;
   const role = auth?.currentUser?.approvalStatus === 'Approved' ? auth.currentUser.role : null;
   const currentUser = auth?.currentUser || null;
 
-  // Airtable PAT token from env or localStorage
-  const [airtablePat, setAirtablePat] = useState(() => {
-    return import.meta.env.VITE_AIRTABLE_PAT || localStorage.getItem(STORAGE_KEYS.AIRTABLE_PAT) || '';
-  });
-  const [isAirtableConnected, setIsAirtableConnected] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Tab state for User Role: 'new-issue' | 'my-tickets'
@@ -135,17 +123,14 @@ export function TicketProvider({ children }) {
     }
   });
 
-  // Active tickets state - clean by default (no dummy tickets)
+  // Active tickets state
   const [tickets, setTickets] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.TICKETS);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          // Filter out any legacy dummy/demo tickets
-          return parsed.filter(
-            (t) => !t.isDemo && !t.id?.startsWith('DEMO-') && !['REQ-10240', 'REQ-10237', 'REQ-10241'].includes(t.id)
-          );
+          return parsed.map(normalizeTicketRecord).filter(Boolean);
         }
       }
     } catch (e) {
@@ -177,88 +162,47 @@ export function TicketProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // 1. READ: Fetch all tickets on load from Airtable
+  // 1. READ: Fetch isolated tickets from authoritative backend
   const fetchTickets = useCallback(async () => {
-    const token = airtablePat.trim();
-    if (!token || token === 'your_actual_pat_token_here') {
-      setIsLoading(false);
-      setIsAirtableConnected(false);
+    if (!token || !getAuthHeaders) {
       return;
     }
 
     try {
-      setIsLoading(true);
-      const response = await fetch(AIRTABLE_URL, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
+      const response = await fetch('/api/v1/tickets', {
+        headers: getAuthHeaders()
       });
 
       if (!response.ok) {
-        throw new Error(`Airtable responded with HTTP ${response.status}: ${response.statusText}`);
+        if (response.status === 401) {
+          // Token expired or invalid
+          return;
+        }
+        throw new Error(`Tickets fetch failed: ${response.status}`);
       }
 
       const data = await response.json();
-      
-      // Map Airtable records into your frontend state format
-      if (Array.isArray(data.records)) {
-        const formattedTickets = data.records.map(formatAirtableRecord);
-        setTickets(formattedTickets);
-        setIsAirtableConnected(true);
-        console.log(`✓ Loaded ${formattedTickets.length} tickets from live Airtable base ${AIRTABLE_BASE_ID}`);
+      if (Array.isArray(data.tickets)) {
+        const normalized = data.tickets.map(normalizeTicketRecord).filter(Boolean);
+        setTickets(normalized);
       }
     } catch (error) {
-      console.warn("Airtable fetch failed, falling back to local state:", error);
-      setIsAirtableConnected(false);
+      console.warn('Backend tickets sync error:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [airtablePat]);
+  }, [token, getAuthHeaders]);
 
+  // Initial fetch and continuous real-time polling
   useEffect(() => {
-    fetchTickets();
-  }, [fetchTickets]);
-
-  // Helper to persist updated tickets array to shared /api/db on host
-  const persistTicketsToBackend = useCallback(async (updatedTickets) => {
-    try {
-      await fetch('/api/db', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tickets: updatedTickets })
-      });
-    } catch (err) {
-      console.warn('[TicketContext] Failed saving tickets to /api/db:', err);
+    if (token) {
+      fetchTickets();
+      const interval = setInterval(fetchTickets, 3000);
+      return () => clearInterval(interval);
     }
-  }, []);
+  }, [token, fetchTickets]);
 
-  // Poll /api/db on mount and every 3 seconds to keep laptop & phone tickets in real-time sync
-  const syncTicketsFromBackend = useCallback(async () => {
-    try {
-      const res = await fetch('/api/db');
-      if (!res.ok) return;
-      const data = await res.json();
-      if (Array.isArray(data.tickets)) {
-        setTickets((prev) => {
-          if (JSON.stringify(prev) === JSON.stringify(data.tickets)) {
-            return prev;
-          }
-          return data.tickets;
-        });
-      }
-    } catch (err) {
-      // Local storage fallback
-    }
-  }, []);
-
-  useEffect(() => {
-    syncTicketsFromBackend();
-    const interval = setInterval(syncTicketsFromBackend, 2000);
-    return () => clearInterval(interval);
-  }, [syncTicketsFromBackend]);
-
-  // Persist tickets
+  // Persist tickets cache locally for smooth reloads
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
@@ -266,19 +210,6 @@ export function TicketProvider({ children }) {
       console.warn('Failed saving tickets to storage:', e);
     }
   }, [tickets]);
-
-  // Persist role
-  useEffect(() => {
-    try {
-      if (role) {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_ROLE, JSON.stringify(role));
-      } else {
-        localStorage.removeItem(STORAGE_KEYS.CURRENT_ROLE);
-      }
-    } catch (e) {
-      console.warn('Failed saving role:', e);
-    }
-  }, [role]);
 
   // Persist user tab
   useEffect(() => {
@@ -309,345 +240,295 @@ export function TicketProvider({ children }) {
     });
   };
 
-  // 2. CREATE: Send the Gemini AI output to Airtable
+  // 2. CREATE: Submit new issue to authoritative backend API
   const addTicket = async (newTicketData) => {
-    const token = airtablePat.trim();
-    const hasValidToken = token && token !== 'your_actual_pat_token_here';
-
-    const randomNum = Math.floor(1000 + Math.random() * 9000);
-    const localId = newTicketData.id || `TCK-${randomNum}`;
-    const now = newTicketData.createdAt || new Date().toISOString();
-
-    const title = newTicketData.title || (newTicketData.description?.length > 50 ? newTicketData.description.substring(0, 47) + '...' : newTicketData.description) || 'Maintenance Request';
-    const category = newTicketData.category || 'General';
-    const urgency = newTicketData.urgency || newTicketData.priority || 'Moderate';
-    const location = newTicketData.location || 'Facility General Area';
-    const description = newTicketData.description || '';
-
-    const reporterDetails = newTicketData.reportedBy || {
-      id: currentUser?.id || `usr_${Date.now()}`,
-      name: currentUser?.name || 'Campus Reporter',
-      email: currentUser?.email || 'user@campus.edu',
-      role: currentUser?.role || 'user',
-      avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
-    };
-
-    let createdRecord = null;
-
-    if (hasValidToken) {
-      try {
-        const payloadFields = {
-          "Title": title,
-          "Location": location,
-          "Description": description,
-          "Category": category,
-          "Urgency": urgency,
-          "Status": "Assigned",
-          "TechConfirmed": "false",
-          "UserConfirmed": "false"
-        };
-
-        const response = await fetch(AIRTABLE_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            records: [{
-              fields: payloadFields
-            }]
-          })
-        });
-
-        if (!response.ok) {
-          const errData = await response.json().catch(() => ({}));
-          throw new Error(`Airtable POST failed: ${errData.error?.message || response.statusText}`);
-        }
-
-        const data = await response.json();
-        
-        // Instantly update the UI with the newly created Airtable record
-        if (data.records && data.records[0]) {
-          createdRecord = formatAirtableRecord({
-            ...data.records[0],
-            fields: {
-              ...payloadFields,
-              ...data.records[0].fields,
-              photo: newTicketData.photo || null
-            }
-          });
-          // Preserve active user details on created Airtable record
-          createdRecord.reportedBy = reporterDetails;
-          createdRecord.reporterId = reporterDetails.id;
-          createdRecord.reporterEmail = reporterDetails.email;
-          createdRecord.reporterName = reporterDetails.name;
-
-          setTickets(prev => {
-            const nextTickets = [createdRecord, ...prev];
-            persistTicketsToBackend(nextTickets);
-            return nextTickets;
-          });
-          addToast({
-            type: 'success',
-            title: `Airtable Record Created!`,
-            message: `Logged to live Airtable base under ID: ${data.records[0].id.substring(0, 8)}...`
-          });
-          return createdRecord;
-        }
-      } catch (error) {
-        console.error("Failed to create ticket in Airtable, saving locally:", error);
-        addToast({
-          type: 'warning',
-          title: 'Airtable Sync Notice',
-          message: 'Saved locally. Please verify your Airtable PAT token permissions.'
-        });
-      }
+    if (!token || !getAuthHeaders) {
+      throw new Error('Authentication required to submit maintenance request.');
     }
 
-    // Local / Offline fallback creation
-    createdRecord = {
-      id: localId,
-      title,
-      Title: title,
-      description,
-      Description: description,
-      category,
-      Category: category,
-      urgency,
-      Urgency: urgency,
-      priority: urgency,
-      status: 'Assigned',
-      Status: 'Assigned',
-      location,
-      Location: location,
-      techConfirmed: false,
-      TechConfirmed: 'false',
-      userConfirmed: false,
-      UserConfirmed: 'false',
-      reportedBy: reporterDetails,
-      reporterId: reporterDetails.id,
-      reporterEmail: reporterDetails.email,
-      reporterName: reporterDetails.name,
-      assignedTo: newTicketData.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : 'General Maintenance'),
-      photo: newTicketData.photo || null,
-      createdAt: now,
-      updatedAt: now,
-      ...newTicketData
-    };
+    try {
+      const payload = {
+        complaint: newTicketData.complaint || newTicketData.description || newTicketData.title || '',
+        title: newTicketData.title,
+        description: newTicketData.description,
+        location: newTicketData.location,
+        category: newTicketData.category,
+        urgency: newTicketData.urgency || newTicketData.priority,
+        image: newTicketData.photo || newTicketData.image || null,
+        mimeType: newTicketData.mimeType || 'image/jpeg'
+      };
 
-    setTickets((prev) => {
-      const nextTickets = [createdRecord, ...prev];
-      persistTicketsToBackend(nextTickets);
-      return nextTickets;
-    });
+      const response = await fetch('/api/v1/tickets', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify(payload)
+      });
 
-    addToast({
-      type: 'success',
-      title: `Ticket #${localId} Logged!`,
-      message: 'Maintenance ticket successfully filed.'
-    });
+      const data = await response.json();
 
-    return createdRecord;
+      if (!response.ok) {
+        throw new Error(data.error || data.message || `Creation failed (${response.status})`);
+      }
+
+      const created = normalizeTicketRecord(data.ticket);
+      setTickets((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
+
+      addToast({
+        type: 'success',
+        title: `Work Order #${created.id} Dispatched!`,
+        message: created.isHazard
+          ? 'EMERGENCY: Safety-critical priority auto-assigned.'
+          : 'Ticket created and routed to specialized department queue.'
+      });
+
+      return created;
+    } catch (err) {
+      console.error('Failed to create ticket on backend:', err);
+      addToast({
+        type: 'error',
+        title: 'Submission Error',
+        message: err.message || 'Could not dispatch work order to backend.'
+      });
+      throw err;
+    }
   };
 
   const createTicket = addTicket;
 
-  // 3. UPDATE: Handle the Dual-Approval system (PATCH request)
-  const handleTicketClosure = async (ticketId, role, currentTicket) => {
-    // Look up ticket if not explicitly passed
-    const ticket = currentTicket || tickets.find((t) => t.id === ticketId);
+  // 3. TECHNICIAN SIGN-OFF: Mark work as completed by technician
+  const techCompleteTicket = async (ticketId, resolutionNotes = '') => {
+    if (!token || !getAuthHeaders) return;
 
-    // Determine the new flags
-    const isTech = role === 'technician';
-    const isUser = role === 'user';
-    
-    const prevTechConfirmed = ticket ? (ticket.TechConfirmed === "true" || ticket.techConfirmed === true) : false;
-    const prevUserConfirmed = ticket ? (ticket.UserConfirmed === "true" || ticket.userConfirmed === true) : false;
+    try {
+      const response = await fetch(`/api/v1/tickets/${ticketId}/tech-complete`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ resolution_notes: resolutionNotes })
+      });
 
-    const newTechConfirmed = isTech ? true : prevTechConfirmed;
-    const newUserConfirmed = isUser ? true : prevUserConfirmed;
+      const data = await response.json();
 
-    const newTechStatus = newTechConfirmed ? "true" : "false";
-    const newUserStatus = newUserConfirmed ? "true" : "false";
-    
-    // Dual-Approval Rule:
-    // If BOTH confirmed -> 'Completed'
-    // If ONLY user confirmed -> 'Awaiting Tech Sign-off'
-    // If ONLY technician confirmed -> 'Pending User Verification'
-    let newStatus = 'Assigned';
-    if (newTechConfirmed && newUserConfirmed) {
-      newStatus = 'Completed';
-    } else if (newUserConfirmed && !newTechConfirmed) {
-      newStatus = 'Awaiting Tech Sign-off';
-    } else if (newTechConfirmed && !newUserConfirmed) {
-      newStatus = 'Pending User Verification';
-    } else {
-      newStatus = ticket?.Status || ticket?.status || 'Assigned';
-    }
-
-    const token = airtablePat.trim();
-    const hasValidToken = token && token !== 'your_actual_pat_token_here';
-    const airtableRecId = (ticketId && ticketId.startsWith('rec')) ? ticketId : ticket?.airtableId;
-
-    // Patch the specific row in Airtable if it is an Airtable record
-    if (hasValidToken && airtableRecId) {
-      try {
-        await fetch(`${AIRTABLE_URL}/${airtableRecId}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            fields: {
-              "TechConfirmed": newTechStatus,
-              "UserConfirmed": newUserStatus,
-              "Status": newStatus
-            }
-          })
-        });
-        console.log(`✓ Dual-approval patched to Airtable record: ${airtableRecId}`);
-      } catch (error) {
-        console.error("Failed to update ticket in Airtable:", error);
+      if (!response.ok) {
+        throw new Error(data.error || 'Technician sign-off failed.');
       }
+
+      const updated = normalizeTicketRecord(data.ticket);
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
+
+      addToast({
+        type: 'info',
+        title: 'Repair Sign-off Recorded',
+        message: 'Ticket sent to reporting user for final verification.'
+      });
+      return updated;
+    } catch (err) {
+      console.error('techCompleteTicket error:', err);
+      addToast({
+        type: 'error',
+        title: 'Sign-off Failed',
+        message: err.message || 'Failed to record technician resolution.'
+      });
+      throw err;
     }
+  };
 
-    // Update local React state to reflect the change immediately and sync with backend
-    setTickets((prev) => {
-      const nextTickets = prev.map((t) => 
-        (t.id === ticketId || (airtableRecId && t.airtableId === airtableRecId))
-          ? { 
-              ...t, 
-              TechConfirmed: newTechStatus, 
-              UserConfirmed: newUserStatus, 
-              Status: newStatus,
-              techConfirmed: newTechConfirmed,
-              userConfirmed: newUserConfirmed,
-              status: newStatus,
-              resolvedAt: newStatus === 'Completed' ? (t.resolvedAt || new Date().toISOString()) : t.resolvedAt
-            } 
-          : t
-      );
-      persistTicketsToBackend(nextTickets);
-      return nextTickets;
-    });
+  // 4. USER VERIFICATION: Confirm physical repair & complete ticket (triggers trusted RAG)
+  const verifyTicketClosure = async (ticketId) => {
+    if (!token || !getAuthHeaders) return;
 
-    if (newStatus === 'Completed') {
+    try {
+      const response = await fetch(`/api/v1/tickets/${ticketId}/verify-closure`, {
+        method: 'POST',
+        headers: getAuthHeaders()
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Verification failed.');
+      }
+
+      const updated = normalizeTicketRecord(data.ticket);
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
+
       addToast({
         type: 'success',
         title: 'Ticket Completed ✓',
-        message: 'Both user and technician have verified and confirmed resolution.'
+        message: 'Both parties confirmed repair. Resolution archived to trusted knowledge base.'
       });
-    } else if (isTech) {
+      return updated;
+    } catch (err) {
+      console.error('verifyTicketClosure error:', err);
       addToast({
-        type: 'info',
-        title: 'Work Marked as Fixed',
-        message: 'Technician sign-off recorded. Sent to user for verification.'
+        type: 'error',
+        title: 'Verification Failed',
+        message: err.message || 'Failed to complete ticket verification.'
       });
-    } else if (isUser) {
-      addToast({
-        type: 'info',
-        title: 'Marked Complete by User',
-        message: 'User sign-off recorded. Awaiting technician sign-off.'
-      });
+      throw err;
     }
   };
 
+  // 5. USER REJECTION: Reject unsatisfactory repair & reopen ticket with reason
+  const rejectTicketClosure = async (ticketId, rejectionReason) => {
+    if (!token || !getAuthHeaders) return;
+
+    if (!rejectionReason || !rejectionReason.trim()) {
+      addToast({
+        type: 'warning',
+        title: 'Rejection Reason Required',
+        message: 'Please provide details explaining why the repair is incomplete.'
+      });
+      throw new Error('Rejection reason is mandatory.');
+    }
+
+    try {
+      const response = await fetch(`/api/v1/tickets/${ticketId}/reject-closure`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ rejection_reason: rejectionReason.trim() })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Rejection failed.');
+      }
+
+      const updated = normalizeTicketRecord(data.ticket);
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
+
+      addToast({
+        type: 'warning',
+        title: 'Ticket Reopened',
+        message: 'Rejection recorded. Ticket returned to In Progress for technician review.'
+      });
+      return updated;
+    } catch (err) {
+      console.error('rejectTicketClosure error:', err);
+      addToast({
+        type: 'error',
+        title: 'Rejection Error',
+        message: err.message || 'Could not reject ticket.'
+      });
+      throw err;
+    }
+  };
+
+  // Dual-Approval compatibility wrapper for existing component calls
+  const handleTicketClosure = async (ticketId, closureRole, resolutionNotes = '') => {
+    if (closureRole === 'technician') {
+      return await techCompleteTicket(ticketId, resolutionNotes);
+    } else if (closureRole === 'user') {
+      return await verifyTicketClosure(ticketId);
+    }
+  };
+
+  // 6. UPDATE STATUS: General status transitions (e.g. In Progress)
   const updateTicketStatus = async (ticketId, newStatus, resolutionNotes = '') => {
-    const now = new Date().toISOString();
-    const isResolved = newStatus === 'Done' || newStatus === 'Completed';
-    const statusVal = newStatus === 'Done' ? 'Completed' : newStatus;
+    if (!token || !getAuthHeaders) return;
 
-    const token = airtablePat.trim();
-    const hasValidToken = token && token !== 'your_actual_pat_token_here';
-
-    if (hasValidToken && ticketId && ticketId.startsWith('rec')) {
-      try {
-        await fetch(`${AIRTABLE_URL}/${ticketId}`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            fields: {
-              "Status": statusVal
-            }
-          })
-        });
-      } catch (err) {
-        console.warn('Airtable status update error:', err);
-      }
+    // Backend state machine strictly blocks jumping directly to Completed
+    if (newStatus === 'Done' || newStatus === 'Completed') {
+      addToast({
+        type: 'warning',
+        title: 'Dual Approval Required',
+        message: 'Tickets cannot be directly marked Completed. Both technician and user must sign off.'
+      });
+      return;
     }
 
-    setTickets((prev) => {
-      const nextTickets = prev.map((t) => {
-        if (t.id === ticketId) {
-          return {
-            ...t,
-            status: statusVal,
-            Status: statusVal,
-            updatedAt: now,
-            resolvedAt: isResolved ? (t.resolvedAt || now) : null,
-            resolutionNotes: resolutionNotes || t.resolutionNotes || (isResolved ? `Resolved by ${currentUser?.name || 'Staff'}` : null)
-          };
-        }
-        return t;
+    try {
+      const response = await fetch(`/api/v1/tickets/${ticketId}/status`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          status: newStatus,
+          resolution_notes: resolutionNotes
+        })
       });
-      persistTicketsToBackend(nextTickets);
-      return nextTickets;
-    });
 
-    addToast({
-      type: isResolved ? 'success' : 'info',
-      title: `Status Updated`,
-      message: `Ticket marked as ${statusVal}.`
-    });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Status update failed.');
+      }
+
+      const updated = normalizeTicketRecord(data.ticket);
+      setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
+
+      addToast({
+        type: 'info',
+        title: 'Status Updated',
+        message: `Ticket marked as ${newStatus}.`
+      });
+      return updated;
+    } catch (err) {
+      console.error('updateTicketStatus error:', err);
+      addToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: err.message || 'Failed to update ticket status.'
+      });
+    }
   };
 
+  // 7. DELETE: Permanent ticket removal
   const deleteTicket = async (ticketId) => {
-    const token = airtablePat.trim();
-    const hasValidToken = token && token !== 'your_actual_pat_token_here';
+    if (!token || !getAuthHeaders) return;
 
-    const target = tickets.find((t) => t.id === ticketId || t.airtableId === ticketId);
-    const airtableRecId = (ticketId && ticketId.startsWith('rec')) ? ticketId : target?.airtableId;
+    try {
+      const response = await fetch(`/api/v1/tickets/${ticketId}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders()
+      });
 
-    if (hasValidToken && airtableRecId) {
-      try {
-        await fetch(`${AIRTABLE_URL}/${airtableRecId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        console.log(`✓ Record deleted from Airtable: ${airtableRecId}`);
-      } catch (err) {
-        console.warn('Airtable delete error:', err);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Delete failed.');
       }
+
+      setTickets((prev) => prev.filter((t) => t.id !== ticketId));
+
+      addToast({
+        type: 'warning',
+        title: 'Ticket Deleted',
+        message: `Ticket #${ticketId} was permanently removed.`
+      });
+    } catch (err) {
+      console.error('deleteTicket error:', err);
+      addToast({
+        type: 'error',
+        title: 'Delete Failed',
+        message: err.message || 'Could not delete ticket.'
+      });
     }
+  };
 
-    setTickets((prev) => {
-      const nextTickets = prev.filter((t) => t.id !== ticketId && t.airtableId !== ticketId);
-      persistTicketsToBackend(nextTickets);
-      return nextTickets;
-    });
+  // 8. AUDIT LOGS: Retrieve immutable audit trail for organisation
+  const fetchAuditLogs = async () => {
+    if (!token || !getAuthHeaders) return [];
 
-    addToast({
-      type: 'warning',
-      title: 'Ticket Deleted',
-      message: `Ticket #${ticketId} was permanently removed.`
-    });
+    try {
+      const response = await fetch('/api/v1/audit-logs', {
+        headers: getAuthHeaders()
+      });
+      if (!response.ok) return [];
+      const data = await response.json();
+      return data.audit_logs || [];
+    } catch (err) {
+      console.warn('fetchAuditLogs error:', err);
+      return [];
+    }
   };
 
   const resetMockData = () => {
     setTickets([]);
-    persistTicketsToBackend([]);
     localStorage.removeItem(STORAGE_KEYS.TICKETS);
     addToast({
       type: 'info',
       title: 'Database Reset',
-      message: 'All maintenance tickets have been cleared from database.'
+      message: 'All local maintenance tickets have been cleared.'
     });
   };
 
@@ -669,7 +550,7 @@ export function TicketProvider({ children }) {
       t.Status === 'Awaiting Tech Sign-off'
     ).length;
     const done = tickets.filter((t) => t.status === 'Done' || t.status === 'Completed' || t.Status === 'Completed').length;
-    const critical = tickets.filter((t) => (t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Urgent') && t.status !== 'Done' && t.status !== 'Completed').length;
+    const critical = tickets.filter((t) => (t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Emergency' || t.isHazard) && t.status !== 'Done' && t.status !== 'Completed').length;
     const resolutionRate = total > 0 ? Math.round((done / total) * 100) : 0;
 
     // Filter tickets raised by / belonging to current user from central database
@@ -704,9 +585,9 @@ export function TicketProvider({ children }) {
     setUserTab,
     tickets,
     isLoading,
-    isAirtableConnected,
-    airtablePat,
-    setAirtablePat,
+    isAirtableConnected: false, // Legacy Airtable replaced with Authoritative Backend
+    airtablePat: '',
+    setAirtablePat: () => {},
     fetchTickets,
     stats,
     toasts,
@@ -716,9 +597,13 @@ export function TicketProvider({ children }) {
     logout,
     addTicket,
     createTicket,
+    techCompleteTicket,
+    verifyTicketClosure,
+    rejectTicketClosure,
     handleTicketClosure,
     updateTicketStatus,
     deleteTicket,
+    fetchAuditLogs,
     resetMockData,
     selectedTicket,
     setSelectedTicketId,

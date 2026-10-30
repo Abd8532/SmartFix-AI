@@ -16,7 +16,7 @@ function AppContent() {
   // Consume Auth State directly from AuthContext
   const { currentUser, logout } = useAuth();
   const [activeModalTicketId, setActiveModalTicketId] = useState(null);
-  const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'approvals' | 'requests' | 'hazards' | 'settings'
+  const [adminTab, setAdminTab] = useState('overview'); // 'overview' | 'approvals' | 'requests' | 'hazards' | 'audit' | 'settings'
 
   // 1. Unauthenticated or Pending Approval Check
   const isApproved = currentUser && currentUser.approvalStatus === 'Approved';

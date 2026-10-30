@@ -12,7 +12,8 @@ import {
   Wrench, 
   Clock, 
   CheckCircle2, 
-  ShieldCheck
+  ShieldCheck,
+  FileText
 } from 'lucide-react';
 
 export default function Sidebar({ adminTab = 'overview', setAdminTab }) {
@@ -193,6 +194,18 @@ export default function Sidebar({ adminTab = 'overview', setAdminTab }) {
                   {stats.critical}
                 </span>
               )}
+            </button>
+
+            <button 
+              onClick={() => setAdminTab && setAdminTab('audit')}
+              className={`flex items-center gap-3 px-3.5 py-3 rounded-2xl font-medium text-xs sm:text-sm text-left transition-all duration-200 active:scale-[0.98] ${
+                adminTab === 'audit'
+                  ? 'bg-[#F5F7FA] text-[#2D60FF] border-l-4 border-[#2D60FF] font-bold shadow-xs'
+                  : 'text-slate-500 hover:text-[#2D60FF] hover:bg-[#F5F7FA]'
+              }`}
+            >
+              <FileText className={`w-4 h-4 ${adminTab === 'audit' ? 'text-[#2D60FF]' : 'text-slate-400'}`} />
+              <span>Audit Trail</span>
             </button>
 
             <button 

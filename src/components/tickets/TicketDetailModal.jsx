@@ -9,15 +9,32 @@ import {
   CheckCircle2, 
   Wrench, 
   Trash2,
-  ExternalLink
+  ExternalLink,
+  AlertTriangle,
+  XCircle,
+  RotateCcw,
+  ShieldAlert,
+  FileText
 } from 'lucide-react';
 import { STATUS_CONFIG } from '../../types/mockData';
 
 export default function TicketDetailModal({ ticketId, onClose }) {
-  const { tickets, updateTicketStatus, handleTicketClosure, deleteTicket, role } = useTickets();
+  const { 
+    tickets, 
+    updateTicketStatus, 
+    techCompleteTicket, 
+    verifyTicketClosure, 
+    rejectTicketClosure, 
+    deleteTicket, 
+    role,
+    currentUser
+  } = useTickets();
 
   const ticket = tickets.find((t) => t.id === ticketId);
   const [resolutionInput, setResolutionInput] = useState('');
+  const [showRejectionForm, setShowRejectionForm] = useState(false);
+  const [rejectionInput, setRejectionInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!ticket) return null;
 
@@ -30,9 +47,48 @@ export default function TicketDetailModal({ ticketId, onClose }) {
     priorityBadgeClass = "bg-[#b45309] text-white";
   }
 
-  const handleStatusChange = (newStatus) => {
-    updateTicketStatus(ticket.id, newStatus, resolutionInput.trim());
-    setResolutionInput('');
+  // Handle Technician Work Sign-off
+  const handleTechComplete = async () => {
+    setIsSubmitting(true);
+    try {
+      await techCompleteTicket(ticket.id, resolutionInput.trim());
+      setResolutionInput('');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Consumer Approval
+  const handleUserVerify = async () => {
+    setIsSubmitting(true);
+    try {
+      await verifyTicketClosure(ticket.id);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle Consumer Rejection
+  const handleUserReject = async () => {
+    if (!rejectionInput.trim()) return;
+    setIsSubmitting(true);
+    try {
+      await rejectTicketClosure(ticket.id, rejectionInput.trim());
+      setRejectionInput('');
+      setShowRejectionForm(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle In Progress transition
+  const handleStartWork = async () => {
+    setIsSubmitting(true);
+    try {
+      await updateTicketStatus(ticket.id, 'In Progress');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleDelete = () => {
@@ -44,7 +100,7 @@ export default function TicketDetailModal({ ticketId, onClose }) {
     <Modal
       isOpen={Boolean(ticketId)}
       onClose={onClose}
-      title={`Ticket #${ticket.id} Details`}
+      title={`Work Order #${ticket.id}`}
       maxWidth="max-w-2xl"
     >
       <div className="space-y-6 text-slate-900">
@@ -77,6 +133,17 @@ export default function TicketDetailModal({ ticketId, onClose }) {
             </span>
           </div>
         </div>
+
+        {/* Rejection Warning Banner (if reopened due to rejection) */}
+        {ticket.rejectionReason && (
+          <div className="p-4 rounded-2xl bg-[#FFE0EB] border border-[#FF4B4A]/30 text-xs text-[#FF4B4A] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]">
+            <div className="font-bold flex items-center gap-1.5 mb-1 text-red-800">
+              <AlertTriangle className="w-4 h-4 text-[#FF4B4A]" />
+              <span>Consumer Rejection Reason (Reopened)</span>
+            </div>
+            <p className="leading-relaxed text-red-900 font-medium whitespace-pre-wrap">{ticket.rejectionReason}</p>
+          </div>
+        )}
 
         {/* Photo View */}
         {ticket.photo && (
@@ -133,17 +200,17 @@ export default function TicketDetailModal({ ticketId, onClose }) {
           </div>
         </div>
 
-        {/* Resolution Notes */}
+        {/* Technician Resolution Notes */}
         {ticket.resolutionNotes && (
           <div className="p-4 rounded-2xl bg-[#DCFAF8] border border-[#16DBCC]/30 text-xs text-[#16DBCC] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]">
             <div className="font-bold text-slate-900 flex items-center gap-1.5 mb-1">
               <CheckCircle2 className="w-4 h-4 text-[#16DBCC]" />
-              <span>Technician Resolution Log</span>
+              <span>Technician Resolution Report</span>
             </div>
             <p className="leading-relaxed text-slate-800 font-medium">{ticket.resolutionNotes}</p>
             {ticket.resolvedAt && (
               <p className="text-xs text-slate-500 mt-1">
-                Resolved: {new Date(ticket.resolvedAt).toLocaleString()}
+                Completed: {new Date(ticket.resolvedAt).toLocaleString()}
               </p>
             )}
           </div>
@@ -154,132 +221,194 @@ export default function TicketDetailModal({ ticketId, onClose }) {
           <div className="flex items-center gap-2">
             <span className="font-bold text-slate-700">Dual-Sign-off:</span>
             <span className={`px-2.5 py-1 rounded-full font-bold ${
-              ticket.userConfirmed ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' : 'bg-slate-200/70 text-slate-600'
-            }`}>
-              User {ticket.userConfirmed ? '✓ Confirmed' : '— Pending'}
-            </span>
-            <span className={`px-2.5 py-1 rounded-full font-bold ${
               ticket.techConfirmed ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' : 'bg-slate-200/70 text-slate-600'
             }`}>
               Technician {ticket.techConfirmed ? '✓ Confirmed' : '— Pending'}
             </span>
+            <span className={`px-2.5 py-1 rounded-full font-bold ${
+              ticket.userConfirmed ? 'bg-emerald-50 text-emerald-700 border border-emerald-300' : 'bg-slate-200/70 text-slate-600'
+            }`}>
+              Consumer {ticket.userConfirmed ? '✓ Confirmed' : '— Pending'}
+            </span>
           </div>
 
           <span className="font-bold text-slate-500">
-            {ticket.userConfirmed && ticket.techConfirmed 
-              ? 'Status: Fully Completed'
-              : ticket.userConfirmed 
-              ? 'Status: Awaiting Tech Sign-off'
-              : ticket.techConfirmed 
-              ? 'Status: Pending User Verification'
-              : 'Status: In Queue / Assigned'}
+            {ticket.status === 'Completed'
+              ? 'Status: Fully Completed & Verified'
+              : ticket.status === 'Pending User Verification'
+              ? 'Status: Awaiting Consumer Verification'
+              : ticket.status === 'In Progress'
+              ? 'Status: Technician Repair in Progress'
+              : 'Status: Assigned in Queue'}
           </span>
         </div>
 
-        {/* User Action Controls (Mark Complete & Delete Ticket) */}
+        {/* Consumer Actions (Dual Approval Verification or Rejection) */}
         {role === 'user' && (
-          <div className="pt-4 border-t border-[#E6EFF5] flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {!ticket.userConfirmed ? (
-                <button
-                  type="button"
-                  onClick={() => handleTicketClosure(ticket.id, 'user')}
-                  className={`h-11 px-6 rounded-2xl font-bold text-xs sm:text-sm flex items-center gap-2 transition-all duration-200 active:scale-[0.98] shadow-md ${
-                    ticket.techConfirmed
-                      ? 'bg-[#16DBCC] hover:bg-emerald-600 text-white shadow-emerald-500/25'
-                      : 'bg-[#2D60FF] hover:bg-[#1814F3] text-white shadow-[#2D60FF]/25'
-                  }`}
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>{ticket.techConfirmed ? 'Verify & Complete' : 'Mark Complete'}</span>
-                </button>
-              ) : !ticket.techConfirmed ? (
-                <div className="h-11 px-5 rounded-2xl bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30 font-bold text-xs flex items-center gap-2 shadow-xs cursor-default">
-                  <Clock className="w-4 h-4 text-[#FFBB38]" />
-                  <span>Marked Done (Waiting for Tech)</span>
+          <div className="pt-4 border-t border-[#E6EFF5] space-y-4">
+            {ticket.status === 'Pending User Verification' && !ticket.userConfirmed && (
+              <div className="p-4 rounded-2xl bg-[#FFF5D9] border border-[#FFBB38]/30 space-y-3">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
+                  <CheckCircle2 className="w-4 h-4 text-[#FFBB38]" />
+                  <span>The technician has marked this issue as resolved. Please inspect the repair:</span>
                 </div>
-              ) : (
-                <div className="h-11 px-5 rounded-2xl bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30 font-bold text-xs flex items-center gap-2 shadow-xs">
-                  <CheckCircle2 className="w-4 h-4 text-[#16DBCC]" />
-                  <span>Completed ✓</span>
-                </div>
-              )}
-            </div>
 
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm(`Delete ticket #${ticket.id}? This will permanently remove it.`)) {
-                  handleDelete();
-                }
-              }}
-              className="h-11 px-5 rounded-2xl bg-[#FFE0EB] hover:bg-rose-100 text-[#FF4B4A] text-xs font-semibold border border-[#FF4B4A]/30 flex items-center gap-1.5 transition-all duration-200 active:scale-[0.98] shadow-xs"
-            >
-              <Trash2 className="w-4 h-4" />
-              <span>Delete Ticket</span>
-            </button>
+                {!showRejectionForm ? (
+                  <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={handleUserVerify}
+                      disabled={isSubmitting}
+                      className="h-11 px-6 rounded-2xl bg-[#16DBCC] hover:bg-emerald-600 text-white font-bold text-xs flex items-center gap-2 transition-all duration-200 active:scale-[0.98] shadow-md shadow-emerald-500/25"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Verify & Complete Work Order</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowRejectionForm(true)}
+                      className="h-11 px-5 rounded-2xl bg-[#FFE0EB] hover:bg-rose-100 text-[#FF4B4A] text-xs font-semibold border border-[#FF4B4A]/30 flex items-center gap-1.5 transition-all duration-200 active:scale-[0.98]"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                      <span>Reject Work (Repair Incomplete)</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pt-2">
+                    <label className="text-xs font-bold text-slate-900 block">
+                      Explain why the repair is unsatisfactory (Mandatory):
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={rejectionInput}
+                      onChange={(e) => setRejectionInput(e.target.value)}
+                      placeholder="e.g. The pipe is still dripping slightly under high pressure..."
+                      className="w-full p-3 rounded-xl border border-red-200 bg-white text-xs font-medium text-slate-900 focus:outline-none focus:ring-2 focus:ring-red-400"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleUserReject}
+                        disabled={isSubmitting || !rejectionInput.trim()}
+                        className="h-10 px-5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>Confirm Rejection & Reopen</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowRejectionForm(false)}
+                        className="h-10 px-4 rounded-xl bg-white border border-slate-300 text-slate-700 text-xs font-medium"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {ticket.status === 'Completed' && (
+              <div className="h-11 px-5 rounded-2xl bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30 font-bold text-xs flex items-center gap-2 shadow-xs">
+                <CheckCircle2 className="w-4 h-4 text-[#16DBCC]" />
+                <span>Work Order Fully Verified & Closed</span>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm(`Delete ticket #${ticket.id}? This will permanently remove it.`)) {
+                    handleDelete();
+                  }
+                }}
+                className="h-10 px-4 rounded-2xl bg-[#FFE0EB] hover:bg-rose-100 text-[#FF4B4A] text-xs font-semibold border border-[#FF4B4A]/30 flex items-center gap-1.5 transition-all duration-200 active:scale-[0.98]"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Ticket</span>
+              </button>
+            </div>
           </div>
         )}
 
-        {/* Technician or Admin Action Controls */}
-        {(role === 'technician' || role === 'admin') && (
+        {/* Technician Action Controls */}
+        {role === 'technician' && (
           <div className="pt-4 border-t border-[#E6EFF5] space-y-4">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-['Plus_Jakarta_Sans']">
               <Wrench className="w-3.5 h-3.5 text-[#2D60FF]" />
-              <span>Maintenance Status Actions</span>
+              <span>Technician Maintenance Actions</span>
             </h4>
 
-            {ticket.status !== 'Done' && (
-              <div>
+            {ticket.status !== 'Completed' && (
+              <div className="space-y-3">
                 <input
                   type="text"
-                  placeholder="Optional resolution or inspection note..."
+                  placeholder="Technician resolution report or parts replaced..."
                   value={resolutionInput}
                   onChange={(e) => setResolutionInput(e.target.value)}
                   className="w-full h-11 px-4 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2] text-xs font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
                 />
+
+                <div className="flex flex-wrap items-center gap-3">
+                  {ticket.status === 'Assigned' && (
+                    <button
+                      type="button"
+                      onClick={handleStartWork}
+                      disabled={isSubmitting}
+                      className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all duration-200 active:scale-[0.98] shadow-xs"
+                    >
+                      Start Work (Mark In Progress)
+                    </button>
+                  )}
+
+                  {!ticket.techConfirmed && (
+                    <button
+                      type="button"
+                      onClick={handleTechComplete}
+                      disabled={isSubmitting}
+                      className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white text-xs font-bold transition-all duration-200 active:scale-[0.98] flex items-center gap-1.5 shadow-md shadow-[#2D60FF]/25"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Complete Work (Send for User Verification)</span>
+                    </button>
+                  )}
+
+                  {ticket.techConfirmed && !ticket.userConfirmed && (
+                    <div className="h-11 px-5 rounded-2xl bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30 font-bold text-xs flex items-center gap-2">
+                      <Clock className="w-4 h-4" />
+                      <span>Waiting for Consumer Verification</span>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Administrator Action Controls */}
+        {role === 'admin' && (
+          <div className="pt-4 border-t border-[#E6EFF5] space-y-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5 font-['Plus_Jakarta_Sans']">
+              <ShieldAlert className="w-3.5 h-3.5 text-[#2D60FF]" />
+              <span>Admin Operations</span>
+            </h4>
 
             <div className="flex flex-wrap items-center gap-3">
-              {role === 'technician' && !ticket.techConfirmed && (
+              {ticket.status === 'Assigned' && (
                 <button
                   type="button"
-                  onClick={() => handleTicketClosure(ticket.id, 'technician')}
-                  className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white text-xs font-bold transition-all duration-200 active:scale-[0.98] flex items-center gap-1.5 shadow-md shadow-[#2D60FF]/25"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Mark as Fixed (Dual-Approval)</span>
-                </button>
-              )}
-
-              {ticket.status !== 'In Progress' && ticket.status !== 'Done' && (
-                <button
-                  onClick={() => handleStatusChange('In Progress')}
+                  onClick={handleStartWork}
+                  disabled={isSubmitting}
                   className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all duration-200 active:scale-[0.98] shadow-xs"
                 >
                   Mark as In Progress
                 </button>
               )}
 
-              {ticket.status !== 'Done' ? (
-                <button
-                  onClick={() => handleStatusChange('Done')}
-                  className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white text-xs font-bold transition-all duration-200 active:scale-[0.98] flex items-center gap-1.5 shadow-md shadow-[#2D60FF]/25"
-                >
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Mark as Done (Resolved)</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => handleStatusChange('Open')}
-                  className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-600 text-xs font-semibold border border-[#DFEAF2] transition-all duration-200 active:scale-[0.98]"
-                >
-                  Reopen Ticket
-                </button>
-              )}
-
               <button
+                type="button"
                 onClick={handleDelete}
                 className="ml-auto h-11 px-5 rounded-2xl bg-[#FFE0EB] hover:bg-rose-100 text-[#FF4B4A] text-xs font-semibold border border-[#FF4B4A]/30 flex items-center gap-1.5 transition-all duration-200 active:scale-[0.98] shadow-xs"
               >

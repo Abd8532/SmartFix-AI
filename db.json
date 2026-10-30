@@ -4,74 +4,94 @@
       "id": "adm_1793368640345_253",
       "name": "Sarthak Chaudhary",
       "email": "bpssarthak321@gmail.com",
-      "password": "12345678",
       "role": "admin",
       "roleDisplay": "Administrator",
       "specialty": null,
       "approvalStatus": "Approved",
       "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
-      "createdAt": "2026-10-30T13:57:20.345Z"
+      "createdAt": "2026-10-30T13:57:20.345Z",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "passwordHash": "pbkdf2_sha256$100000$a46c8a8f1b5ddcca1d11587a915695e6$a2b85a9505778ed1be78e1cb2eb8e661f40e8fe2b5684114aede6bce2356140c"
     },
     {
       "id": "adm_master_1",
       "name": "Master Administrator",
       "email": "admin@campus.edu",
-      "password": "admin123",
       "role": "admin",
       "roleDisplay": "Administrator",
       "department": "Campus Facilities Operations",
       "approvalStatus": "Approved",
       "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
-      "createdAt": "2026-10-30T13:34:30.195Z"
+      "createdAt": "2026-10-30T13:34:30.195Z",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "passwordHash": "pbkdf2_sha256$100000$d1698a0bda016854d3d3fd9267d33e51$5016f1190b21b219c261d693a823e932de99114c85d67880e47bc1c22a8a7358"
     },
     {
       "id": "tech_1",
       "name": "Marcus Vance",
       "email": "tech@campus.edu",
-      "password": "password123",
       "role": "technician",
       "roleDisplay": "Field Technician",
       "specialty": "Plumbing",
       "approvalStatus": "Approved",
       "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
-      "createdAt": "2026-10-30T13:34:30.195Z"
+      "createdAt": "2026-10-30T13:34:30.195Z",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "passwordHash": "pbkdf2_sha256$100000$33a16a10e55f166b1cb71bb8b972171b$c6b35cc51c501b0299c50f174038addd258ea3775df4c34b9220b12cb4deec5c"
     },
     {
       "id": "tech_2",
       "name": "Elena Rostova",
       "email": "elena@campus.edu",
-      "password": "password123",
       "role": "technician",
       "roleDisplay": "Field Technician",
       "specialty": "Electrical",
       "approvalStatus": "Approved",
       "avatar": "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=120&auto=format&fit=crop&q=80",
-      "createdAt": "2026-10-30T13:34:30.195Z"
+      "createdAt": "2026-10-30T13:34:30.195Z",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "passwordHash": "pbkdf2_sha256$100000$77cfb9b1fa63221f0a2849a6dbb5efad$10b6d2f80ee43e7a60d9f04be619c03e2544ce22b72c84362d06e72d157adb28"
     },
     {
       "id": "tech_3",
       "name": "Liam Smith",
       "email": "liam@campus.edu",
-      "password": "password123",
       "role": "technician",
       "roleDisplay": "Field Technician",
       "specialty": "HVAC",
       "approvalStatus": "Approved",
       "avatar": "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80",
-      "createdAt": "2026-10-30T13:34:30.195Z"
+      "createdAt": "2026-10-30T13:34:30.195Z",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "passwordHash": "pbkdf2_sha256$100000$88406b58895dd7d652e98a648dff370a$a9e7fa1ca80aebc6e3339ff3d7bd4b495708cdf3b35391beab6587e45f4f5b49"
     },
     {
       "id": "usr_default",
       "name": "Campus User",
       "email": "user@campus.edu",
-      "password": "password",
       "role": "user",
       "roleDisplay": "Campus User",
       "department": "Campus Student Services",
       "approvalStatus": "Approved",
       "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-      "createdAt": "2026-10-30T13:54:23.404Z"
+      "createdAt": "2026-10-30T13:54:23.404Z",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "passwordHash": "pbkdf2_sha256$100000$1594151903cccad11823cb77c1650a44$32fecb1ae4061d8aae349db2e0af3ea2350209208b020abb045a47af58add14b"
     }
   ],
-  "tickets": []
+  "tickets": [],
+  "organizations": [
+    {
+      "id": "org_campus_main",
+      "name": "Campus Facilities Operations",
+      "domain": "campus.edu"
+    }
+  ],
+  "audit_logs": []
 }
