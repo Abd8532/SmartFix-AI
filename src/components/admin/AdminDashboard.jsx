@@ -60,7 +60,8 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     addToast,
     fetchTickets,
     resetMockData,
-    fetchAuditLogs
+    fetchAuditLogs,
+    isLoading
   } = useTickets();
   const { users, pendingUsers, approvedUsers, approveUser, rejectUser } = useAuth();
 
@@ -659,10 +660,10 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
               {filteredTickets.length} matching work orders
             </p>
 
-            {/* Skeleton Loader during active Airtable Syncing */}
-            {isSyncing ? (
+            {/* Skeleton Loader during active backend syncing */}
+            {isLoading ? (
               <div className="py-4">
-                <p className="text-xs font-semibold text-slate-500 mb-3 animate-pulse">Syncing work orders from live Airtable database...</p>
+                <p className="text-xs font-semibold text-slate-500 mb-3 animate-pulse">Syncing work orders from secure backend database...</p>
                 <TicketSkeleton count={4} />
               </div>
             ) : filteredTickets.length === 0 ? (
@@ -745,8 +746,8 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
                             </td>
 
                             <td className="px-4 py-4 whitespace-nowrap">
-                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#F5F7FA] text-slate-500 border border-[#E6EFF5]">
-                                {ticket.isAirtable ? 'AIRTABLE' : 'LOCAL'}
+                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30 font-mono">
+                                AUTHORITATIVE
                               </span>
                             </td>
 
@@ -870,9 +871,9 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
           </div>
 
           {/* Request Queue Table or Skeletons or Empty State */}
-          {isSyncing ? (
+          {isLoading ? (
             <div className="py-4">
-              <p className="text-xs font-semibold text-slate-500 mb-3 animate-pulse">Syncing work orders from live Airtable database...</p>
+              <p className="text-xs font-semibold text-slate-500 mb-3 animate-pulse">Syncing work orders from secure backend database...</p>
               <TicketSkeleton count={4} />
             </div>
           ) : filteredTickets.length === 0 ? (
