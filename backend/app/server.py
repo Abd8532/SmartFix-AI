@@ -25,12 +25,26 @@ class ApiRequestHandler(BaseHTTPRequestHandler):
         # Map headers
         headers_dict = {k: v for k, v in self.headers.items()}
 
-        response = handle_api_request(
-            path=self.path,
-            method=self.command,
-            headers=headers_dict,
-            body_data=body_str
-        )
+        try:
+            response = handle_api_request(
+                path=self.path,
+                method=self.command,
+                headers=headers_dict,
+                body_data=body_str
+            )
+        except Exception as e:
+            import traceback
+            sys.stderr.write(f"[Server Error] {self.command} {self.path}: {str(e)}\n")
+            traceback.print_exc()
+            response = {
+                "statusCode": 500,
+                "headers": {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": headers_dict.get("Origin") or "http://localhost:5173",
+                    "Access-Control-Allow-Credentials": "true"
+                },
+                "body": json.dumps({"success": False, "error": f"Internal Server Error: {str(e)}"})
+            }
 
         status_code = response.get("statusCode", 200)
         resp_headers = response.get("headers", {})

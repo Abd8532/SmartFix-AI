@@ -15,7 +15,18 @@ export default defineConfig(({ mode }) => {
         '/api': {
           target: backendTarget,
           changeOrigin: true,
-          secure: false
+          secure: false,
+          configure: (proxy) => {
+            proxy.on('error', (err, req, res) => {
+              if (res && !res.headersSent) {
+                res.writeHead(503, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                  success: false,
+                  error: 'Python backend unavailable. Ensure the backend server is running on http://127.0.0.1:8000 (execute: python run_backend.py).'
+                }));
+              }
+            });
+          }
         }
       }
     }
