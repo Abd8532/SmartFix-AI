@@ -125,14 +125,22 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
       if (priorityFilter !== 'All' && ticket.priority !== priorityFilter) return false;
 
       if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
+        const q = searchQuery.trim().toLowerCase();
+        const cleanQ = q.startsWith('#') ? q.slice(1).trim() : q;
+        const idStr = String(ticket?.id || '').toLowerCase();
+        const titleStr = String(ticket?.title || ticket?.Title || ticket?.complaint || ticket?.issue || '').toLowerCase();
+        const descStr = String(ticket?.description || ticket?.Description || '').toLowerCase();
+        const locStr = String(ticket?.location || ticket?.Location || ticket?.room || '').toLowerCase();
+        const catStr = String(ticket?.category || ticket?.Category || '').toLowerCase();
+        const repStr = String(ticket?.reportedBy?.name || ticket?.reporterName || '').toLowerCase();
+
         const matches =
-          ticket.id.toLowerCase().includes(q) ||
-          ticket.title.toLowerCase().includes(q) ||
-          ticket.description.toLowerCase().includes(q) ||
-          (ticket.location && ticket.location.toLowerCase().includes(q)) ||
-          ticket.category.toLowerCase().includes(q) ||
-          (ticket.reportedBy?.name && ticket.reportedBy.name.toLowerCase().includes(q));
+          idStr.includes(cleanQ) ||
+          titleStr.includes(q) ||
+          descStr.includes(q) ||
+          locStr.includes(q) ||
+          catStr.includes(q) ||
+          repStr.includes(q);
 
         if (!matches) return false;
       }
