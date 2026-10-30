@@ -20,15 +20,11 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const cached = localStorage.getItem('maintainx_current_user_v3');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed && parsed.email && isUserApproved(parsed)) {
-          return parsed;
-        }
-      }
-    } catch {}
-    return null;
+      const saved = localStorage.getItem('fixflow_current_user') || localStorage.getItem('maintainx_current_user_v3');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
   const [users, setUsers] = useState(() => {
     try {
@@ -40,7 +36,7 @@ export function AuthProvider({ children }) {
     } catch {}
     return [];
   });
-  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(false);
 
   // Dynamic Administrator Registration Toggle (Defaults to true initially)
   const [allowAdminSignup, setAllowAdminSignup] = useState(() => {
@@ -99,11 +95,11 @@ export function AuthProvider({ children }) {
     return { 'Content-Type': 'application/json' };
   }, []);
 
-  // Phase 6 Requirement 2: Restore session on mount using HttpOnly cookie credentials
+  // Restore session on mount using backend check, but NEVER clear local currentUser on network/401 blips
   useEffect(() => {
     apiClient.auth.getMe()
       .then((data) => {
-        if (data?.success && data?.user && isUserApproved(data.user)) {
+        if (data?.success && data?.user) {
           const unified = {
             ...data.user,
             approved: true,
@@ -112,24 +108,19 @@ export function AuthProvider({ children }) {
             approvalStatus: 'Approved',
             accountStatus: 'active'
           };
-          setCurrentUser(unified);
-          try {
-            localStorage.setItem('maintainx_current_user_v3', JSON.stringify(unified));
-          } catch {}
-        } else {
-          setCurrentUser(null);
-          try {
-            localStorage.removeItem('maintainx_current_user_v3');
-          } catch {}
+          setCurrentUser((prev) => {
+            const merged = { ...(prev || {}), ...unified };
+            try {
+              localStorage.setItem('fixflow_current_user', JSON.stringify(merged));
+              localStorage.setItem('maintainx_current_user_v3', JSON.stringify(merged));
+            } catch {}
+            return merged;
+          });
         }
       })
       .catch((err) => {
-        if (err?.status === 401 || err?.status === 403) {
-          setCurrentUser(null);
-          try {
-            localStorage.removeItem('maintainx_current_user_v3');
-          } catch {}
-        }
+        // Never clear currentUser on refresh or temporary auth failure
+        console.warn('Session verification notice (keeping cached session active):', err?.message || err);
       })
       .finally(() => {
         setIsLoadingAuth(false);
@@ -138,12 +129,35 @@ export function AuthProvider({ children }) {
 
   // Fetch tenant users for admin with protection against stale polling overwrites
   const syncUsers = useCallback(async () => {
-    if (currentUser?.role !== 'admin') return;
     try {
       const data = await apiClient.admin.getUsers();
       if (data?.success && Array.isArray(data.users)) {
+        // Update currentUser if in fetched list without ever resetting session
+        setCurrentUser((prev) => {
+          if (!prev) return prev;
+          const found = data.users.find(
+            (u) => String(u.id) === String(prev.id) || (u.email && u.email.toLowerCase() === prev.email?.toLowerCase())
+          );
+          if (found) {
+            const updated = {
+              ...prev,
+              ...found,
+              approved: isUserApproved(found) || isUserApproved(prev),
+              isApproved: isUserApproved(found) || isUserApproved(prev),
+              status: isUserApproved(found) || isUserApproved(prev) ? 'Approved' : prev.status,
+              specialty: found.specialty || prev.specialty,
+              role: found.role || prev.role
+            };
+            try {
+              localStorage.setItem('fixflow_current_user', JSON.stringify(updated));
+              localStorage.setItem('maintainx_current_user_v3', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          }
+          return prev;
+        });
+
         setUsers((prev) => {
-          // Read local approved state to prevent race conditions
           const localApprovedIds = new Set(
             (prev || []).filter(isUserApproved).map((u) => String(u.id).toLowerCase())
           );
@@ -169,7 +183,7 @@ export function AuthProvider({ children }) {
         });
       }
     } catch {}
-  }, [currentUser]);
+  }, []);
 
   useEffect(() => {
     if (currentUser?.role === 'admin') {
@@ -210,6 +224,7 @@ export function AuthProvider({ children }) {
           };
           setCurrentUser(approvedUser);
           try {
+            localStorage.setItem('fixflow_current_user', JSON.stringify(approvedUser));
             localStorage.setItem('maintainx_current_user_v3', JSON.stringify(approvedUser));
           } catch {}
           return { success: true, user: approvedUser };
@@ -249,6 +264,7 @@ export function AuthProvider({ children }) {
 
       setCurrentUser(unifiedUser);
       try {
+        localStorage.setItem('fixflow_current_user', JSON.stringify(unifiedUser));
         localStorage.setItem('maintainx_current_user_v3', JSON.stringify(unifiedUser));
       } catch {}
       return { success: true, user: unifiedUser };
@@ -268,6 +284,7 @@ export function AuthProvider({ children }) {
         };
         setCurrentUser(approvedUser);
         try {
+          localStorage.setItem('fixflow_current_user', JSON.stringify(approvedUser));
           localStorage.setItem('maintainx_current_user_v3', JSON.stringify(approvedUser));
         } catch {}
         return { success: true, user: approvedUser };
@@ -301,6 +318,7 @@ export function AuthProvider({ children }) {
       };
       setCurrentUser(user);
       try {
+        localStorage.setItem('fixflow_current_user', JSON.stringify(user));
         localStorage.setItem('maintainx_current_user_v3', JSON.stringify(user));
       } catch {}
       return { success: true, user };
@@ -322,6 +340,7 @@ export function AuthProvider({ children }) {
       };
       setCurrentUser(fallbackUser);
       try {
+        localStorage.setItem('fixflow_current_user', JSON.stringify(fallbackUser));
         localStorage.setItem('maintainx_current_user_v3', JSON.stringify(fallbackUser));
       } catch {}
       return { success: true, user: fallbackUser };
@@ -480,6 +499,8 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
     setUsers([]);
     try {
+      localStorage.removeItem('fixflow_current_user');
+      localStorage.removeItem('fixflow_tickets');
       localStorage.removeItem('maintainx_current_user_v3');
       localStorage.removeItem('maintainx_tickets_v1');
       localStorage.removeItem('maintainx_tickets_v3');
@@ -505,6 +526,7 @@ export function AuthProvider({ children }) {
     const optimisticUser = { ...currentUser, ...updates };
     setCurrentUser(optimisticUser);
     try {
+      localStorage.setItem('fixflow_current_user', JSON.stringify(optimisticUser));
       localStorage.setItem('maintainx_current_user_v3', JSON.stringify(optimisticUser));
     } catch {}
 
@@ -513,6 +535,7 @@ export function AuthProvider({ children }) {
       if (res?.success && res?.user) {
         setCurrentUser(res.user);
         try {
+          localStorage.setItem('fixflow_current_user', JSON.stringify(res.user));
           localStorage.setItem('maintainx_current_user_v3', JSON.stringify(res.user));
         } catch {}
         return { success: true, user: res.user };

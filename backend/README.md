@@ -59,7 +59,7 @@ backend/
 │   ├── storage.py            # BaseRepository interface, JsonFileRepository & DynamoDBRepository adapters
 │   ├── lifecycle.py          # State machine, anti-impersonation, safety overrides, dual approval
 │   ├── rag.py                # Semantic embeddings (text-embedding-004), verified-repair gating
-│   ├── ai.py                 # Gemini 1.5 Flash multimodal vision analysis & Open-Meteo context
+│   ├── ai.py                 # Gemini 2.5 Flash multimodal vision analysis & Open-Meteo context
 │   ├── audit.py              # Immutable multi-tenant audit trail service
 │   ├── api.py                # Central REST router for HTTP & AWS Lambda events
 │   └── server.py             # Built-in lightweight HTTP server for local development

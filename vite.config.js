@@ -34,11 +34,30 @@ function localDbSyncPlugin() {
                 }
 
                 if (Array.isArray(payload.users)) {
-                  // Cleanly update and write the new users array to db.json on disk
-                  dbData.users = payload.users;
+                  // Merge users by id while strictly preserving existing tickets
+                  const existingUsers = Array.isArray(dbData.users) ? dbData.users : [];
+                  const userMap = new Map();
+                  existingUsers.forEach((u) => {
+                    const k = String(u.id || u.email || '').toLowerCase();
+                    if (k) userMap.set(k, u);
+                  });
+                  payload.users.forEach((u) => {
+                    const k = String(u.id || u.email || '').toLowerCase();
+                    if (k) userMap.set(k, { ...(userMap.get(k) || {}), ...u });
+                  });
+                  dbData.users = Array.from(userMap.values());
                 }
                 if (Array.isArray(payload.tickets)) {
-                  dbData.tickets = payload.tickets;
+                  // Merge tickets by id while strictly preserving existing users
+                  const existingTickets = Array.isArray(dbData.tickets) ? dbData.tickets : [];
+                  const ticketMap = new Map();
+                  existingTickets.forEach((t) => {
+                    if (t?.id) ticketMap.set(String(t.id), t);
+                  });
+                  payload.tickets.forEach((t) => {
+                    if (t?.id) ticketMap.set(String(t.id), { ...(ticketMap.get(String(t.id)) || {}), ...t });
+                  });
+                  dbData.tickets = Array.from(ticketMap.values());
                 }
                 if (payload.system_settings) {
                   dbData.system_settings = { ...dbData.system_settings, ...payload.system_settings };
@@ -46,7 +65,7 @@ function localDbSyncPlugin() {
 
                 fs.writeFileSync(DB_FILE_PATH, JSON.stringify(dbData, null, 2), 'utf-8');
                 res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ success: true, users: dbData.users }));
+                res.end(JSON.stringify({ success: true, users: dbData.users, tickets: dbData.tickets }));
               } catch (err) {
                 res.writeHead(500, { 'Content-Type': 'application/json' });
                 res.end(JSON.stringify({ success: false, error: err.message }));

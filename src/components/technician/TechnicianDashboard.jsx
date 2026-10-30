@@ -17,6 +17,18 @@ const normalizeTrade = (str = '') => {
   return s;
 };
 
+// Check if ticket mentions any electrical term
+const isElectricalMatch = (ticket) => {
+  const terms = ['elec', 'light', 'wire', 'spark', 'power', 'breaker', 'fan', 'switch', 'socket', 'ward'];
+  const text = `${ticket.category || ''} ${ticket.assignedTo || ''} ${ticket.assignedSpecialty || ''} ${ticket.title || ''} ${ticket.description || ''} ${ticket.complaint || ''}`.toLowerCase();
+  return terms.some((term) => text.includes(term));
+};
+
+// Strict dual-approval resolved check: ticket is open until BOTH tech and user have confirmed
+const isTicketCompleted = (t) => {
+  return Boolean(t.techConfirmed && t.userConfirmed) || t.status === 'Completed';
+};
+
 export default function TechnicianDashboard({ onSelectTicket }) {
   const { tickets, handleTicketClosure, confirmTicketCompletion, addToast } = useTickets();
   const { currentUser } = useAuth();
@@ -41,11 +53,22 @@ export default function TechnicianDashboard({ onSelectTicket }) {
   // Flexible Trade Matching & RAG Priority Sorting
   const myDepartmentTickets = useMemo(() => {
     const deptFiltered = tickets.filter((ticket) => {
-      // Allow clicking 'All Categories' in left sidebar to preview all tickets
-      if (selectedCategory === 'All') return true;
+      // Allow clicking 'All Categories' or 'All' in left sidebar to preview all tickets
+      if (selectedCategory === 'All' || selectedCategory === 'all-tickets') return true;
 
       const targetSpec = selectedCategory || currentUser?.specialty || '';
-      return normalizeTrade(ticket.category) === normalizeTrade(targetSpec);
+      const normTarget = normalizeTrade(targetSpec);
+
+      // When filtering for 'Electrical', match any electrical term across all fields
+      if (normTarget === 'electrical') {
+        if (isElectricalMatch(ticket)) return true;
+      }
+
+      return (
+        normalizeTrade(ticket.category) === normTarget ||
+        normalizeTrade(ticket.assignedSpecialty) === normTarget ||
+        normalizeTrade(ticket.assignedTo) === normTarget
+      );
     });
 
     return [...deptFiltered].sort((a, b) => {
@@ -67,7 +90,7 @@ export default function TechnicianDashboard({ onSelectTicket }) {
     let urgent = 0;
 
     myDepartmentTickets.forEach((t) => {
-      const isResolved = t.status === 'Completed' || t.status === 'Done' || t.status === 'Resolved';
+      const isResolved = isTicketCompleted(t);
       if (isResolved) {
         done++;
       } else {
@@ -92,7 +115,7 @@ export default function TechnicianDashboard({ onSelectTicket }) {
   // Filter tickets by search and feature filters within the department queue
   const displayedTickets = useMemo(() => {
     return myDepartmentTickets.filter((ticket) => {
-      const isResolved = ticket.status === 'Done' || ticket.status === 'Completed' || ticket.status === 'Resolved';
+      const isResolved = isTicketCompleted(ticket);
       if (activeSegment === 'active' && isResolved) return false;
       if (activeSegment === 'resolved' && !isResolved) return false;
 

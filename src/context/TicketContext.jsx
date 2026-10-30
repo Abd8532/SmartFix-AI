@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import apiClient from '../services/apiClient';
 
@@ -243,6 +243,7 @@ export function TicketProvider({ children }) {
   const role = auth?.currentUser?.approvalStatus === 'Approved' ? auth.currentUser.role : null;
   const currentUser = auth?.currentUser || null;
 
+  const isHydrated = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
 
   // Tab state for User Role: 'new-issue' | 'my-tickets'
@@ -254,23 +255,18 @@ export function TicketProvider({ children }) {
     }
   });
 
-  // Active tickets state - strictly scoped by organization ID and user ID to prevent cross-tenant/cross-user leaks
+  // Active tickets state - synchronously initialized from fixflow_tickets so refresh never wipes state
   const [tickets, setTickets] = useState(() => {
     try {
-      const activeUserStr = localStorage.getItem('maintainx_current_user_v3');
-      if (!activeUserStr) return [];
-      const activeUser = JSON.parse(activeUserStr);
-      if (!activeUser?.id || !activeUser?.org_id) return [];
-      const scopedKey = `maintainx_tickets_${activeUser.org_id}_${activeUser.id}`;
-      const saved = localStorage.getItem(scopedKey);
+      const saved = localStorage.getItem('fixflow_tickets') || localStorage.getItem(STORAGE_KEYS.TICKETS) || localStorage.getItem('maintainx_tickets_v3');
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
+        if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed.map(normalizeTicketRecord).filter(Boolean);
         }
       }
     } catch (e) {
-      console.warn('Failed reading scoped tickets from storage:', e);
+      console.warn('Failed reading tickets from storage:', e);
     }
     return [];
   });
@@ -298,64 +294,97 @@ export function TicketProvider({ children }) {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // 1. READ: Fetch isolated tickets from authoritative Python backend
+  // 1. READ: Fetch isolated tickets from authoritative Python backend & /api/db, merging without overwriting
   const fetchTickets = useCallback(async () => {
-    if (!currentUser) return;
-
     try {
-      const data = await apiClient.tickets.list();
-      if (Array.isArray(data.tickets)) {
-        const normalized = data.tickets.map(normalizeTicketRecord).filter(Boolean);
-        setTickets(normalized);
-      }
-    } catch (error) {
-      if (error.status !== 401) {
-        console.warn('Backend tickets sync error:', error);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentUser]);
-
-  // Clear cached tickets immediately on account/organisation switch or logout (Phase 4 requirement 3)
-  useEffect(() => {
-    setTickets([]);
-    setSelectedTicketId(null);
-    try {
-      localStorage.removeItem(STORAGE_KEYS.TICKETS);
-      if (!currentUser) {
-        for (let i = localStorage.length - 1; i >= 0; i--) {
-          const k = localStorage.key(i);
-          if (k && (k.startsWith('maintainx_tickets_') || k === STORAGE_KEYS.TICKETS)) {
-            localStorage.removeItem(k);
-          }
+      let serverTickets = [];
+      try {
+        const data = await apiClient.tickets.list();
+        if (Array.isArray(data?.tickets)) {
+          serverTickets = data.tickets;
+        }
+      } catch (error) {
+        if (error.status !== 401) {
+          console.warn('Backend tickets sync error:', error);
         }
       }
-    } catch {}
 
+      // Merge with shared /api/db tickets
+      try {
+        const dbRes = await fetch('/api/db');
+        if (dbRes.ok) {
+          const dbData = await dbRes.json();
+          if (Array.isArray(dbData?.tickets)) {
+            serverTickets = [...serverTickets, ...dbData.tickets];
+          }
+        }
+      } catch {}
+
+      const localRaw = (() => {
+        try {
+          return JSON.parse(
+            localStorage.getItem('fixflow_tickets') ||
+            localStorage.getItem(STORAGE_KEYS.TICKETS) ||
+            localStorage.getItem('maintainx_tickets_v3') ||
+            '[]'
+          );
+        } catch {
+          return [];
+        }
+      })();
+      const localTickets = (Array.isArray(localRaw) ? localRaw : []).map(normalizeTicketRecord).filter(Boolean);
+      const normalizedServer = serverTickets.map(normalizeTicketRecord).filter(Boolean);
+
+      // Deduplicate by ticket.id
+      const mergedMap = new Map();
+      [...localTickets, ...normalizedServer].forEach((t) => {
+        if (t && t.id) {
+          mergedMap.set(String(t.id), t);
+        }
+      });
+      const mergedTickets = Array.from(mergedMap.values());
+
+      setTickets(mergedTickets);
+      isHydrated.current = true;
+      try {
+        localStorage.setItem('fixflow_tickets', JSON.stringify(mergedTickets));
+        localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(mergedTickets));
+        localStorage.setItem('maintainx_tickets_v3', JSON.stringify(mergedTickets));
+      } catch {}
+    } finally {
+      setIsLoading(false);
+      isHydrated.current = true;
+    }
+  }, []);
+
+  // Fetch tickets on mount & user change WITHOUT wiping in-memory tickets
+  useEffect(() => {
     if (currentUser) {
-      setIsLoading(true);
       fetchTickets();
     }
   }, [currentUser?.id, currentUser?.org_id, fetchTickets]);
 
   // Initial fetch and continuous real-time polling
   useEffect(() => {
-    if (currentUser) {
-      fetchTickets();
-      const interval = setInterval(fetchTickets, 3000);
-      return () => clearInterval(interval);
-    }
-  }, [currentUser, fetchTickets]);
+    fetchTickets();
+    const interval = setInterval(fetchTickets, 3500);
+    return () => clearInterval(interval);
+  }, [fetchTickets]);
 
-  // Persist tickets cache locally scoped by tenant and user ID
+  // Persist tickets cache locally once hydrated
   useEffect(() => {
-    if (currentUser?.id && currentUser?.org_id && tickets.length > 0) {
+    if (!isHydrated.current) return;
+    if (tickets.length > 0) {
       try {
-        const scopedKey = `maintainx_tickets_${currentUser.org_id}_${currentUser.id}`;
-        localStorage.setItem(scopedKey, JSON.stringify(tickets));
+        localStorage.setItem('fixflow_tickets', JSON.stringify(tickets));
+        localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+        localStorage.setItem('maintainx_tickets_v3', JSON.stringify(tickets));
+        if (currentUser?.org_id && currentUser?.id) {
+          const scopedKey = `maintainx_tickets_${currentUser.org_id}_${currentUser.id}`;
+          localStorage.setItem(scopedKey, JSON.stringify(tickets));
+        }
       } catch (e) {
-        console.warn('Failed saving tickets to scoped storage:', e);
+        console.warn('Failed saving tickets to storage:', e);
       }
     }
   }, [tickets, currentUser?.id, currentUser?.org_id]);
@@ -484,8 +513,9 @@ export function TicketProvider({ children }) {
       setTickets((prev) => {
         const nextList = [created, ...prev.filter((t) => String(t.id) !== String(created.id))];
         try {
+          localStorage.setItem('fixflow_tickets', JSON.stringify(nextList));
+          localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(nextList));
           localStorage.setItem('maintainx_tickets_v3', JSON.stringify(nextList));
-          localStorage.setItem('maintainx_tickets', JSON.stringify(nextList));
           if (currentUser?.org_id && currentUser?.id) {
             localStorage.setItem(`maintainx_tickets_${currentUser.org_id}_${currentUser.id}`, JSON.stringify(nextList));
           }
@@ -497,7 +527,7 @@ export function TicketProvider({ children }) {
       try {
         const currentStored = (() => {
           try {
-            return JSON.parse(localStorage.getItem('maintainx_tickets_v3') || '[]');
+            return JSON.parse(localStorage.getItem('fixflow_tickets') || localStorage.getItem('maintainx_tickets_v3') || '[]');
           } catch { return []; }
         })();
         const allTicketsToSync = [created, ...currentStored.filter((t) => String(t.id) !== String(created.id))];
@@ -704,8 +734,9 @@ export function TicketProvider({ children }) {
     setTickets((prev) => {
       const nextList = prev.map((t) => (String(t.id) === String(ticketId) ? updated : t));
       try {
+        localStorage.setItem('fixflow_tickets', JSON.stringify(nextList));
+        localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(nextList));
         localStorage.setItem('maintainx_tickets_v3', JSON.stringify(nextList));
-        localStorage.setItem('maintainx_tickets', JSON.stringify(nextList));
         if (currentUser?.org_id && currentUser?.id) {
           localStorage.setItem(`maintainx_tickets_${currentUser.org_id}_${currentUser.id}`, JSON.stringify(nextList));
         }
