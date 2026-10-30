@@ -8,42 +8,34 @@ export default function BottomNav() {
   if (!role) return null;
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-[#E6EFF5] pb-safe text-[#718EBF] shadow-lg">
-      <div className="flex items-center justify-around h-16 px-2">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#18181c] border-t border-[#2a2a32] pb-safe text-zinc-400">
+      <div className="flex items-center justify-around h-14 px-2">
         {role === 'user' && (
           <>
             <button
               onClick={() => setUserTab('new-issue')}
-              className={`flex-1 flex flex-col items-center justify-center py-1 transition-all duration-200 active:scale-[0.98] ${
+              className={`flex-1 flex flex-col items-center justify-center py-1 transition ${
                 userTab === 'new-issue'
-                  ? 'text-[#2D60FF] font-bold'
-                  : 'text-slate-400 hover:text-slate-700'
+                  ? 'text-indigo-400 font-semibold'
+                  : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              <div className={`p-1.5 rounded-xl transition-all ${
-                userTab === 'new-issue' ? 'bg-[#E7EDFF] text-[#2D60FF]' : ''
-              }`}>
-                <PlusCircle className="w-5 h-5" />
-              </div>
-              <span className="text-[11px] mt-0.5">New Issue</span>
+              <PlusCircle className="w-4 h-4" />
+              <span className="text-[10px] mt-0.5">New Issue</span>
             </button>
 
             <button
               onClick={() => setUserTab('my-tickets')}
-              className={`flex-1 flex flex-col items-center justify-center py-1 transition-all duration-200 active:scale-[0.98] relative ${
+              className={`flex-1 flex flex-col items-center justify-center py-1 transition relative ${
                 userTab === 'my-tickets'
-                  ? 'text-[#2D60FF] font-bold'
-                  : 'text-slate-400 hover:text-slate-700'
+                  ? 'text-indigo-400 font-semibold'
+                  : 'text-zinc-500 hover:text-zinc-300'
               }`}
             >
-              <div className={`p-1.5 rounded-xl transition-all ${
-                userTab === 'my-tickets' ? 'bg-[#E7EDFF] text-[#2D60FF]' : ''
-              }`}>
-                <ListTodo className="w-5 h-5" />
-              </div>
-              <span className="text-[11px] mt-0.5">My Tickets</span>
-              {stats.userTicketsCount > 0 && (
-                <span className="absolute top-1.5 right-[28%] px-1.5 py-0.2 bg-[#2D60FF] text-white text-[10px] font-bold rounded-full min-w-4 text-center">
+              <ListTodo className="w-4 h-4" />
+              <span className="text-[10px] mt-0.5">My Tickets</span>
+              {stats?.userTicketsCount > 0 && (
+                <span className="absolute top-1 right-[28%] px-1.5 py-0.2 bg-indigo-600 text-white text-[9px] font-bold rounded-full min-w-4 text-center">
                   {stats.userTicketsCount}
                 </span>
               )}
@@ -52,16 +44,16 @@ export default function BottomNav() {
         )}
 
         {role === 'technician' && (
-          <div className="flex items-center justify-center w-full text-xs text-[#343C6A] font-semibold gap-2">
-            <Wrench className="w-4 h-4 text-[#2D60FF]" />
-            <span>Technician Resolution Mode</span>
+          <div className="flex-1 text-center py-2 text-xs text-indigo-400 font-semibold flex items-center justify-center gap-1.5">
+            <Wrench className="w-4 h-4" />
+            <span>Field Technician Workspace</span>
           </div>
         )}
 
         {role === 'admin' && (
-          <div className="flex items-center justify-center w-full text-xs text-[#343C6A] font-semibold gap-2">
-            <Shield className="w-4 h-4 text-[#2D60FF]" />
-            <span>Facilities Administration</span>
+          <div className="flex-1 text-center py-2 text-xs text-indigo-400 font-semibold flex items-center justify-center gap-1.5">
+            <Shield className="w-4 h-4" />
+            <span>Facilities Admin Portal</span>
           </div>
         )}
       </div>

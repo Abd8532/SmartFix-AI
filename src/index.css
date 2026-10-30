@@ -4,67 +4,56 @@
 
 @layer base {
   * {
-    border-color: #E6EFF5;
+    border-color: #2a2a32;
   }
   body {
-    background-color: #F5F7FA;
-    color: #343C6A;
+    background-color: #131316;
+    color: #f4f4f5;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Custom BankDash modern light scrollbar */
+/* Custom NeetCode Matte Dark Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #F5F7FA;
+  background: #131316;
 }
 ::-webkit-scrollbar-thumb {
-  background: #DFEAF2;
+  background: #2a2a32;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #B1B7D1;
+  background: #3f3f4a;
 }
 
-/* BankDash & Modern Layered Depth Card Utilities */
-.shadow-layered {
-  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 4px 16px -4px rgba(0, 0, 0, 0.05);
+/* Subtle border and hover helpers */
+.matte-card {
+  background-color: #1c1c21;
+  border: 1px solid #2a2a32;
+  border-radius: 0.75rem; /* 12px */
 }
 
-.shadow-layered-hover {
-  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), box-shadow 200ms ease;
-}
-
-.shadow-layered-hover:hover {
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.07), 0 8px 24px -4px rgba(0, 0, 0, 0.07);
-}
-
-.bankdash-card {
-  background-color: #ffffff;
-  border: 1px solid #E6EFF5;
-  border-radius: 1.5rem;
-  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 4px 16px -4px rgba(0, 0, 0, 0.05);
-}
-
-.bankdash-card-blue {
-  background: linear-gradient(135deg, #2D60FF 0%, #1814F3 100%);
-  color: #ffffff;
-  border-radius: 1.5rem;
-  box-shadow: 0 8px 24px -4px rgba(45, 96, 255, 0.3);
+.matte-input {
+  background-color: #24242b;
+  border: 1px solid #32323b;
+  border-radius: 0.5rem; /* 8px */
 }
 
 /* Tactile micro-interaction helper */
 .interactive-tap {
-  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, box-shadow 150ms ease;
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1), background-color 150ms ease, border-color 150ms ease;
 }
 
 .interactive-tap:active {
   transform: scale(0.98);
 }
 
-/* Safe area padding for mobile bottom nav */
+/* Safe area padding for mobile navigation */
 .pb-safe {
   padding-bottom: env(safe-area-inset-bottom, 1rem);
 }

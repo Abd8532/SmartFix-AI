@@ -1,9 +1,8 @@
-import React, { useState } from 'react';
-import { Mail, Lock, User, Wrench, ShieldCheck, ArrowRight, CheckCircle2, ShieldAlert } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Mail, Lock, User, Wrench, ShieldCheck, ArrowRight, CheckCircle2, ShieldAlert, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
 
-// Admin Auth Validation Login & Registration Portal
 export default function LoginView({ onLogin }) {
   const { login, register, allowAdminSignup } = useAuth();
   const { addToast } = useTickets();
@@ -22,7 +21,7 @@ export default function LoginView({ onLogin }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Auto-reset role to 'user' if Admin registration was selected but is locked
-  React.useEffect(() => {
+  useEffect(() => {
     if (isSignUp && formData.role === 'admin' && !allowAdminSignup) {
       setFormData((prev) => ({ ...prev, role: 'user' }));
     }
@@ -93,22 +92,20 @@ export default function LoginView({ onLogin }) {
         }
 
         setFormData((prev) => ({ ...prev, password: '' }));
-        setIsSignUp(false); // Switch to login view with success banner
+        setIsSignUp(false);
       } else {
-        // 2. LOGIN: Strictly verified against shared server /api/login endpoint
         const result = await login(formData.email, formData.password, formData.role);
 
         if (!result.success) {
           setErrorMessage(result.error);
           addToast({
             type: 'error',
-            title: result.status === 'Pending' ? 'Approval Required' : 'Domain Access Denied',
+            title: result.status === 'Pending' ? 'Approval Required' : 'Access Denied',
             message: result.error
           });
-          return; // Prevent routing on validation failure
+          return;
         }
 
-        // Login approved & granted!
         if (typeof onLogin === 'function') {
           onLogin(result.user);
         }
@@ -119,287 +116,228 @@ export default function LoginView({ onLogin }) {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-[#F5F7FA] relative">
-      {/* Modern Card with Layered Depth Elevation */}
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] border border-[#E6EFF5] p-6 sm:p-10 relative z-10 text-slate-900">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 bg-[#131316] text-zinc-100">
+      {/* Matte Dark Card */}
+      <div className="max-w-md w-full bg-[#1c1c21] border border-[#2a2a32] rounded-2xl p-6 sm:p-8 relative z-10">
         
-        {/* Main Hero Header: Center-Aligned Style */}
+        {/* Brand Logo & Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#E7EDFF] border border-[#2D60FF]/20 text-[#2D60FF] text-xs font-bold mb-3 shadow-2xs">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#2D60FF]" />
-            <span>Admin Auth Validation</span>
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold mb-3">
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>NeetCode Matte Dark Workspace</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight mb-2 font-['Plus_Jakarta_Sans']">
-            SmartFixFlow <span className="text-[#2D60FF]">- AI</span>
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans',sans-serif]">
+            FixFlow AI<span className="text-indigo-500">.</span>
           </h1>
-          <p className="text-slate-500 text-sm max-w-sm mx-auto leading-relaxed font-medium">
-            {isSignUp ? 'Create an account to request campus maintenance portal access' : 'Sign in to access your campus maintenance dashboard'}
+          <p className="text-zinc-400 text-xs sm:text-sm mt-1 max-w-sm mx-auto">
+            {isSignUp ? 'Request campus maintenance portal credentials' : 'Sign in to access your operations dashboard'}
           </p>
         </div>
 
         {/* Success Alert Banner */}
         {successMessage && (
-          <div className="mb-6 p-4 rounded-2xl bg-[#DCFAF8] border border-[#16DBCC]/30 text-[#16DBCC] text-xs flex items-start gap-3 animate-slide-up shadow-2xs">
-            <CheckCircle2 className="w-5 h-5 text-[#16DBCC] shrink-0 mt-0.5" />
+          <div className="mb-5 p-3.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-bold text-[#16DBCC]">Registration Submitted</p>
-              <p className="mt-1 leading-relaxed text-[#16DBCC]/90 font-medium">{successMessage}</p>
+              <p className="font-semibold text-emerald-300">Registration Submitted</p>
+              <p className="mt-0.5 text-emerald-400/90">{successMessage}</p>
             </div>
           </div>
         )}
 
         {/* Error Alert Banner */}
         {errorMessage && (
-          <div className="mb-6 p-4 rounded-2xl bg-[#FFE0EB] border border-[#FF4B4A]/30 text-[#FF4B4A] text-xs flex items-start gap-3 animate-slide-up shadow-2xs">
-            <ShieldAlert className="w-5 h-5 text-[#FF4B4A] shrink-0 mt-0.5" />
+          <div className="mb-5 p-3.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-start gap-2.5">
+            <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
             <div className="flex-1">
-              <p className="font-bold text-[#FF4B4A]">Access Restricted</p>
-              <p className="mt-1 leading-relaxed font-semibold text-[#FF4B4A]/90">{errorMessage}</p>
+              <p className="font-semibold text-rose-300">Access Restricted</p>
+              <p className="mt-0.5 text-rose-400/90">{errorMessage}</p>
             </div>
           </div>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           
-          {/* Role Selector */}
+          {/* Role Selector Tabs */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-2 tracking-wider font-['Plus_Jakarta_Sans']">
-              {isSignUp ? 'I am registering as' : 'Choose Role / Account Type'}
+            <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+              {isSignUp ? 'Registering as' : 'Choose Account Role'}
             </label>
-            {isSignUp ? (
-              // Sign-up: Consumer, Technician, and Dynamic Administrator Gating
-              <div className="space-y-2">
-                <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
-                  <button
-                    type="button"
-                    onClick={() => handleRoleSelect('user')}
-                    className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                      formData.role === 'user'
-                        ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                        : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    <User className="w-4 h-4" />
-                    <span className="truncate">User</span>
-                  </button>
 
-                  <button
-                    type="button"
-                    onClick={() => handleRoleSelect('technician')}
-                    className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                      formData.role === 'technician'
-                        ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                        : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    <Wrench className="w-4 h-4" />
-                    <span className="truncate">Technician</span>
-                  </button>
+            <div className="grid grid-cols-3 gap-2 p-1 rounded-xl bg-[#24242b] border border-[#32323b]">
+              <button
+                type="button"
+                onClick={() => handleRoleSelect('user')}
+                className={`h-9 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition ${
+                  formData.role === 'user'
+                    ? 'bg-[#2e2e38] text-white font-semibold border border-[#3f3f4e] shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <User className="w-3.5 h-3.5 text-indigo-400" />
+                <span>User</span>
+              </button>
 
-                  {allowAdminSignup ? (
-                    <button
-                      type="button"
-                      onClick={() => handleRoleSelect('admin')}
-                      className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                        formData.role === 'admin'
-                          ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                          : 'text-slate-500 hover:text-slate-900'
-                      }`}
-                    >
-                      <ShieldCheck className="w-4 h-4 text-[#2D60FF]" />
-                      <span className="truncate">Admin</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      disabled
-                      title="Admin sign-up is disabled by the system administrator."
-                      className="h-11 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 text-slate-400 bg-slate-100 border border-dashed border-slate-300 opacity-60 cursor-not-allowed"
-                    >
-                      <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="truncate">Admin</span>
-                    </button>
-                  )}
-                </div>
+              <button
+                type="button"
+                onClick={() => handleRoleSelect('technician')}
+                className={`h-9 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition ${
+                  formData.role === 'technician'
+                    ? 'bg-[#2e2e38] text-white font-semibold border border-[#3f3f4e] shadow-sm'
+                    : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                <Wrench className="w-3.5 h-3.5 text-amber-400" />
+                <span>Tech</span>
+              </button>
 
-                {/* Role Specific Registration Helper Notes */}
-                {formData.role === 'admin' ? (
-                  <div className="text-xs text-[#2D60FF] bg-[#E7EDFF] p-3 rounded-2xl border border-[#2D60FF]/30 font-medium flex items-start gap-2 animate-fade-in">
-                    <ShieldCheck className="w-4 h-4 text-[#2D60FF] shrink-0 mt-0.5" />
-                    <span><strong>Administrator Registration Enabled:</strong> New administrator accounts are provisioned with immediate portal access.</span>
-                  </div>
-                ) : !allowAdminSignup ? (
-                  <div className="space-y-1.5">
-                    <p className="text-xs text-[#FFBB38] bg-[#FFF5D9] p-3 rounded-2xl border border-[#FFBB38]/30 font-medium">
-                      🔒 <strong>Strict Admin Gating:</strong> New accounts require administrator verification and approval before dashboard access is unlocked.
-                    </p>
-                    <div className="text-[11px] text-slate-500 bg-slate-100 p-2.5 rounded-2xl border border-slate-200 font-medium flex items-center gap-2">
-                      <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span>Admin sign-up is disabled by the system administrator.</span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#FFBB38] bg-[#FFF5D9] p-3 rounded-2xl border border-[#FFBB38]/30 font-medium">
-                    🔒 <strong>Strict Admin Gating:</strong> New accounts require administrator verification and approval before dashboard access is unlocked.
-                  </p>
-                )}
-              </div>
-            ) : (
-              // Login: Quick role filter
-              <div className="grid grid-cols-3 gap-2 p-1.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
+              {isSignUp && !allowAdminSignup ? (
                 <button
                   type="button"
-                  onClick={() => handleRoleSelect('user')}
-                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                    formData.role === 'user'
-                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
+                  disabled
+                  title="Admin sign-up is disabled by the system administrator."
+                  className="h-9 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 text-zinc-600 bg-[#1e1e24] border border-[#2a2a32] opacity-60 cursor-not-allowed"
                 >
-                  <User className="w-4 h-4" />
-                  <span>User</span>
+                  <Lock className="w-3.5 h-3.5 text-zinc-600" />
+                  <span>Admin</span>
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleRoleSelect('technician')}
-                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
-                    formData.role === 'technician'
-                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                      : 'text-slate-500 hover:text-slate-900'
-                  }`}
-                >
-                  <Wrench className="w-4 h-4" />
-                  <span>Technician</span>
-                </button>
-
+              ) : (
                 <button
                   type="button"
                   onClick={() => handleRoleSelect('admin')}
-                  className={`h-11 rounded-xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] flex items-center justify-center gap-1.5 ${
+                  className={`h-9 rounded-lg text-xs font-medium flex items-center justify-center gap-1.5 transition ${
                     formData.role === 'admin'
-                      ? 'bg-white text-[#2D60FF] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] font-bold border border-[#DFEAF2]'
-                      : 'text-slate-500 hover:text-slate-900'
+                      ? 'bg-[#2e2e38] text-white font-semibold border border-[#3f3f4e] shadow-sm'
+                      : 'text-zinc-400 hover:text-white'
                   }`}
                 >
-                  <ShieldCheck className="w-4 h-4" />
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Admin</span>
                 </button>
-              </div>
+              )}
+            </div>
+
+            {/* Admin Signup Dynamic Indicator */}
+            {isSignUp && !allowAdminSignup && (
+              <p className="text-[11px] text-zinc-400 mt-2 bg-[#24242b] border border-[#32323b] p-2.5 rounded-lg flex items-center gap-2">
+                <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                <span>Admin sign-up is disabled by the system administrator.</span>
+              </p>
             )}
           </div>
 
-          {/* Technician Specialization / Department Selection (Sign-Up Only) */}
+          {/* Technician Specialty Field (Sign-up only) */}
           {isSignUp && formData.role === 'technician' && (
-            <div className="animate-slide-up">
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">
-                Field of Specialization / Department <span className="text-[#FF4B4A]">*</span>
+            <div>
+              <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+                Department Specialty <span className="text-rose-500">*</span>
               </label>
-              <div className="relative">
-                <select
-                  required
-                  value={formData.specialty || 'Plumbing'}
-                  onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
-                  className="block w-full h-11 px-4 text-xs sm:text-sm border border-[#DFEAF2] rounded-2xl focus:ring-2 focus:ring-[#2D60FF]/20 focus:border-[#2D60FF] focus:bg-white outline-none bg-[#F5F7FA] text-slate-900 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)] font-semibold transition-all cursor-pointer"
-                >
-                  {['Plumbing', 'Electrical', 'HVAC', 'IT', 'General'].map((dept) => (
-                    <option key={dept} value={dept}>
-                      {dept}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-[11px] text-slate-500 mt-1 font-medium">
-                Work orders assigned to this trade will route directly to your queue.
-              </p>
+              <select
+                required
+                value={formData.specialty || 'Plumbing'}
+                onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
+                className="w-full h-10 px-3 text-xs bg-[#24242b] border border-[#32323b] text-white rounded-lg focus:outline-none focus:border-indigo-500 transition"
+              >
+                {['Plumbing', 'Electrical', 'HVAC', 'IT', 'General'].map((dept) => (
+                  <option key={dept} value={dept} className="bg-[#1c1c21] text-white">
+                    {dept}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
-          {/* Only show Name field if they are signing up */}
+          {/* Full Name (Sign-up only) */}
           {isSignUp && (
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">Full Name</label>
+              <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+                Full Name
+              </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <User className="h-4 w-4 text-slate-400" />
-                </div>
+                <User className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
                   required
                   value={formData.name}
-                  onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="block w-full h-11 pl-11 pr-4 text-xs sm:text-sm border border-[#DFEAF2] rounded-2xl focus:ring-2 focus:ring-[#2D60FF]/20 focus:border-[#2D60FF] focus:bg-white outline-none bg-[#F5F7FA] text-slate-900 placeholder-slate-400 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)] transition-all font-medium"
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Alex Rivera"
+                  className="w-full h-10 pl-9 pr-3 text-xs bg-[#24242b] border border-[#32323b] text-white placeholder-zinc-500 rounded-lg focus:outline-none focus:border-indigo-500 transition"
                 />
               </div>
             </div>
           )}
 
+          {/* Email Address */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">Email Address</label>
+            <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+              Email Address
+            </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Mail className="h-4 w-4 text-slate-400" />
-              </div>
+              <Mail className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="email"
                 required
                 value={formData.email}
-                onChange={(e) => setFormData({...formData, email: e.target.value})}
-                className="block w-full h-11 pl-11 pr-4 text-xs sm:text-sm border border-[#DFEAF2] rounded-2xl focus:ring-2 focus:ring-[#2D60FF]/20 focus:border-[#2D60FF] focus:bg-white outline-none bg-[#F5F7FA] text-slate-900 placeholder-slate-400 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)] transition-all font-medium"
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 placeholder="alex@campus.edu"
+                className="w-full h-10 pl-9 pr-3 text-xs bg-[#24242b] border border-[#32323b] text-white placeholder-zinc-500 rounded-lg focus:outline-none focus:border-indigo-500 transition"
               />
             </div>
           </div>
 
+          {/* Password */}
           <div>
-            <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">Password</label>
+            <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1.5">
+              Password
+            </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Lock className="h-4 w-4 text-slate-400" />
-              </div>
+              <Lock className="w-4 h-4 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="password"
                 required
                 value={formData.password}
-                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                className="block w-full h-11 pl-11 pr-4 text-xs sm:text-sm border border-[#DFEAF2] rounded-2xl focus:ring-2 focus:ring-[#2D60FF]/20 focus:border-[#2D60FF] focus:bg-white outline-none bg-[#F5F7FA] text-slate-900 placeholder-slate-400 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)] transition-all font-medium"
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 placeholder="••••••••"
+                className="w-full h-10 pl-9 pr-3 text-xs bg-[#24242b] border border-[#32323b] text-white placeholder-zinc-500 rounded-lg focus:outline-none focus:border-indigo-500 transition"
               />
             </div>
           </div>
 
-          {/* Quick Universal Demo Access Note */}
+          {/* Demo Credentials Box (Login Mode) */}
           {!isSignUp && (
-            <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2] text-[11px] text-slate-600 font-medium space-y-1.5 animate-fade-in">
-              <p className="font-bold text-slate-800 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-[#16DBCC]" />
-                <span>Universal Pre-Seeded Accounts (Works across all devices):</span>
-              </p>
-              <div className="grid grid-cols-3 gap-1.5 text-[10px] pt-0.5">
-                <div className="bg-white p-2 rounded-xl border border-[#E6EFF5] text-center shadow-2xs">
-                  <span className="font-bold text-[#2D60FF] block">User</span>
-                  <span className="truncate block font-semibold text-slate-700">user@campus.edu</span>
-                  <span className="text-slate-400 block font-mono">password</span>
+            <div className="p-3 rounded-lg bg-[#24242b] border border-[#32323b] text-[11px] text-zinc-400 space-y-2">
+              <p className="font-semibold text-zinc-300">Quick Test Credentials:</p>
+              <div className="grid grid-cols-3 gap-1.5 text-[10px]">
+                <div 
+                  onClick={() => setFormData({ email: 'user@campus.edu', password: 'password', role: 'user', specialty: 'Plumbing' })}
+                  className="bg-[#1c1c21] p-1.5 rounded border border-[#32323b] text-center hover:border-indigo-500 cursor-pointer transition"
+                >
+                  <span className="font-bold text-indigo-400 block">User</span>
+                  <span className="truncate block text-zinc-300">user@campus.edu</span>
                 </div>
-                <div className="bg-white p-2 rounded-xl border border-[#E6EFF5] text-center shadow-2xs">
-                  <span className="font-bold text-[#FFBB38] block">Technician</span>
-                  <span className="truncate block font-semibold text-slate-700">tech@campus.edu</span>
-                  <span className="text-slate-400 block font-mono">password</span>
+                <div 
+                  onClick={() => setFormData({ email: 'tech@campus.edu', password: 'password', role: 'technician', specialty: 'Plumbing' })}
+                  className="bg-[#1c1c21] p-1.5 rounded border border-[#32323b] text-center hover:border-amber-400 cursor-pointer transition"
+                >
+                  <span className="font-bold text-amber-400 block">Tech</span>
+                  <span className="truncate block text-zinc-300">tech@campus.edu</span>
                 </div>
-                <div className="bg-white p-2 rounded-xl border border-[#E6EFF5] text-center shadow-2xs">
-                  <span className="font-bold text-[#16DBCC] block">Admin</span>
-                  <span className="truncate block font-semibold text-slate-700">admin@campus.edu</span>
-                  <span className="text-slate-400 block font-mono">admin123</span>
+                <div 
+                  onClick={() => setFormData({ email: 'admin@campus.edu', password: 'admin123', role: 'admin', specialty: 'Plumbing' })}
+                  className="bg-[#1c1c21] p-1.5 rounded border border-[#32323b] text-center hover:border-emerald-400 cursor-pointer transition"
+                >
+                  <span className="font-bold text-emerald-400 block">Admin</span>
+                  <span className="truncate block text-zinc-300">admin@campus.edu</span>
                 </div>
               </div>
             </div>
           )}
 
+          {/* Submit Button */}
           <button
             type="submit"
             disabled={isSubmitting}
-            className={`w-full h-12 min-h-[48px] bg-[#2D60FF] hover:bg-[#1814F3] text-white font-bold px-4 rounded-2xl flex items-center justify-center gap-2 transition-all duration-200 mt-4 shadow-lg shadow-[#2D60FF]/25 active:scale-[0.98] ${
+            className={`w-full h-10 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg flex items-center justify-center gap-2 transition shadow-sm ${
               isSubmitting ? 'opacity-70 cursor-not-allowed' : ''
             }`}
           >
@@ -414,24 +352,24 @@ export default function LoginView({ onLogin }) {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-slate-500 font-medium">
-          {isSignUp ? "Already have an account? " : "New to SmartFixFlow - AI? "}
-          <button 
+        {/* Switch Login / Sign-up Mode */}
+        <div className="mt-5 text-center text-xs text-zinc-400">
+          {isSignUp ? 'Already registered? ' : 'New to FixFlow AI? '}
+          <button
             type="button"
             onClick={() => {
-              const nextIsSignUp = !isSignUp;
-              setIsSignUp(nextIsSignUp);
+              setIsSignUp(!isSignUp);
               setErrorMessage('');
               setSuccessMessage('');
-              setFormData({ 
-                name: '', 
-                email: '', 
-                password: '', 
+              setFormData({
+                name: '',
+                email: '',
+                password: '',
                 role: 'user',
                 specialty: 'Plumbing'
               });
             }}
-            className="font-bold text-[#2D60FF] hover:underline transition-colors ml-1"
+            className="text-indigo-400 hover:text-indigo-300 font-semibold underline transition ml-1"
           >
             {isSignUp ? 'Log in' : 'Request account approval'}
           </button>

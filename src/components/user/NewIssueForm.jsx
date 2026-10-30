@@ -505,35 +505,35 @@ export default function NewIssueForm({ onTicketCreated }) {
   // SUCCESS CONFIRMATION VIEW
   if (successTicket) {
     return (
-      <div className="bg-white rounded-3xl p-6 sm:p-8 text-center max-w-lg mx-auto border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] animate-slide-up text-slate-900">
-        <div className="w-16 h-16 rounded-2xl bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30 flex items-center justify-center mx-auto mb-4 shadow-xs">
-          <CheckCircle2 className="w-8 h-8" />
+      <div className="bg-[#1c1c21] rounded-xl p-6 sm:p-8 text-center max-w-lg mx-auto border border-[#2a2a32] text-zinc-100 shadow-2xl animate-slide-up">
+        <div className="w-14 h-14 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto mb-4">
+          <CheckCircle2 className="w-7 h-7" />
         </div>
 
-        <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-[#E7EDFF] border border-[#2D60FF]/30 text-[#2D60FF] text-xs font-semibold mb-3">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold mb-3">
           <Sparkles className="w-3.5 h-3.5" />
           <span>Authoritative AI Maintenance Triage</span>
         </div>
 
-        <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 font-['Plus_Jakarta_Sans'] tracking-tight">
+        <h2 className="text-xl sm:text-2xl font-extrabold text-white font-['Plus_Jakarta_Sans',sans-serif] tracking-tight">
           Maintenance Ticket Created
         </h2>
-        <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 mb-5">
-          Fault analyzed and registered in campus dispatch under <strong className="text-slate-900">#{successTicket.id}</strong>.
+        <p className="text-xs sm:text-sm text-zinc-400 font-medium mt-1 mb-5">
+          Fault analyzed and registered in campus dispatch under <strong className="text-white">#{successTicket.id}</strong>.
         </p>
 
         {/* Recurrence Escalation Banner */}
         {successTicket.isRecurring && (
-          <div className="mb-5 p-4 rounded-2xl bg-[#FFE0EB] border border-[#FF4B4A]/30 text-left text-xs text-[#FF4B4A] shadow-xs animate-slide-up">
+          <div className="mb-5 p-4 rounded-xl bg-rose-500/10 border border-rose-500/30 text-left text-xs text-rose-400 animate-slide-up">
             <div className="flex items-center gap-2 font-bold mb-1">
-              <Flame className="w-4 h-4 text-[#FF4B4A]" />
+              <Flame className="w-4 h-4 text-rose-400" />
               <span>RECURRING EQUIPMENT FAULT DETECTED</span>
             </div>
-            <p className="text-slate-700 leading-relaxed font-medium">
+            <p className="text-zinc-300 leading-relaxed font-medium">
               Vector store matched this complaint with previous maintenance incidents. Urgency has been automatically escalated.
             </p>
             {successTicket.recurringFixSummary && (
-              <p className="text-[11px] text-slate-500 mt-2 bg-white/70 p-2.5 rounded-xl border border-rose-200 font-mono">
+              <p className="text-[11px] text-zinc-400 mt-2 bg-[#1c1c21] p-2.5 rounded-lg border border-rose-500/20 font-mono">
                 {successTicket.recurringFixSummary}
               </p>
             )}
@@ -541,42 +541,42 @@ export default function NewIssueForm({ onTicketCreated }) {
         )}
 
         {/* AI Extracted Summary Card */}
-        <div className="p-5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2] text-left space-y-3 mb-6 text-xs text-slate-900 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]">
+        <div className="p-5 rounded-xl bg-[#24242b] border border-[#32323b] text-left space-y-3 mb-6 text-xs text-zinc-200">
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400">Title</span>
-            <p className="font-bold text-slate-900 text-sm mt-0.5">{successTicket.title}</p>
+            <span className="text-[10px] uppercase font-bold text-zinc-500">Title</span>
+            <p className="font-bold text-white text-sm mt-0.5">{successTicket.title}</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span className="px-3 py-1 rounded-full bg-white text-slate-700 font-semibold text-xs border border-[#E6EFF5]">
+            <span className="px-2.5 py-0.5 rounded-lg bg-[#1c1c21] text-zinc-300 font-medium text-xs border border-[#32323b]">
               {successTicket.category}
             </span>
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+            <span className={`px-2.5 py-0.5 rounded-lg text-xs font-semibold ${
               successTicket.priority === 'High' || successTicket.priority === 'Urgent' 
-                ? 'bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30' 
+                ? 'bg-amber-500/10 text-amber-400 border border-amber-500/30' 
                 : successTicket.priority === 'Critical' || successTicket.priority === 'Emergency' 
-                ? 'bg-[#FFE0EB] text-[#FF4B4A] border border-[#FF4B4A]/30' 
-                : 'bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30'
+                ? 'bg-rose-500/10 text-rose-400 border border-rose-500/30' 
+                : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
             }`}>
               {successTicket.priority} Priority
             </span>
-            <span className="text-slate-500 font-medium flex items-center gap-1 text-xs">
-              <MapPin className="w-3.5 h-3.5 text-[#2D60FF]" />
+            <span className="text-zinc-400 font-medium flex items-center gap-1 text-xs">
+              <MapPin className="w-3.5 h-3.5 text-indigo-400" />
               <span>{successTicket.location}</span>
             </span>
             {successTicket.assignedTo && (
-              <span className="px-3 py-1 rounded-full bg-[#E7EDFF] text-[#2D60FF] font-semibold text-xs border border-[#2D60FF]/30">
+              <span className="px-2.5 py-0.5 rounded-lg bg-indigo-500/10 text-indigo-400 font-medium text-xs border border-indigo-500/30">
                 Routed to: {typeof successTicket.assignedTo === 'string' ? successTicket.assignedTo : successTicket.assignedTo?.name || 'Technician'}
               </span>
             )}
-            <span className="px-3 py-1 rounded-full bg-[#E7EDFF] text-[#2D60FF] font-bold text-xs border border-[#2D60FF]/30">
+            <span className="px-2.5 py-0.5 rounded-lg bg-amber-500/10 text-amber-400 font-semibold text-xs border border-amber-500/30">
               📊 RAG History: {successTicket.ragTicketVolume || 1} Reports • Score: {successTicket.priorityScore ?? 40}/100
             </span>
           </div>
 
-          <div className="pt-2 border-t border-[#DFEAF2]">
-            <span className="text-[10px] uppercase font-bold text-slate-400">Diagnosis & Engineering Assessment</span>
-            <p className="text-xs text-slate-700 font-medium mt-1 leading-relaxed">
+          <div className="pt-2 border-t border-[#32323b]">
+            <span className="text-[10px] uppercase font-bold text-zinc-500">Diagnosis & Engineering Assessment</span>
+            <p className="text-xs text-zinc-300 font-medium mt-1 leading-relaxed">
               {successTicket.description}
             </p>
           </div>
@@ -585,7 +585,7 @@ export default function NewIssueForm({ onTicketCreated }) {
             const successImg = successTicket.image || successTicket.photo || successTicket.imageUrl;
             if (!successImg) return null;
             return (
-              <div className="mt-3 rounded-2xl overflow-hidden border border-[#E6EFF5] max-h-48 shadow-xs bg-[#F5F7FA]">
+              <div className="mt-3 rounded-xl overflow-hidden border border-[#32323b] max-h-48 bg-[#1c1c21]">
                 <img
                   src={successImg}
                   alt="Fault"
@@ -608,13 +608,13 @@ export default function NewIssueForm({ onTicketCreated }) {
               if (onTicketCreated) onTicketCreated();
               setUserTab('my-tickets');
             }}
-            className="flex-1 h-11 px-5 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white font-bold text-xs sm:text-sm transition-all duration-200 active:scale-[0.98] shadow-md shadow-[#2D60FF]/25"
+            className="flex-1 h-10 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition"
           >
             View in My Tickets
           </button>
           <button
             onClick={() => setSuccessTicket(null)}
-            className="flex-1 h-11 px-5 rounded-2xl bg-white hover:bg-[#F5F7FA] text-slate-600 hover:text-slate-900 font-semibold text-xs sm:text-sm transition-all duration-200 active:scale-[0.98] border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
+            className="flex-1 h-10 px-4 rounded-lg bg-[#24242b] hover:bg-[#2e2e38] text-zinc-300 hover:text-white font-medium text-xs border border-[#32323b] transition"
           >
             Report Another Issue
           </button>
@@ -624,24 +624,27 @@ export default function NewIssueForm({ onTicketCreated }) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto pb-16 text-slate-900">
+    <div className="max-w-2xl mx-auto pb-16 text-zinc-100">
       {/* Header - Center Aligned Hero Section */}
-      <div className="mb-8 text-center">
-        <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-['Plus_Jakarta_Sans']">
-          New Maintenance Issue
+      <div className="mb-6 text-center">
+        <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans',sans-serif]">
+          New Maintenance Issue<span className="text-indigo-500">.</span>
         </h2>
+        <p className="text-xs text-zinc-400 mt-1">
+          Attach a fault photo and describe your complaint for automated AI triage
+        </p>
       </div>
 
       {/* MAIN FORM CARD */}
-      <form onSubmit={handleSubmit} className="bg-white border border-[#E6EFF5] rounded-3xl p-6 sm:p-8 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] space-y-6 text-slate-900">
+      <form onSubmit={handleSubmit} className="bg-[#1c1c21] border border-[#2a2a32] rounded-xl p-6 sm:p-8 space-y-6 text-zinc-100 shadow-xl">
         {/* 1. CAMERA & IMAGE UPLOAD SECTION */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <label className="text-sm font-bold text-slate-900 flex items-center gap-2 font-['Plus_Jakarta_Sans']">
-              <Camera className="w-4 h-4 text-[#2D60FF]" />
+            <label className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+              <Camera className="w-4 h-4 text-indigo-400" />
               <span>Fault Photo Documentation</span>
             </label>
-            <span className="text-xs text-slate-400 font-medium">Rear Camera Native</span>
+            <span className="text-xs text-zinc-500 font-medium">Rear Camera Native</span>
           </div>
 
           {/* Hidden rear-camera input with capture="environment" */}
@@ -667,25 +670,25 @@ export default function NewIssueForm({ onTicketCreated }) {
 
           {/* Prominent Visual Verification Rejection Alert Banner Right Above Upload Box */}
           {imageWarning && (
-            <div className="bg-red-50 border-2 border-red-500 text-red-900 p-4 sm:p-5 rounded-2xl animate-slide-up flex items-start gap-3.5 shadow-sm">
-              <div className="w-10 h-10 rounded-xl bg-red-100 border border-red-200 flex items-center justify-center shrink-0 text-red-600 mt-0.5">
+            <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-4 rounded-xl animate-slide-up flex items-start gap-3">
+              <div className="w-9 h-9 rounded-lg bg-rose-500/20 border border-rose-500/30 flex items-center justify-center shrink-0 text-rose-400 mt-0.5">
                 <AlertTriangle className="w-5 h-5" />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="font-extrabold text-sm text-red-950 font-['Plus_Jakarta_Sans'] flex items-center gap-1.5">
+                  <span className="font-bold text-xs text-rose-200 flex items-center gap-1.5">
                     Visual-Textual Verification Rejected
                   </span>
                   <button
                     type="button"
                     onClick={() => setImageWarning('')}
-                    className="text-red-400 hover:text-red-800 p-1 rounded-lg transition-colors"
+                    className="text-rose-400 hover:text-rose-200 p-1 rounded transition"
                     aria-label="Dismiss warning"
                   >
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-                <p className="text-xs sm:text-sm text-red-800 font-semibold mt-1.5 leading-relaxed">
+                <p className="text-xs text-rose-300 font-medium mt-1 leading-relaxed">
                   {imageWarning}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -696,9 +699,9 @@ export default function NewIssueForm({ onTicketCreated }) {
                       handleRemovePhoto();
                       startLiveCamera('environment');
                     }}
-                    className="h-8 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5"
+                    className="h-7 px-3 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold transition flex items-center gap-1.5"
                   >
-                    <Camera className="w-3.5 h-3.5" />
+                    <Camera className="w-3 h-3" />
                     <span>Retake Photo</span>
                   </button>
                   <button
@@ -708,9 +711,9 @@ export default function NewIssueForm({ onTicketCreated }) {
                       handleRemovePhoto();
                       filePickerRef.current?.click();
                     }}
-                    className="h-8 px-3 rounded-xl bg-white hover:bg-red-100 text-red-800 border border-red-300 text-xs font-semibold transition-all shadow-xs flex items-center gap-1.5"
+                    className="h-7 px-3 rounded-lg bg-[#24242b] hover:bg-[#2e2e38] text-zinc-200 border border-[#32323b] text-xs font-medium transition flex items-center gap-1.5"
                   >
-                    <ImagePlus className="w-3.5 h-3.5 text-red-700" />
+                    <ImagePlus className="w-3 h-3 text-zinc-400" />
                     <span>Upload Different Image</span>
                   </button>
                 </div>
@@ -721,19 +724,22 @@ export default function NewIssueForm({ onTicketCreated }) {
           {/* IMAGE PREVIEW OR CAPTURE BUTTONS */}
           {!imagePreview ? (
             <div className="space-y-4">
-              <div className="border-2 border-dashed border-[#DFEAF2] hover:border-[#2D60FF] rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center transition-all bg-[#F5F7FA] text-center shadow-[0_2px_8px_-2px_rgba(0,0,0,0.02)]">
-                <div className="w-16 h-16 rounded-2xl bg-white border border-[#E6EFF5] flex items-center justify-center text-[#2D60FF] mb-3 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
-                  <Camera className="w-8 h-8" />
+              <div className="border-2 border-dashed border-[#32323b] hover:border-indigo-500 rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center transition bg-[#24242b] text-center">
+                <div className="w-14 h-14 rounded-xl bg-[#1c1c21] border border-[#32323b] flex items-center justify-center text-indigo-400 mb-3">
+                  <Camera className="w-7 h-7" />
                 </div>
-                <p className="text-base font-bold text-slate-900 font-['Plus_Jakarta_Sans']">
+                <p className="text-sm font-bold text-white">
                   Take a Photo or Upload Fault Image
                 </p>
+                <p className="text-xs text-zinc-400 mt-1 max-w-xs">
+                  Native camera on mobile or file selector on desktop
+                </p>
 
-                <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
                   <button
                     type="button"
                     onClick={() => startLiveCamera('environment')}
-                    className="h-11 min-h-[44px] inline-flex items-center gap-2 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white text-xs font-bold shadow-md shadow-[#2D60FF]/25 transition-all duration-200 active:scale-[0.98]"
+                    className="h-9 px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-2 transition"
                   >
                     <Camera className="w-4 h-4" />
                     <span>Take Photo</span>
@@ -742,9 +748,9 @@ export default function NewIssueForm({ onTicketCreated }) {
                   <button
                     type="button"
                     onClick={() => filePickerRef.current?.click()}
-                    className="h-11 min-h-[44px] inline-flex items-center gap-2 px-6 rounded-2xl bg-white hover:bg-[#F5F7FA] text-slate-800 text-xs font-semibold border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] transition-all duration-200 active:scale-[0.98]"
+                    className="h-9 px-4 rounded-lg bg-[#1c1c21] hover:bg-[#282830] text-zinc-300 hover:text-white text-xs font-medium border border-[#32323b] flex items-center gap-2 transition"
                   >
-                    <ImagePlus className="w-4 h-4 text-slate-500" />
+                    <ImagePlus className="w-4 h-4 text-zinc-400" />
                     <span>Upload from Gallery</span>
                   </button>
                 </div>
@@ -752,7 +758,7 @@ export default function NewIssueForm({ onTicketCreated }) {
             </div>
           ) : (
             /* IMAGE PREVIEW AREA */
-            <div className="relative rounded-2xl overflow-hidden border border-[#E6EFF5] bg-[#F5F7FA] group shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]">
+            <div className="relative rounded-xl overflow-hidden border border-[#32323b] bg-[#24242b] group">
               <img
                 src={imagePreview}
                 alt="Fault preview"
@@ -767,19 +773,19 @@ export default function NewIssueForm({ onTicketCreated }) {
                   <button
                     type="button"
                     onClick={() => startLiveCamera('environment')}
-                    className="h-10 px-4 rounded-xl bg-black/60 hover:bg-black/80 text-white text-xs font-semibold border border-white/20 flex items-center gap-1.5 shadow-sm transition-all duration-200 active:scale-[0.98]"
+                    className="h-8 px-3 rounded-lg bg-[#1c1c21]/90 hover:bg-[#1c1c21] text-white text-xs font-medium border border-[#32323b] flex items-center gap-1.5 transition"
                   >
-                    <RotateCcw className="w-3.5 h-3.5" />
+                    <RotateCcw className="w-3 h-3" />
                     <span>Retake</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleRemovePhoto}
-                    className="h-10 w-10 flex items-center justify-center rounded-xl bg-[#FF4B4A] hover:bg-rose-600 text-white transition-all duration-200 active:scale-[0.98] shadow-sm"
+                    className="h-8 w-8 flex items-center justify-center rounded-lg bg-rose-600 hover:bg-rose-500 text-white transition"
                     aria-label="Remove image"
                     title="Remove photo"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
               </div>
@@ -790,10 +796,10 @@ export default function NewIssueForm({ onTicketCreated }) {
         {/* 2. USER COMPLAINT TEXTAREA */}
         <div>
           <div className="flex justify-between items-center mb-1.5">
-            <label htmlFor="complaint" className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">
-              Describe the problem / User Complaint <span className="text-[#FF4B4A]">*</span>
+            <label htmlFor="complaint" className="text-xs font-semibold uppercase tracking-wider text-zinc-400">
+              Describe the problem / User Complaint <span className="text-rose-500">*</span>
             </label>
-            <span className="text-xs font-mono text-slate-400 font-medium">{complaint.length}/500</span>
+            <span className="text-xs font-mono text-zinc-500">{complaint.length}/500</span>
           </div>
           <textarea
             id="complaint"
@@ -802,56 +808,56 @@ export default function NewIssueForm({ onTicketCreated }) {
             onChange={(e) => setComplaint(e.target.value)}
             placeholder="Describe your issue..."
             maxLength={500}
-            className="w-full p-4 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2] text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 text-sm transition-all shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
+            className="w-full p-3.5 rounded-lg bg-[#24242b] border border-[#32323b] text-white placeholder-zinc-500 focus:bg-[#282832] focus:outline-none focus:border-indigo-500 text-sm transition"
           />
         </div>
 
-        {/* 3. MULTI-STAGE RAG PROGRESS INDICATOR (Displayed during processing) */}
+        {/* 3. MULTI-STAGE RAG PROGRESS INDICATOR */}
         {isProcessing && (
-          <div className="p-5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2] space-y-3 animate-fade-in shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-900">
+          <div className="p-4 rounded-xl bg-[#24242b] border border-[#32323b] space-y-3 animate-fade-in">
+            <div className="flex items-center justify-between text-xs font-bold text-white">
               <span className="flex items-center gap-2">
-                <Database className="w-4 h-4 text-[#2D60FF] animate-pulse" />
+                <Database className="w-4 h-4 text-indigo-400 animate-pulse" />
                 <span>RAG Pipeline in Execution</span>
               </span>
-              <span className="text-[#2D60FF] font-mono">Step {currentRagStep || 1} of 4</span>
+              <span className="text-indigo-400 font-mono">Step {currentRagStep || 1} of 4</span>
             </div>
 
             {/* Progress Bar */}
-            <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+            <div className="w-full h-1.5 rounded-full bg-[#1c1c21] overflow-hidden">
               <div 
-                className="h-full bg-gradient-to-r from-[#2D60FF] to-teal-400 transition-all duration-500 rounded-full"
+                className="h-full bg-indigo-500 transition-all duration-500 rounded-full"
                 style={{ width: `${Math.max(15, (currentRagStep / 4) * 100)}%` }}
               />
             </div>
 
             {/* Current Step Text */}
-            <p className="text-xs font-medium text-slate-600 animate-pulse flex items-center gap-2">
-              <Loader2 className="w-3.5 h-3.5 animate-spin text-[#2D60FF] shrink-0" />
+            <p className="text-xs font-medium text-zinc-300 animate-pulse flex items-center gap-2">
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400 shrink-0" />
               <span>{aiStatusMessage || 'Processing with Pinecone & Gemini 1.5 Flash...'}</span>
             </p>
 
             {/* Step Checkmarks */}
-            <div className="grid grid-cols-4 gap-1.5 pt-1 text-[10px] font-semibold text-slate-400">
-              <span className={currentRagStep >= 1 ? 'text-[#2D60FF]' : ''}>1. Vector Query</span>
-              <span className={currentRagStep >= 2 ? 'text-[#2D60FF]' : ''}>2. Multimodal AI</span>
-              <span className={currentRagStep >= 3 ? 'text-[#2D60FF]' : ''}>3. Recurrence</span>
-              <span className={currentRagStep >= 4 ? 'text-[#2D60FF]' : ''}>4. Audit Commit</span>
+            <div className="grid grid-cols-4 gap-1.5 pt-1 text-[10px] font-semibold text-zinc-500">
+              <span className={currentRagStep >= 1 ? 'text-indigo-400' : ''}>1. Vector Query</span>
+              <span className={currentRagStep >= 2 ? 'text-indigo-400' : ''}>2. Multimodal AI</span>
+              <span className={currentRagStep >= 3 ? 'text-indigo-400' : ''}>3. Recurrence</span>
+              <span className={currentRagStep >= 4 ? 'text-indigo-400' : ''}>4. Audit Commit</span>
             </div>
           </div>
         )}
 
-        {/* Verification / Rejection Alert Box directly above submit */}
+        {/* Verification / Rejection Alert Box */}
         {errorMessage && (
-          <div className="bg-red-50 border border-red-300 text-red-700 p-4 rounded-xl text-xs sm:text-sm animate-slide-up flex items-start gap-3 shadow-xs">
-            <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+          <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-4 rounded-xl text-xs sm:text-sm animate-slide-up flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
             <div className="flex-1">
               <div className="flex items-center justify-between">
-                <span className="font-bold text-red-800 font-['Plus_Jakarta_Sans']">Submission Alert</span>
+                <span className="font-bold text-rose-200">Submission Alert</span>
                 <button
                   type="button"
                   onClick={() => setErrorMessage('')}
-                  className="text-red-400 hover:text-red-700 font-bold p-0.5"
+                  className="text-rose-400 hover:text-rose-200 font-bold p-0.5"
                   aria-label="Dismiss error"
                 >
                   <X className="w-4 h-4" />
@@ -862,7 +868,7 @@ export default function NewIssueForm({ onTicketCreated }) {
                 <button
                   type="submit"
                   disabled={isProcessing}
-                  className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-all active:scale-[0.98]"
+                  className="px-3 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition"
                 >
                   Retry Submission
                 </button>
@@ -871,12 +877,12 @@ export default function NewIssueForm({ onTicketCreated }) {
           </div>
         )}
 
-        {/* 4. SUBMIT BUTTON WITH 48px TOUCH TARGET */}
+        {/* 4. SUBMIT BUTTON */}
         <div>
           <button
             type="submit"
             disabled={isProcessing}
-            className="w-full h-12 min-h-[48px] flex items-center justify-center gap-2.5 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white font-bold text-sm sm:text-base shadow-lg shadow-[#2D60FF]/25 hover:shadow-[#2D60FF]/40 transition-all duration-200 active:scale-[0.98] disabled:opacity-75 disabled:cursor-not-allowed"
+            className="w-full h-11 min-h-[44px] flex items-center justify-center gap-2 px-6 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-sm transition shadow-sm disabled:opacity-75 disabled:cursor-not-allowed"
           >
             {isProcessing ? (
               <>

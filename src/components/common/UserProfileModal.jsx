@@ -48,7 +48,6 @@ export default function UserProfileModal({ isOpen, onClose }) {
 
   const fileInputRef = useRef(null);
 
-  // Synchronize modal state with currentUser whenever modal opens or user changes
   useEffect(() => {
     if (isOpen && currentUser) {
       setAvatarUrl(currentUser.avatar || '');
@@ -61,7 +60,6 @@ export default function UserProfileModal({ isOpen, onClose }) {
 
   if (!isOpen || !currentUser) return null;
 
-  // Handle local image file upload with client-side canvas compression for crisp avatars
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -84,40 +82,32 @@ export default function UserProfileModal({ isOpen, onClose }) {
 
       const img = new Image();
       img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const maxSize = 320;
-          let width = img.width;
-          let height = img.height;
+        const canvas = document.createElement('canvas');
+        const maxDim = 320;
+        let w = img.width;
+        let h = img.height;
 
-          if (width > height) {
-            if (width > maxSize) {
-              height = Math.round((height * maxSize) / width);
-              width = maxSize;
-            }
-          } else {
-            if (height > maxSize) {
-              width = Math.round((width * maxSize) / height);
-              height = maxSize;
-            }
-          }
-
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          ctx.drawImage(img, 0, 0, width, height);
-
-          const compressed = canvas.toDataURL('image/jpeg', 0.88);
-          setAvatarUrl(compressed);
-        } catch {
-          setAvatarUrl(rawDataUrl);
+        if (w > h && w > maxDim) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else if (h > maxDim) {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
         }
+
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+
+        const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.88);
+        setAvatarUrl(compressedDataUrl);
 
         if (addToast) {
           addToast({
             type: 'info',
-            title: 'Image Selected',
-            message: 'Click "Save Changes" to save and persist your new profile photo.'
+            title: 'Photo Uploaded',
+            message: 'Click "Save Changes" to persist your new profile photo.'
           });
         }
       };
@@ -171,48 +161,48 @@ export default function UserProfileModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 transition-opacity" onClick={onClose}>
       <div 
-        className="bg-white rounded-3xl max-w-md w-full shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] border border-[#E6EFF5] overflow-hidden animate-slide-up relative z-10 text-slate-900"
+        className="bg-[#1c1c21] rounded-xl max-w-md w-full border border-[#2a2a32] overflow-hidden relative z-10 text-zinc-100 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-[#E6EFF5] flex items-center justify-between bg-white">
+        <div className="px-6 py-4 border-b border-[#2a2a32] flex items-center justify-between bg-[#18181c]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-[#E7EDFF] text-[#2D60FF] flex items-center justify-center shadow-xs">
-              <User className="w-5 h-5" />
+            <div className="w-8 h-8 rounded-lg bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center">
+              <User className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900 font-['Plus_Jakarta_Sans']">User Profile Settings</h3>
-              <p className="text-xs font-medium text-slate-500">Manage photo & account details</p>
+              <h3 className="text-sm font-bold text-white font-['Plus_Jakarta_Sans',sans-serif]">User Profile Settings</h3>
+              <p className="text-[11px] text-zinc-400">Manage photo & account details</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-[#F5F7FA] transition-all duration-200 active:scale-[0.98]"
+            className="w-8 h-8 rounded-lg flex items-center justify-center text-zinc-400 hover:text-white hover:bg-[#282830] transition"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-6 max-h-[80vh] overflow-y-auto">
+        <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
           {/* Avatar Edit Section */}
           <div className="flex flex-col items-center text-center">
             <div className="relative group mb-3">
               <Avatar
                 src={avatarUrl}
                 name={name || currentUser?.name}
-                size="w-24 h-24"
-                className="ring-4 ring-[#E6EFF5] shadow-md text-xl"
+                size="w-20 h-20"
+                className="ring-2 ring-[#32323b] text-lg"
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-0 right-0 p-2.5 rounded-full bg-[#2D60FF] hover:bg-[#1814F3] text-white shadow-md transition-all duration-200 active:scale-[0.98]"
+                className="absolute bottom-0 right-0 p-2 rounded-full bg-indigo-600 hover:bg-indigo-500 text-white shadow transition"
                 title="Upload new image"
               >
-                <Camera className="w-4 h-4" />
+                <Camera className="w-3.5 h-3.5" />
               </button>
               <input
                 ref={fileInputRef}
@@ -223,43 +213,42 @@ export default function UserProfileModal({ isOpen, onClose }) {
               />
             </div>
 
-            <p className="text-base font-bold text-slate-900 font-['Plus_Jakarta_Sans']">{name || currentUser?.name}</p>
-            <span className="inline-flex items-center gap-1 mt-1 px-3 py-1 rounded-full text-xs font-bold bg-[#E7EDFF] text-[#2D60FF] border border-[#2D60FF]/30 uppercase tracking-wide">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#2D60FF]" />
-              {currentUser?.roleDisplay || currentUser?.role || 'Campus User'}
+            <h4 className="text-sm font-bold text-white">{name || currentUser?.name}</h4>
+            <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+              <ShieldCheck className="w-3 h-3" />
+              <span>{currentUser?.roleDisplay || currentUser?.role?.toUpperCase()}</span>
             </span>
 
-            {/* Change Picture Controls */}
-            <div className="flex items-center gap-3 mt-6 w-full">
+            {/* Photo Action Buttons */}
+            <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 h-11 px-4 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] border border-[#DFEAF2] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
+                className="h-8 px-3 rounded-lg bg-[#24242b] hover:bg-[#2e2e38] text-zinc-200 border border-[#32323b] text-xs font-medium flex items-center gap-1.5 transition"
               >
-                <Upload className="w-4 h-4 text-slate-500" />
+                <Upload className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Upload Photo</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsUrlInputOpen(!isUrlInputOpen)}
-                className="h-11 px-4 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-600 hover:text-slate-900 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-[0.98] border border-[#DFEAF2] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
-                title="Paste image web link"
+                className="h-8 px-3 rounded-lg bg-[#24242b] hover:bg-[#2e2e38] text-zinc-200 border border-[#32323b] text-xs font-medium flex items-center gap-1.5 transition"
               >
-                <LinkIcon className="w-4 h-4" />
+                <LinkIcon className="w-3.5 h-3.5 text-zinc-400" />
                 <span>URL</span>
               </button>
             </div>
 
-            {/* Custom URL Input Accordion */}
+            {/* Custom URL Input Box */}
             {isUrlInputOpen && (
-              <div className="w-full mt-3 flex items-center gap-2">
+              <div className="mt-2.5 w-full flex items-center gap-1.5">
                 <input
                   type="url"
-                  placeholder="Paste image URL (https://...)"
+                  placeholder="Paste direct image URL..."
                   value={customUrl}
                   onChange={(e) => setCustomUrl(e.target.value)}
-                  className="flex-1 h-11 text-xs px-4 rounded-2xl border border-[#DFEAF2] bg-[#F5F7FA] text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20"
+                  className="flex-1 h-8 px-3 text-xs bg-[#24242b] border border-[#32323b] text-white rounded-lg focus:outline-none focus:border-indigo-500"
                 />
                 <button
                   type="button"
@@ -270,122 +259,98 @@ export default function UserProfileModal({ isOpen, onClose }) {
                       setIsUrlInputOpen(false);
                     }
                   }}
-                  className="h-11 px-5 rounded-2xl bg-[#2D60FF] text-white text-xs font-bold hover:bg-[#1814F3] transition-all duration-200 active:scale-[0.98]"
+                  className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium"
                 >
-                  Apply
+                  Set
                 </button>
               </div>
             )}
+          </div>
 
-            {/* Quick Avatar Presets */}
-            <div className="mt-6 w-full text-left">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1">
-                <Sparkles className="w-3.5 h-3.5 text-[#FFBB38]" />
-                <span>Or Select Preset Avatar</span>
-              </p>
-              <div className="grid grid-cols-4 gap-2.5">
-                {AVATAR_PRESETS.map((p, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => setAvatarUrl(p.url)}
-                    className={`relative p-1.5 rounded-2xl border transition-all duration-200 active:scale-[0.98] flex flex-col items-center gap-1 ${
-                      avatarUrl === p.url
-                        ? 'border-[#2D60FF] bg-[#E7EDFF] ring-2 ring-[#2D60FF]/30 shadow-xs'
-                        : 'border-[#E6EFF5] hover:border-[#2D60FF]/40 bg-[#F5F7FA]'
-                    }`}
-                  >
-                    <img src={p.url} alt={p.label} className="w-12 h-12 rounded-xl object-cover" />
-                    <span className="text-[10px] font-semibold text-slate-600 truncate w-full text-center">
-                      {p.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
+          {/* Preset Avatars */}
+          <div>
+            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+              Or Select Preset Avatar
+            </p>
+            <div className="grid grid-cols-4 gap-2">
+              {AVATAR_PRESETS.map((preset) => (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => setAvatarUrl(preset.url)}
+                  className={`p-1.5 rounded-lg border text-center transition ${
+                    avatarUrl === preset.url
+                      ? 'bg-indigo-600/20 border-indigo-500'
+                      : 'bg-[#24242b] border-[#32323b] hover:border-zinc-500'
+                  }`}
+                >
+                  <img
+                    src={preset.url}
+                    alt={preset.label}
+                    className="w-10 h-10 rounded-full mx-auto object-cover"
+                  />
+                  <span className="block text-[9px] text-zinc-400 mt-1 truncate">
+                    {preset.label}
+                  </span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Account Details Form */}
-          <div className="space-y-4 pt-4 border-t border-[#E6EFF5]">
+          {/* Account Details */}
+          <div className="space-y-3 pt-2 border-t border-[#2a2a32]">
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">
+              <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
                 Display Name
               </label>
-              <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full h-11 pl-11 pr-4 text-xs sm:text-sm font-medium rounded-2xl border border-[#DFEAF2] bg-[#F5F7FA] text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
-                  placeholder="Your full name"
-                />
-              </div>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full h-9 px-3 text-xs bg-[#24242b] border border-[#32323b] text-white rounded-lg focus:outline-none focus:border-indigo-500"
+              />
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">
+              <label className="block text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-1">
                 Email Address
               </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
-                  type="email"
-                  disabled
-                  value={currentUser?.email || ''}
-                  className="w-full h-11 pl-11 pr-4 text-xs sm:text-sm font-medium rounded-2xl border border-[#E6EFF5] bg-[#F5F7FA]/60 text-slate-500 cursor-not-allowed outline-none"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">
-                Department / Assignment
-              </label>
-              <div className="relative">
-                <Building className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={department}
-                  onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full h-11 pl-11 pr-4 text-xs sm:text-sm font-medium rounded-2xl border border-[#DFEAF2] bg-[#F5F7FA] text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
-                  placeholder="Campus Department or Specialty"
-                />
-              </div>
+              <input
+                type="email"
+                disabled
+                value={currentUser?.email}
+                className="w-full h-9 px-3 text-xs bg-[#1e1e24] border border-[#2a2a32] text-zinc-500 rounded-lg cursor-not-allowed"
+              />
             </div>
           </div>
         </div>
 
-        {/* Modal Footer Actions: Save Changes and Direct Logout */}
-        <div className="p-6 bg-white border-t border-[#E6EFF5] flex flex-col sm:flex-row items-center justify-between gap-3">
+        {/* Modal Footer */}
+        <div className="px-6 py-3.5 border-t border-[#2a2a32] bg-[#18181c] flex items-center justify-between">
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full sm:w-auto h-11 px-5 rounded-2xl border border-rose-200 bg-white hover:bg-rose-50 text-[#FF4B4A] text-xs font-bold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] shadow-xs order-2 sm:order-1"
+            className="text-xs text-rose-400 hover:text-rose-300 font-medium flex items-center gap-1.5 transition"
           >
-            <LogOut className="w-4 h-4 text-[#FF4B4A]" />
+            <LogOut className="w-3.5 h-3.5" />
             <span>Log Out</span>
           </button>
 
-          <div className="flex items-center gap-3 w-full sm:w-auto justify-end order-1 sm:order-2">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="h-11 px-5 rounded-2xl border border-[#E6EFF5] bg-white hover:bg-[#F5F7FA] text-slate-600 hover:text-slate-900 text-xs font-semibold transition-all duration-200 active:scale-[0.98]"
+              className="px-3.5 py-1.5 rounded-lg border border-[#32323b] bg-[#24242b] text-zinc-300 hover:text-white text-xs font-medium transition"
             >
               Cancel
             </button>
             <button
               type="button"
-              onClick={handleSave}
               disabled={isSaving}
-              className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-[#2D60FF]/25 transition-all duration-200 active:scale-[0.98] disabled:opacity-75 cursor-pointer"
+              onClick={handleSave}
+              className="px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition disabled:opacity-60"
             >
-              {isSaving ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Check className="w-4 h-4" />
-              )}
+              <Check className="w-3.5 h-3.5" />
               <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
             </button>
           </div>

@@ -1,57 +1,31 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useTickets } from '../../context/TicketContext';
 import { useAuth } from '../../context/AuthContext';
-import TicketSkeleton from '../common/TicketSkeleton';
-import EmptyState from '../common/EmptyState';
-import { 
-  Select, 
-  SelectTrigger, 
-  SelectValue, 
-  SelectContent, 
-  SelectItem 
-} from '../ui/select';
+import WorkspaceSidebar from '../common/WorkspaceSidebar';
+import DashboardHeroBanner from '../common/DashboardHeroBanner';
+import NeetCodeTicketTable from '../tickets/NeetCodeTicketTable';
+import SlaPriorityRingWidget from '../common/SlaPriorityRingWidget';
+import ActivityCalendarWidget from '../common/ActivityCalendarWidget';
 import { 
   ShieldCheck, 
   Search, 
-  Filter, 
   Trash2, 
-  ExternalLink,
-  MapPin,
-  Clock,
-  Layers,
-  Wrench,
-  AlertTriangle,
-  CheckCircle2,
-  XCircle,
-  Users,
-  UserCheck,
-  UserX,
-  Mail,
-  Calendar,
-  Sparkles,
-  ArrowRight,
-  ListFilter,
+  CheckCircle2, 
+  XCircle, 
+  Users, 
+  UserCheck, 
+  UserX, 
+  RefreshCw, 
+  Download, 
+  Check, 
+  ShieldAlert, 
+  Lock, 
+  Unlock, 
   Settings as SettingsIcon,
   Flame,
-  ShieldAlert,
-  Database,
-  Key,
-  RefreshCw,
-  Download,
-  Check,
-  Eye,
-  EyeOff,
-  Sliders,
-  AlertOctagon,
-  Zap,
-  SlidersHorizontal,
-  FileText,
-  ClipboardCheck,
-  Lock,
-  Unlock
+  FileText
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { STATUS_CONFIG, CATEGORIES, PRIORITIES } from '../../types/mockData';
 
 export default function AdminDashboard({ onSelectTicket, activeTab = 'overview', setActiveTab }) {
   const { 
@@ -61,19 +35,31 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     stats, 
     addToast,
     fetchTickets,
-    resetMockData,
     fetchAuditLogs,
-    isLoading
+    verifyTicketClosure
   } = useTickets();
+
   const { 
     users = [], 
     pendingUsers = [], 
     approvedUsers = [], 
     approveUser, 
-    rejectUser,
-    allowAdminSignup,
-    toggleAdminSignup
+    rejectUser, 
+    allowAdminSignup, 
+    toggleAdminSignup 
   } = useAuth();
+
+  const [internalTab, setInternalTab] = useState(activeTab);
+  const currentTab = activeTab || internalTab;
+
+  useEffect(() => {
+    setInternalTab(activeTab);
+  }, [activeTab]);
+
+  const handleTabChange = (tabKey) => {
+    setInternalTab(tabKey);
+    if (setActiveTab) setActiveTab(tabKey);
+  };
 
   const handleAdminSignupToggle = async (e) => {
     const nextVal = e.target.checked;
@@ -93,21 +79,10 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     }
   };
 
-  const [internalTab, setInternalTab] = useState(activeTab);
-  const currentTab = activeTab || internalTab;
-
-  useEffect(() => {
-    setInternalTab(activeTab);
-  }, [activeTab]);
-
-  // Request Queue / Overview filters
+  // Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
-  const [categoryFilter, setCategoryFilter] = useState('All');
-  const [priorityFilter, setPriorityFilter] = useState('All');
-
-  // Hazard Queue specific filter
-  const [hazardFilter, setHazardFilter] = useState('All'); // 'All' | 'Critical' | 'Urgent'
+  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [activeFeatureFilter, setActiveFeatureFilter] = useState('all');
 
   // Audit Trail State
   const [auditLogs, setAuditLogs] = useState([]);
@@ -118,7 +93,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
       setLoadingAudit(true);
       try {
         const logs = await fetchAuditLogs();
-        setAuditLogs(logs);
+        setAuditLogs(logs || []);
       } finally {
         setLoadingAudit(false);
       }
@@ -131,6 +106,17 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     }
   }, [currentTab]);
 
+  const handleExportAuditJson = () => {
+    const jsonStr = JSON.stringify(auditLogs, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `audit-trail-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   // Operational Policies State
   const [policies, setPolicies] = useState({
     strictGating: true,
@@ -138,384 +124,334 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     autoRouting: true
   });
 
-  const handleTabSwitch = (tab) => {
-    setInternalTab(tab);
-    if (typeof setActiveTab === 'function') {
-      setActiveTab(tab);
+  // Calculate Global Admin KPIs
+  const adminStats = useMemo(() => {
+    let resolved = 0;
+    let open = 0;
+    let urgent = 0;
+
+    tickets.forEach((t) => {
+      const isDone = t.status === 'Completed' || t.status === 'Done' || t.status === 'Resolved';
+      if (isDone) resolved++;
+      else open++;
+
+      const p = (t.priority || t.urgency || '').toLowerCase();
+      if (p === 'urgent' || p === 'emergency' || p === 'critical' || p === 'moderate') {
+        urgent++;
+      }
+    });
+
+    return {
+      resolvedCount: resolved,
+      openCount: open,
+      escalatedCount: urgent,
+      total: tickets.length,
+      activeCount: open
+    };
+  }, [tickets]);
+
+  // Filtered tickets according to tab, search query, category, and feature cards
+  const displayedTickets = useMemo(() => {
+    return tickets.filter((t) => {
+      // Hazards tab filter
+      if (currentTab === 'hazards') {
+        const p = (t.priority || t.urgency || '').toLowerCase();
+        if (p !== 'emergency' && p !== 'critical' && !t.isHazard) return false;
+      }
+
+      // Category filter
+      if (selectedCategory !== 'All') {
+        const cat = (t.category || '').toLowerCase();
+        if (cat !== selectedCategory.toLowerCase()) return false;
+      }
+
+      // Feature filter
+      if (activeFeatureFilter === 'urgent') {
+        const p = (t.priority || t.urgency || '').toLowerCase();
+        if (p !== 'urgent' && p !== 'emergency' && p !== 'critical') return false;
+      } else if (activeFeatureFilter === 'rag-history') {
+        if (!t.ragTicketVolume || Number(t.ragTicketVolume) < 2) return false;
+      }
+
+      // Search query
+      if (searchQuery.trim()) {
+        const q = searchQuery.trim().toLowerCase();
+        const idMatch = String(t.id || '').toLowerCase().includes(q.replace('#', ''));
+        const titleMatch = String(t.title || t.complaint || '').toLowerCase().includes(q);
+        const locMatch = String(t.location || '').toLowerCase().includes(q);
+        const catMatch = String(t.category || '').toLowerCase().includes(q);
+        if (!idMatch && !titleMatch && !locMatch && !catMatch) return false;
+      }
+
+      return true;
+    });
+  }, [tickets, currentTab, selectedCategory, activeFeatureFilter, searchQuery]);
+
+  // Admin completion toggle
+  const handleToggleComplete = async (ticket) => {
+    if (ticket.status === 'Completed' || ticket.status === 'Done') {
+      addToast({
+        type: 'info',
+        title: 'Already Resolved',
+        message: 'This ticket is already closed and dual-verified.'
+      });
+      return;
+    }
+
+    try {
+      await updateTicketStatus(ticket.id, 'Completed');
+      addToast({
+        type: 'success',
+        title: 'Status Updated',
+        message: `Ticket #${ticket.id} marked as Completed by Administrator.`
+      });
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Update Error',
+        message: e?.message || 'Failed to update ticket.'
+      });
     }
   };
 
-  // Filter all tickets across all campus users for Overview and Request Queue
-  const filteredTickets = useMemo(() => {
-    return tickets.filter((ticket) => {
-      if (statusFilter !== 'All' && ticket.status !== statusFilter) return false;
-      if (categoryFilter !== 'All' && ticket.category !== categoryFilter) return false;
-      if (priorityFilter !== 'All' && ticket.priority !== priorityFilter) return false;
-
-      if (searchQuery.trim()) {
-        const q = searchQuery.trim().toLowerCase();
-        const cleanQ = q.startsWith('#') ? q.slice(1).trim() : q;
-        const idStr = String(ticket?.id || '').toLowerCase();
-        const titleStr = String(ticket?.title || ticket?.Title || ticket?.complaint || ticket?.issue || '').toLowerCase();
-        const descStr = String(ticket?.description || ticket?.Description || '').toLowerCase();
-        const locStr = String(ticket?.location || ticket?.Location || ticket?.room || '').toLowerCase();
-        const catStr = String(ticket?.category || ticket?.Category || '').toLowerCase();
-        const repStr = String(ticket?.reportedBy?.name || ticket?.reporterName || '').toLowerCase();
-
-        const matches =
-          idStr.includes(cleanQ) ||
-          titleStr.includes(q) ||
-          descStr.includes(q) ||
-          locStr.includes(q) ||
-          catStr.includes(q) ||
-          repStr.includes(q);
-
-        if (!matches) return false;
-      }
-      return true;
-    });
-  }, [tickets, statusFilter, categoryFilter, priorityFilter, searchQuery]);
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setStatusFilter('All');
-    setCategoryFilter('All');
-    setPriorityFilter('All');
-  };
-
-  // Dynamic category counts
-  const categoryCounts = useMemo(() => {
-    const counts = { Electrical: 0, Plumbing: 0, Lift: 0, HVAC: 0, Other: 0 };
-    tickets.forEach((t) => {
-      counts[t.category] = (counts[t.category] || 0) + 1;
-    });
-    return counts;
-  }, [tickets]);
-
-  // All Hazard tickets (Active/Unresolved)
-  const hazardTickets = useMemo(() => {
-    return tickets.filter((t) => {
-      if (t.status === 'Completed' || t.status === 'Done') return false;
-      return (
-        t.isHazard === true ||
-        t.priority === 'Critical' ||
-        t.priority === 'Emergency' ||
-        t.Urgency === 'Emergency' ||
-        t.urgency === 'Emergency' ||
-        (t.priority === 'Urgent' && (t.category === 'Electrical' || t.category === 'Plumbing'))
-      );
-    });
-  }, [tickets]);
-
-  // Filtered Hazard tickets
-  const filteredHazards = useMemo(() => {
-    return hazardTickets.filter((t) => {
-      if (hazardFilter === 'Critical') {
-        return t.isHazard || t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Emergency' || t.urgency === 'Emergency';
-      }
-      if (hazardFilter === 'Urgent') {
-        return t.priority === 'Urgent' || t.Urgency === 'Urgent' || t.urgency === 'Urgent';
-      }
-      return true;
-    });
-  }, [hazardTickets, hazardFilter]);
-
-  // Handle Approving a Pending User
-  const handleApprove = async (user) => {
-    await approveUser(user.id);
+  const handleDeleteTicket = async (ticketId) => {
     try {
-      confetti({
-        particleCount: 45,
-        spread: 60,
-        origin: { y: 0.6 }
+      await deleteTicket(ticketId);
+      addToast({
+        type: 'success',
+        title: 'Ticket Deleted',
+        message: `Ticket #${ticketId} purged from database.`
       });
-    } catch {}
-
-    addToast({
-      type: 'success',
-      title: 'User Approved!',
-      message: `${user.name} (${user.roleDisplay}) has been approved and can now log in.`
-    });
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Delete Failed',
+        message: e?.message || 'Failed to delete ticket.'
+      });
+    }
   };
 
-  // Handle Rejecting a Pending User
-  const handleReject = async (user) => {
-    await rejectUser(user.id);
-    addToast({
-      type: 'warning',
-      title: 'User Access Rejected',
-      message: `${user.name}'s registration request was rejected.`
-    });
+  const handleApprove = async (userId) => {
+    try {
+      await approveUser(userId);
+      confetti({ particleCount: 30, spread: 50, origin: { y: 0.6 } });
+      addToast({
+        type: 'success',
+        title: 'User Approved',
+        message: 'User account unlocked and granted access.'
+      });
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Approval Error',
+        message: e?.message || 'Failed to approve user.'
+      });
+    }
   };
 
-  // Export Tickets as JSON file
-  const handleExportJson = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(tickets, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `smartfixflow-workorders-${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    addToast({
-      type: 'success',
-      title: 'Export Complete',
-      message: `Exported ${tickets.length} work orders to JSON file.`
-    });
-  };
-
-  // Export Audit Trail as JSON file
-  const handleExportAuditJson = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(auditLogs, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `smartfixflow-audit-trail-${new Date().toISOString().split('T')[0]}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-    addToast({
-      type: 'success',
-      title: 'Audit Export Complete',
-      message: `Exported ${auditLogs.length} audit records to JSON file.`
-    });
-  };
-
-  // Clear all maintenance work orders
-  const handleResetData = () => {
-    if (window.confirm('Are you sure you want to clear all maintenance work orders from the database?')) {
-      if (resetMockData) resetMockData();
+  const handleReject = async (userId) => {
+    try {
+      await rejectUser(userId);
+      addToast({
+        type: 'warning',
+        title: 'User Rejected',
+        message: 'User account registration rejected.'
+      });
+    } catch (e) {
+      addToast({
+        type: 'error',
+        title: 'Rejection Error',
+        message: e?.message || 'Failed to reject user.'
+      });
     }
   };
 
   return (
-    <div className="space-y-6 sm:space-y-8 pb-16 text-slate-900">
-      {/* Top Banner & Header - Center Aligned Hero Section */}
-      <div className="text-center max-w-3xl mx-auto mb-8">
-        <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
-          MAINTENANCE OPERATIONS & ADMINISTRATION
-        </p>
-        <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight font-['Plus_Jakarta_Sans']">
-          Safety first. Progress visible.
-        </h1>
-        <p className="text-sm text-slate-500 font-medium mt-2 max-w-xl mx-auto leading-relaxed">
-          Live campus maintenance requests, automatically routed and ready for review.
-        </p>
+    <div className="w-full max-w-[1440px] mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* 1. Left Sidebar (lg:col-span-2) */}
+      <div className="lg:col-span-2">
+        <WorkspaceSidebar
+          currentView={currentTab}
+          onSelectView={handleTabChange}
+          selectedCategory={selectedCategory}
+          onSelectCategory={(cat) => setSelectedCategory(cat)}
+          role="admin"
+          stats={adminStats}
+        />
       </div>
 
-      {/* PENDING APPROVALS NOTICE (Visible in Overview if there are pending users) */}
-      {currentTab === 'overview' && (pendingUsers?.length || 0) > 0 && (
-        <div className="p-4 sm:p-6 rounded-3xl bg-[#FFF5D9] border border-[#FFBB38]/30 text-slate-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] animate-slide-up">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-2xl bg-white text-[#FFBB38] border border-[#FFBB38]/30 flex items-center justify-center shrink-0 shadow-xs">
-              <Users className="w-5 h-5" />
-            </div>
-            <div>
-              <p className="font-bold text-slate-900 text-sm">
-                Account Approvals: {pendingUsers.length} account request{pendingUsers.length > 1 ? 's' : ''} awaiting validation
-              </p>
-              <p className="text-slate-600 text-xs font-medium mt-0.5">
-                New user and technician registrations require your approval before they can access SmartFixFlow - AI.
-              </p>
-            </div>
-          </div>
+      {/* 2. Center Main Content (lg:col-span-7) */}
+      <main className="lg:col-span-7 min-w-0 space-y-6">
+        {/* Top Category Feature Cards, Hero Banner Card, Search Toolbar */}
+        <DashboardHeroBanner
+          title="Campus Control"
+          subtitle="Authoritative multi-tenant governance, RAG vector memory, and identity security."
+          stats={adminStats}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          onRefresh={fetchTickets}
+          activeFeatureFilter={activeFeatureFilter}
+          onFeatureCardClick={(filter) => {
+            setActiveFeatureFilter((prev) => (prev === filter ? 'all' : filter));
+          }}
+        />
 
-          <button
-            type="button"
-            onClick={() => handleTabSwitch('approvals')}
-            className="self-start sm:self-auto h-11 px-5 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white font-bold text-xs transition-all duration-200 active:scale-[0.98] flex items-center gap-2 shadow-md shadow-[#2D60FF]/25"
-          >
-            <span>Review Pending Users</span>
-            <ArrowRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+        {/* TAB CONTENT */}
 
-      {/* ========================================================================= */}
-      {/* TAB 1: PENDING USER APPROVALS & USER MANAGEMENT                           */}
-      {/* ========================================================================= */}
-      {currentTab === 'approvals' && (
-        <div className="space-y-6 sm:space-y-8 animate-slide-up">
-          {/* Section Subheader */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 font-['Plus_Jakarta_Sans']">
-                <ShieldCheck className="w-6 h-6 text-[#2D60FF]" />
-                <span>Admin Auth Validation & User Gating</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                Strict admin gate: Approve or reject user and technician requests before granting portal access.
-              </p>
-            </div>
+        {/* TAB: OVERVIEW / REQUESTS / HAZARDS (Ticket Table) */}
+        {(currentTab === 'overview' || currentTab === 'requests' || currentTab === 'hazards') && (
+          <NeetCodeTicketTable
+            tickets={displayedTickets}
+            onSelectTicket={onSelectTicket}
+            onToggleComplete={handleToggleComplete}
+            onDeleteTicket={handleDeleteTicket}
+            role="admin"
+            emptyMessage={
+              currentTab === 'hazards'
+                ? 'No active life-safety hazards or critical emergencies.'
+                : 'No campus tickets match your search filters.'
+            }
+          />
+        )}
 
-            <div className="flex items-center gap-2 text-xs">
-              <span className="px-4 py-2 rounded-2xl bg-[#FFF5D9] text-[#FFBB38] font-bold border border-[#FFBB38]/30 shadow-2xs">
-                {pendingUsers.length} Pending
-              </span>
-              <span className="px-4 py-2 rounded-2xl bg-[#DCFAF8] text-[#16DBCC] font-bold border border-[#16DBCC]/30 shadow-2xs">
-                {approvedUsers.length} Approved Active
-              </span>
-            </div>
-          </div>
-
-          {/* Pending Users Table with Layered Depth */}
-          <div className="bg-white rounded-3xl border border-[#E6EFF5] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] text-slate-900">
-            <div className="px-6 py-4 border-b border-[#E6EFF5] bg-white flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">
-                Pending Approval Queue ({pendingUsers.length})
-              </h3>
-              <span className="text-xs text-slate-400 font-medium">Strict manual verification</span>
-            </div>
-
-            {pendingUsers.length === 0 ? (
-              <EmptyState
-                icon={CheckCircle2}
-                title="Queue is clear"
-                subtitle="All user registrations have been verified. Newly registered campus users or technicians will appear here for your approval."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#F5F7FA] text-slate-500 border-b border-[#E6EFF5] text-xs font-semibold">
-                    <tr>
-                      <th className="px-6 py-4 font-bold">Applicant / User</th>
-                      <th className="px-4 py-4 font-bold">Requested Role</th>
-                      <th className="px-4 py-4 font-bold">Status</th>
-                      <th className="px-4 py-4 font-bold">Requested On</th>
-                      <th className="px-6 py-4 text-right font-bold">Approval Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E6EFF5]">
-                    {pendingUsers.map((user) => (
-                      <tr key={user.id} className="hover:bg-[#F5F7FA]/75 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center gap-3">
-                            <img
-                              src={user.avatar}
-                              alt={user.name}
-                              className="w-10 h-10 rounded-full object-cover ring-2 ring-[#E6EFF5]"
-                            />
-                            <div>
-                              <p className="font-bold text-slate-900 text-sm font-['Plus_Jakarta_Sans']">{user.name}</p>
-                              <p className="text-xs text-slate-500 font-medium flex items-center gap-1 mt-0.5">
-                                <Mail className="w-3.5 h-3.5 text-slate-400" />
-                                <span>{user.email}</span>
-                              </p>
-                            </div>
-                          </div>
-                        </td>
-
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                            user.role === 'technician'
-                              ? 'bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30'
-                              : 'bg-[#E7EDFF] text-[#2D60FF] border border-[#2D60FF]/30'
-                          }`}>
-                            {user.role === 'technician' ? <Wrench className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
-                            <span>{user.role === 'technician' ? `Technician • ${user.specialty || 'General'}` : user.roleDisplay}</span>
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[#FFBB38] animate-ping" />
-                            <span>Pending Approval</span>
-                          </span>
-                        </td>
-
-                        <td className="px-4 py-4 whitespace-nowrap text-slate-500 text-xs font-medium">
-                          <div className="flex items-center gap-1.5">
-                            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                            <span>{new Date(user.createdAt).toLocaleDateString()}</span>
-                          </div>
-                        </td>
-
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button
-                              type="button"
-                              onClick={() => handleApprove(user)}
-                              className="h-11 px-5 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white font-bold text-xs transition-all duration-200 active:scale-[0.98] flex items-center gap-1.5 shadow-md shadow-[#2D60FF]/25"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span>Approve</span>
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleReject(user)}
-                              className="h-11 px-4 rounded-2xl bg-white hover:bg-rose-50 border border-rose-200 text-[#FF4B4A] font-semibold text-xs transition-all duration-200 active:scale-[0.98] flex items-center gap-1 shadow-2xs"
-                            >
-                              <XCircle className="w-4 h-4" />
-                              <span>Reject</span>
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+        {/* TAB: USER APPROVALS */}
+        {currentTab === 'approvals' && (
+          <div className="space-y-4">
+            <div className="bg-[#1c1c21] border border-[#2a2a32] rounded-xl p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-indigo-400" />
+                  <h3 className="text-sm font-bold text-white">Pending Approval Queue</h3>
+                </div>
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  {pendingUsers.length} Pending
+                </span>
               </div>
-            )}
-          </div>
 
-          {/* List of Approved Users for oversight */}
-          <div className="bg-white rounded-3xl border border-[#E6EFF5] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] text-slate-900">
-            <div className="px-6 py-4 border-b border-[#E6EFF5] bg-white flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">
-                Approved Active Users ({approvedUsers.length})
+              {pendingUsers.length === 0 ? (
+                <p className="text-xs text-zinc-500 py-6 text-center">
+                  All user registrations have been verified and approved.
+                </p>
+              ) : (
+                <div className="space-y-2.5">
+                  {pendingUsers.map((u) => (
+                    <div
+                      key={u.id}
+                      className="bg-[#24242b] border border-[#32323b] rounded-lg p-3.5 flex items-center justify-between gap-4"
+                    >
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-white truncate">{u.name}</span>
+                          <span className="text-[10px] text-indigo-400 font-mono bg-[#1c1c21] px-1.5 py-0.2 rounded border border-[#32323b]">
+                            {u.role?.toUpperCase()}
+                          </span>
+                          {u.specialty && (
+                            <span className="text-[10px] text-amber-400 font-medium bg-amber-500/10 px-1.5 py-0.2 rounded">
+                              {u.specialty}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-zinc-400 mt-0.5 truncate">{u.email}</p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleApprove(u.id)}
+                          className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium flex items-center gap-1.5 transition"
+                        >
+                          <UserCheck className="w-3.5 h-3.5" />
+                          <span>Approve</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleReject(u.id)}
+                          className="h-8 px-3 rounded-lg bg-[#1c1c21] hover:bg-rose-500/20 text-rose-400 border border-[#32323b] hover:border-rose-500/30 text-xs font-medium flex items-center gap-1.5 transition"
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                          <span>Reject</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Approved Users List */}
+            <div className="bg-[#1c1c21] border border-[#2a2a32] rounded-xl p-5">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 mb-3">
+                Active Campus Personnel ({approvedUsers.length})
               </h3>
-              <span className="text-xs text-slate-400 font-medium">Authorized campus accounts</span>
+              <div className="divide-y divide-[#24242c] text-xs">
+                {approvedUsers.slice(0, 10).map((u) => (
+                  <div key={u.id} className="py-2.5 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      <span className="text-zinc-200 font-medium">{u.name}</span>
+                      <span className="text-zinc-500 text-[11px] font-mono">({u.email})</span>
+                    </div>
+                    <span className="text-[10px] text-zinc-400 uppercase font-mono">{u.role}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB: AUDIT LOGS */}
+        {currentTab === 'audit' && (
+          <div className="bg-[#1c1c21] border border-[#2a2a32] rounded-xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-[#2a2a32] flex items-center justify-between bg-[#18181c]">
+              <div>
+                <h3 className="text-sm font-bold text-white">Immutable Security Audit Trail</h3>
+                <p className="text-xs text-zinc-400 mt-0.5">{auditLogs.length} verified operations recorded</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={loadAuditLogs}
+                  disabled={loadingAudit}
+                  className="h-8 px-3 rounded-lg bg-[#24242b] hover:bg-[#2e2e38] text-zinc-200 border border-[#32323b] text-xs font-medium flex items-center gap-1.5 transition"
+                >
+                  <RefreshCw className={`w-3.5 h-3.5 ${loadingAudit ? 'animate-spin' : ''}`} />
+                  <span>Refresh</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportAuditJson}
+                  className="h-8 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1.5 transition"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export JSON</span>
+                </button>
+              </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
-                <thead className="bg-[#F5F7FA] text-slate-500 border-b border-[#E6EFF5] text-xs font-semibold">
+                <thead className="bg-[#18181c] text-zinc-400 border-b border-[#2a2a32] text-[11px] font-semibold uppercase tracking-wider">
                   <tr>
-                    <th className="px-6 py-4 font-bold">User</th>
-                    <th className="px-4 py-4 font-bold">Role</th>
-                    <th className="px-4 py-4 font-bold">Status</th>
-                    <th className="px-4 py-4 font-bold">Account ID</th>
+                    <th className="px-4 py-3">Timestamp</th>
+                    <th className="px-4 py-3">Action</th>
+                    <th className="px-4 py-3">Target</th>
+                    <th className="px-4 py-3">Actor</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#E6EFF5]">
-                  {approvedUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-[#F5F7FA]/75 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={user.avatar}
-                            alt={user.name}
-                            className="w-9 h-9 rounded-full object-cover ring-2 ring-[#E6EFF5]"
-                          />
-                          <div>
-                            <p className="font-semibold text-slate-900 font-['Plus_Jakarta_Sans']">{user.name}</p>
-                            <p className="text-xs text-slate-500 font-medium">{user.email}</p>
-                          </div>
-                        </div>
+                <tbody className="divide-y divide-[#24242c]">
+                  {auditLogs.slice(0, 50).map((log) => (
+                    <tr key={log.id} className="hover:bg-[#23232a] transition-colors">
+                      <td className="px-4 py-3 text-zinc-500 font-mono text-[11px]">
+                        {new Date(log.timestamp).toLocaleTimeString()}
                       </td>
-
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold ${
-                          user.role === 'technician'
-                            ? 'bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30'
-                            : user.role === 'admin'
-                            ? 'bg-[#E7EDFF] text-[#2D60FF] border border-[#2D60FF]/30'
-                            : 'bg-[#F5F7FA] text-slate-700 border border-[#E6EFF5]'
-                        }`}>
-                          {user.role === 'technician' ? <Wrench className="w-3 h-3" /> : user.role === 'admin' ? <ShieldCheck className="w-3 h-3" /> : <UserCheck className="w-3 h-3" />}
-                          <span>{user.role === 'technician' ? `Technician • ${user.specialty || 'General'}` : user.roleDisplay}</span>
-                        </span>
+                      <td className="px-4 py-3 font-semibold text-zinc-200">
+                        {log.action}
                       </td>
-
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 text-xs font-bold text-[#16DBCC] bg-[#DCFAF8] px-3 py-1 rounded-full border border-[#16DBCC]/30">
-                          <CheckCircle2 className="w-3.5 h-3.5 text-[#16DBCC]" />
-                          <span>Approved</span>
-                        </span>
+                      <td className="px-4 py-3 font-mono text-zinc-400">
+                        {log.target_id || log.ticket_id || '—'}
                       </td>
-
-                      <td className="px-4 py-4 whitespace-nowrap font-mono text-xs text-slate-400 font-medium">
-                        {user.id}
+                      <td className="px-4 py-3 text-zinc-400">
+                        <span>{log.actor_email || log.actor_id}</span>
                       </td>
                     </tr>
                   ))}
@@ -523,1004 +459,134 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
               </table>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* ========================================================================= */}
-      {/* TAB 2: OVERVIEW & WORK-ORDER REGISTER (Strict 8pt Grid & Layered Depth)   */}
-      {/* ========================================================================= */}
-      {currentTab === 'overview' && (
-        <div className="space-y-6 sm:space-y-8 animate-slide-up text-slate-900">
-          {/* SECTION: 4 Main Metric Cards with Layered Depth & Tactile Micro-Interactions */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {/* Card 1: BankDash Cobalt Gradient "My Cards" Card */}
-            <div className="bg-gradient-to-r from-[#2D60FF] to-[#1814F3] text-white p-6 rounded-3xl shadow-[0_8px_24px_-4px_rgba(45,96,255,0.35)] flex flex-col justify-between relative overflow-hidden transition-transform duration-200 active:scale-[0.98] hover:-translate-y-0.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-white/80">Total requests</p>
-                  <p className="text-3xl font-extrabold text-white mt-2 font-['Plus_Jakarta_Sans'] tracking-tight">{stats.total}</p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white shadow-xs">
-                  <FileText className="w-6 h-6" />
-                </div>
-              </div>
-              <p className="text-xs text-white/80 mt-4 font-medium">All campus work orders</p>
-            </div>
-
-            {/* Card 2: Open requests */}
-            <div className="bg-white p-6 rounded-3xl border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] flex flex-col justify-between transition-transform duration-200 active:scale-[0.98] hover:-translate-y-0.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-slate-400">Open requests</p>
-                  <p className="text-3xl font-extrabold text-slate-900 mt-2 font-['Plus_Jakarta_Sans'] tracking-tight">{stats.open}</p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-[#FFF5D9] flex items-center justify-center text-[#FFBB38]">
-                  <Clock className="w-6 h-6" />
-                </div>
-              </div>
-              <p className="text-xs text-slate-500 font-medium mt-4">Awaiting resolution</p>
-            </div>
-
-            {/* Card 3: Critical / Emergency */}
-            <div 
-              onClick={() => handleTabSwitch('hazards')}
-              className="bg-white p-6 rounded-3xl border border-[#E6EFF5] hover:border-[#FF4B4A]/50 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] flex flex-col justify-between cursor-pointer group transition-all duration-200 active:scale-[0.98] hover:-translate-y-0.5"
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-[#FF4B4A] flex items-center gap-1.5">
-                    <span>Critical / emergency</span>
-                  </p>
-                  <p className="text-3xl font-extrabold text-[#FF4B4A] mt-2 font-['Plus_Jakarta_Sans'] tracking-tight">{stats.critical}</p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-[#FFE0EB] flex items-center justify-center text-[#FF4B4A] group-hover:scale-105 transition-transform">
-                  <AlertTriangle className="w-6 h-6" />
-                </div>
-              </div>
-              <p className="text-xs text-[#FF4B4A] mt-4 flex items-center gap-1 font-semibold">
-                <span>Review safety guidance</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </p>
-            </div>
-
-            {/* Card 4: Resolved / Closed */}
-            <div className="bg-white p-6 rounded-3xl border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] flex flex-col justify-between transition-transform duration-200 active:scale-[0.98] hover:-translate-y-0.5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs font-semibold text-slate-400">Resolved / closed</p>
-                  <p className="text-3xl font-extrabold text-slate-900 mt-2 font-['Plus_Jakarta_Sans'] tracking-tight">{stats.done}</p>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-[#DCFAF8] flex items-center justify-center text-[#16DBCC]">
-                  <CheckCircle2 className="w-6 h-6" />
-                </div>
-              </div>
-              <p className="text-xs text-slate-500 font-medium mt-4">Completed work</p>
-            </div>
-          </div>
-
-          {/* SECTION: Requests by Category */}
-          <div>
-            <h3 className="text-base font-bold text-slate-900 mb-3 font-['Plus_Jakarta_Sans'] tracking-tight">Requests by category</h3>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-              {CATEGORIES.map((cat) => (
-                <div
-                  key={cat.id}
-                  onClick={() => setCategoryFilter(categoryFilter === cat.id ? 'All' : cat.id)}
-                  className={`p-5 rounded-3xl border transition-all duration-200 active:scale-[0.98] cursor-pointer ${
-                    categoryFilter === cat.id
-                      ? 'border-[#2D60FF] ring-2 ring-[#2D60FF]/20 bg-[#E7EDFF]/30 shadow-md'
-                      : 'border-[#E6EFF5] hover:border-[#2D60FF]/40 bg-white shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]'
-                  }`}
-                >
-                  <p className="text-xs font-semibold text-slate-400">{cat.label}</p>
-                  <p className="text-2xl font-extrabold text-slate-900 mt-1.5 font-['Plus_Jakarta_Sans']">
-                    {categoryCounts[cat.id] || 0}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* SECTION: Work-order register Table & shadcn/ui Select Filters */}
+        {/* TAB: SETTINGS (Dynamic Admin Signup Toggle & Security Policy) */}
+        {currentTab === 'settings' && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h2 className="text-xl font-bold text-slate-900 font-['Plus_Jakarta_Sans'] tracking-tight">Work-order register</h2>
-              <button
-                onClick={clearFilters}
-                className="h-11 px-5 rounded-2xl border border-[#E6EFF5] bg-white hover:bg-[#F5F7FA] text-xs font-semibold text-slate-600 hover:text-slate-900 transition-all duration-200 active:scale-[0.98] shadow-2xs"
-              >
-                Clear filters
-              </button>
-            </div>
-
-            {/* Filters Row with shadcn/ui Select components */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Request ID</label>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by ID"
-                  className="w-full h-11 px-4 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2] text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)] focus:bg-white focus:outline-none focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 transition-all"
-                />
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Status</label>
-                <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val)}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="All statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All statuses</SelectItem>
-                    <SelectItem value="Assigned">Assigned (Open)</SelectItem>
-                    <SelectItem value="In Progress">In Progress</SelectItem>
-                    <SelectItem value="Pending User Verification">Pending Verification</SelectItem>
-                    <SelectItem value="Completed">Completed</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Category</label>
-                <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val)}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="All categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All categories</SelectItem>
-                    {CATEGORIES.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="text-xs font-semibold text-slate-700 mb-1.5 block">Urgency</label>
-                <Select value={priorityFilter} onValueChange={(val) => setPriorityFilter(val)}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="All urgency levels" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All urgency levels</SelectItem>
-                    <SelectItem value="Emergency">Emergency</SelectItem>
-                    <SelectItem value="Urgent">Urgent</SelectItem>
-                    <SelectItem value="Routine">Routine</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <p className="text-xs text-slate-500 font-medium">
-              {filteredTickets.length} matching work orders
-            </p>
-
-            {/* Skeleton Loader during active backend syncing */}
-            {isLoading ? (
-              <div className="py-4">
-                <p className="text-xs font-semibold text-slate-500 mb-3 animate-pulse">Syncing work orders from secure backend database...</p>
-                <TicketSkeleton count={4} />
-              </div>
-            ) : filteredTickets.length === 0 ? (
-              <EmptyState
-                icon={ClipboardCheck}
-                title="Queue is clear"
-                subtitle="No work orders match the selected filters or search query."
-              />
-            ) : (
-              /* Table with Layered Depth */
-              <div className="bg-white rounded-3xl border border-[#E6EFF5] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] text-slate-900">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
-                    <thead className="bg-[#F5F7FA] text-slate-500 border-b border-[#E6EFF5] text-xs font-semibold">
-                      <tr>
-                        <th className="px-5 py-4 font-bold">Request ID</th>
-                        <th className="px-5 py-4 font-bold">Location</th>
-                        <th className="px-4 py-4 font-bold">Category</th>
-                        <th className="px-4 py-4 font-bold">Priority</th>
-                        <th className="px-4 py-4 font-bold">Status</th>
-                        <th className="px-4 py-4 font-bold">Safety</th>
-                        <th className="px-4 py-4 font-bold">Data</th>
-                        <th className="px-5 py-4 text-right font-bold">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#E6EFF5]">
-                      {filteredTickets.map((ticket) => {
-                        const statusStyle = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.Open;
-
-                        let priorityBadgeClass = "bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30";
-                        if (ticket.priority === 'Emergency' || ticket.priority === 'Critical') {
-                          priorityBadgeClass = "bg-[#FFE0EB] text-[#FF4B4A] border border-[#FF4B4A]/30";
-                        } else if (ticket.priority === 'Urgent' || ticket.priority === 'High') {
-                          priorityBadgeClass = "bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30";
-                        }
-
-                        return (
-                          <tr
-                            key={ticket.id}
-                            onClick={() => onSelectTicket && onSelectTicket(ticket.id)}
-                            className="hover:bg-[#F5F7FA]/75 transition-colors cursor-pointer group"
-                          >
-                            <td className="px-5 py-4 whitespace-nowrap font-bold text-slate-900 group-hover:text-[#2D60FF] transition-colors">
-                              {ticket.id}
-                            </td>
-
-                            <td className="px-5 py-4 whitespace-nowrap text-slate-700 font-medium">
-                              {ticket.location || 'Campus Building A'}
-                            </td>
-
-                            <td className="px-4 py-4 whitespace-nowrap text-slate-500 font-medium">
-                              {ticket.category}
-                            </td>
-
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${priorityBadgeClass}`}>
-                                {ticket.priority === 'Critical' ? 'Emergency' : ticket.priority === 'High' ? 'Urgent' : ticket.priority}
-                              </span>
-                            </td>
-
-                            <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              <select
-                                value={ticket.status === 'Completed' ? 'Completed' : ticket.status}
-                                onChange={(e) => updateTicketStatus(ticket.id, e.target.value)}
-                                className={`px-3 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer focus:ring-2 focus:ring-[#2D60FF]/20 ${statusStyle.pill}`}
-                              >
-                                <option value="Assigned">Assigned</option>
-                                <option value="In Progress">In Progress</option>
-                                <option value="Pending User Verification">Pending Verification</option>
-                                <option value="Completed">Completed</option>
-                              </select>
-                            </td>
-
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              {ticket.isHazard || ticket.priority === 'Critical' || ticket.priority === 'Emergency' ? (
-                                <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FFE0EB] text-[#FF4B4A] border border-[#FF4B4A]/30 tracking-wide">
-                                  HAZARD
-                                </span>
-                              ) : null}
-                            </td>
-
-                            <td className="px-4 py-4 whitespace-nowrap">
-                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30 font-mono">
-                                AUTHORITATIVE
-                              </span>
-                            </td>
-
-                            <td className="px-5 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => onSelectTicket && onSelectTicket(ticket.id)}
-                                  className="p-2 text-slate-400 hover:text-[#2D60FF] rounded-xl hover:bg-[#F5F7FA] transition-colors"
-                                  title="View details"
-                                >
-                                  <ExternalLink className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => deleteTicket(ticket.id)}
-                                  className="p-2 text-slate-400 hover:text-[#FF4B4A] rounded-xl hover:bg-rose-50 transition-colors"
-                                  title="Delete"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 3: REQUEST QUEUE (Dedicated All Requests View)                        */}
-      {/* ========================================================================= */}
-      {currentTab === 'requests' && (
-        <div className="space-y-6 animate-slide-up text-slate-900">
-          {/* Subheader */}
-          <div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 font-['Plus_Jakarta_Sans']">
-              <ListFilter className="w-6 h-6 text-[#2D60FF]" />
-              <span>Work-Order Request Queue</span>
-            </h2>
-            <p className="text-sm font-medium text-slate-500 mt-1">
-              Centralized queue of all campus maintenance work orders logged via web portal and Voiceflow AI.
-            </p>
-          </div>
-
-          {/* Quick Filter Status Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            {[
-              { id: 'All', label: 'All Requests', count: tickets.length },
-              { id: 'Assigned', label: 'Assigned (Open)', count: stats.open },
-              { id: 'In Progress', label: 'In Progress', count: stats.inProgress },
-              { id: 'Pending User Verification', label: 'Pending Verification', count: tickets.filter(t => t.status === 'Pending User Verification').length },
-              { id: 'Completed', label: 'Completed', count: stats.done }
-            ].map((pill) => (
-              <button
-                key={pill.id}
-                type="button"
-                onClick={() => setStatusFilter(pill.id)}
-                className={`h-11 px-5 rounded-2xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] whitespace-nowrap flex items-center gap-2 ${
-                  statusFilter === pill.id
-                    ? 'bg-[#2D60FF] text-white shadow-md shadow-[#2D60FF]/25 font-bold'
-                    : 'bg-white hover:bg-[#F5F7FA] text-slate-600 border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]'
-                }`}
-              >
-                <span>{pill.label}</span>
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                  statusFilter === pill.id ? 'bg-white/20 text-white' : 'bg-[#F5F7FA] text-slate-500'
-                }`}>
-                  {pill.count}
-                </span>
-              </button>
-            ))}
-          </div>
-
-          {/* Search & Filter Controls with shadcn/ui Select */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="relative">
-                <Search className="w-4 h-4 text-slate-400 absolute left-4 top-3.5" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search by ID, title, complaint, or location..."
-                  className="w-full h-11 pl-11 pr-4 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2] text-xs sm:text-sm font-medium text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)] transition-all"
-                />
-              </div>
-
-              <div>
-                <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val)}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="All Categories" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Categories</SelectItem>
-                    {CATEGORIES.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>{c.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Select value={priorityFilter} onValueChange={(val) => setPriorityFilter(val)}>
-                  <SelectTrigger className="h-11">
-                    <SelectValue placeholder="All Urgency Levels" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All">All Urgency Levels</SelectItem>
-                    <SelectItem value="Emergency">Emergency</SelectItem>
-                    <SelectItem value="Urgent">Urgent</SelectItem>
-                    <SelectItem value="Routine">Routine</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          {/* Request Queue Table or Skeletons or Empty State */}
-          {isLoading ? (
-            <div className="py-4">
-              <p className="text-xs font-semibold text-slate-500 mb-3 animate-pulse">Syncing work orders from secure backend database...</p>
-              <TicketSkeleton count={4} />
-            </div>
-          ) : filteredTickets.length === 0 ? (
-            <EmptyState
-              icon={ClipboardCheck}
-              title="Queue is clear"
-              subtitle="Great job, all maintenance requests are resolved."
-            />
-          ) : (
-            <div className="bg-white rounded-3xl border border-[#E6EFF5] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] text-slate-900">
-              <div className="px-6 py-4 border-b border-[#E6EFF5] bg-white flex items-center justify-between">
-                <span className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">
-                  {filteredTickets.length} Work Orders in Queue
-                </span>
-                <span className="text-xs font-medium text-slate-500">Live operational dispatch</span>
-              </div>
-
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#F5F7FA] text-slate-500 border-b border-[#E6EFF5] text-xs font-semibold">
-                    <tr>
-                      <th className="px-5 py-4 font-bold">Request ID</th>
-                      <th className="px-5 py-4 font-bold">Location</th>
-                      <th className="px-4 py-4 font-bold">Category</th>
-                      <th className="px-4 py-4 font-bold">Priority</th>
-                      <th className="px-4 py-4 font-bold">Status</th>
-                      <th className="px-4 py-4 font-bold">Safety</th>
-                      <th className="px-4 py-4 font-bold">Assigned Tech</th>
-                      <th className="px-5 py-4 text-right font-bold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E6EFF5]">
-                    {filteredTickets.map((ticket) => {
-                      const statusStyle = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.Open;
-                      let priorityBadgeClass = "bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30";
-                      if (ticket.priority === 'Emergency' || ticket.priority === 'Critical') {
-                        priorityBadgeClass = "bg-[#FFE0EB] text-[#FF4B4A] border border-[#FF4B4A]/30";
-                      } else if (ticket.priority === 'Urgent' || ticket.priority === 'High') {
-                        priorityBadgeClass = "bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30";
-                      }
-
-                      return (
-                        <tr
-                          key={ticket.id}
-                          onClick={() => onSelectTicket && onSelectTicket(ticket.id)}
-                          className="hover:bg-[#F5F7FA]/75 transition-colors cursor-pointer group"
-                        >
-                          <td className="px-5 py-4 whitespace-nowrap">
-                            <p className="font-bold text-slate-900 group-hover:text-[#2D60FF] transition-colors">{ticket.id}</p>
-                            <p className="text-xs font-medium text-slate-500 mt-0.5 line-clamp-1 max-w-[200px]">{ticket.title}</p>
-                          </td>
-
-                          <td className="px-5 py-4 whitespace-nowrap text-slate-700 font-medium">
-                            {ticket.location || 'Campus Facilities'}
-                          </td>
-
-                          <td className="px-4 py-4 whitespace-nowrap text-slate-500 font-medium">
-                            {ticket.category}
-                          </td>
-
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${priorityBadgeClass}`}>
-                              {ticket.priority === 'Critical' ? 'Emergency' : ticket.priority === 'High' ? 'Urgent' : ticket.priority}
-                            </span>
-                          </td>
-
-                          <td className="px-4 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            <select
-                              value={ticket.status === 'Completed' ? 'Completed' : ticket.status}
-                              onChange={(e) => updateTicketStatus(ticket.id, e.target.value)}
-                              className={`px-3 py-1 rounded-full text-xs font-semibold border-0 cursor-pointer focus:ring-2 focus:ring-[#2D60FF]/20 ${statusStyle.pill}`}
-                            >
-                              <option value="Assigned">Assigned</option>
-                              <option value="In Progress">In Progress</option>
-                              <option value="Pending User Verification">Pending Verification</option>
-                              <option value="Completed">Completed</option>
-                            </select>
-                          </td>
-
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            {ticket.isHazard || ticket.priority === 'Critical' || ticket.priority === 'Emergency' ? (
-                              <span className="inline-block px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#FFE0EB] text-[#FF4B4A] border border-[#FF4B4A]/30 tracking-wide">
-                                HAZARD
-                              </span>
-                            ) : (
-                              <span className="text-xs font-medium text-slate-400">Normal</span>
-                            )}
-                          </td>
-
-                          <td className="px-4 py-4 whitespace-nowrap text-slate-700 font-medium">
-                            {ticket.assignedTo || 'Unassigned'}
-                          </td>
-
-                          <td className="px-5 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-end gap-1">
-                              <button
-                                onClick={() => onSelectTicket && onSelectTicket(ticket.id)}
-                                className="p-2 text-slate-400 hover:text-[#2D60FF] rounded-xl hover:bg-[#F5F7FA] transition-colors"
-                                title="Inspect ticket details"
-                              >
-                                <ExternalLink className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => deleteTicket(ticket.id)}
-                                className="p-2 text-slate-400 hover:text-[#FF4B4A] rounded-xl hover:bg-rose-50 transition-colors"
-                                title="Delete ticket"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ========================================================================= */}
-      {/* TAB 4: HAZARD QUEUE (High-Priority Life Safety & Risk Management)         */}
-      {/* ========================================================================= */}
-      {currentTab === 'hazards' && (
-        <div className="space-y-6 animate-slide-up text-slate-900">
-          {/* High-Impact Emergency Header */}
-          <div className="p-6 rounded-3xl bg-gradient-to-r from-rose-50 via-white to-rose-50 border border-[#FF4B4A]/30 text-slate-900 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] relative overflow-hidden">
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div>
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[#FFE0EB] border border-[#FF4B4A]/30 text-[#FF4B4A] text-xs font-bold mb-2">
-                  <Flame className="w-3.5 h-3.5 text-[#FF4B4A] animate-pulse" />
-                  <span>EMERGENCY DISPATCH COMMAND CENTER</span>
-                </div>
-                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight font-['Plus_Jakarta_Sans']">
-                  Critical Facility Hazard Queue
-                </h2>
-                <p className="text-sm font-medium text-slate-500 mt-1 max-w-xl">
-                  High-voltage electrical faults, burst pressurized piping, structural risks, and lift failures requiring immediate on-site technician containment.
-                </p>
-              </div>
-
-              {/* Emergency Summary Numbers */}
-              <div className="flex items-center gap-3">
-                <div className="p-4 rounded-2xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] text-center min-w-24">
-                  <p className="text-xs font-semibold text-[#FF4B4A]">Critical Alerts</p>
-                  <p className="text-2xl font-black text-[#FF4B4A] mt-0.5 font-['Plus_Jakarta_Sans']">{stats.critical}</p>
-                </div>
-                <div className="p-4 rounded-2xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] text-center min-w-24">
-                  <p className="text-xs font-semibold text-slate-500">Total Hazards</p>
-                  <p className="text-2xl font-black text-slate-900 mt-0.5 font-['Plus_Jakarta_Sans']">{hazardTickets.length}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Safety Guidelines Triage Callouts */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="p-6 rounded-2xl bg-white border border-[#E6EFF5] text-slate-900 text-xs flex items-start gap-3 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]">
-              <div className="w-9 h-9 rounded-xl bg-[#FFF5D9] text-[#FFBB38] flex items-center justify-center shrink-0">
-                <Zap className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-900 text-sm">⚡ Electrical Shock Risk</p>
-                <p className="text-slate-500 text-xs font-medium mt-1">Isolate main branch breakers before technician touches wiring.</p>
-              </div>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#E6EFF5] text-slate-900 text-xs flex items-start gap-3 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]">
-              <div className="w-9 h-9 rounded-xl bg-[#DCFAF8] text-[#16DBCC] flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-900 text-sm">💧 Water Flooding Risk</p>
-                <p className="text-slate-500 text-xs font-medium mt-1">Shut off building riser valve; inspect adjacent electrical sockets.</p>
-              </div>
-            </div>
-
-            <div className="p-6 rounded-2xl bg-white border border-[#E6EFF5] text-slate-900 text-xs flex items-start gap-3 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]">
-              <div className="w-9 h-9 rounded-xl bg-[#FFE0EB] text-[#FF4B4A] flex items-center justify-center shrink-0">
-                <ShieldAlert className="w-5 h-5" />
-              </div>
-              <div>
-                <p className="font-bold text-slate-900 text-sm">🛗 Lift / Elevator Lockout</p>
-                <p className="text-slate-500 text-xs font-medium mt-1">Park cabin at ground level, turn off auto-recall and post physical notices.</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Hazard Filter Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1">
-            <button
-              type="button"
-              onClick={() => setHazardFilter('All')}
-              className={`h-11 px-5 rounded-2xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] whitespace-nowrap ${
-                hazardFilter === 'All'
-                  ? 'bg-[#FF4B4A] text-white shadow-md shadow-[#FF4B4A]/25'
-                  : 'bg-white hover:bg-[#F5F7FA] text-slate-600 border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]'
-              }`}
-            >
-              All Hazard Work Orders ({hazardTickets.length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setHazardFilter('Critical')}
-              className={`h-11 px-5 rounded-2xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] whitespace-nowrap ${
-                hazardFilter === 'Critical'
-                  ? 'bg-[#FF4B4A] text-white shadow-md shadow-[#FF4B4A]/25'
-                  : 'bg-white hover:bg-[#F5F7FA] text-slate-600 border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]'
-              }`}
-            >
-              Critical / Emergency Only ({hazardTickets.filter(t => t.isHazard || t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Emergency' || t.urgency === 'Emergency').length})
-            </button>
-            <button
-              type="button"
-              onClick={() => setHazardFilter('Urgent')}
-              className={`h-11 px-5 rounded-2xl text-xs font-semibold transition-all duration-200 active:scale-[0.98] whitespace-nowrap ${
-                hazardFilter === 'Urgent'
-                  ? 'bg-[#FF4B4A] text-white shadow-md shadow-[#FF4B4A]/25'
-                  : 'bg-white hover:bg-[#F5F7FA] text-slate-600 border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]'
-              }`}
-            >
-              Urgent Priority Only ({hazardTickets.filter(t => t.priority === 'Urgent' || t.Urgency === 'Urgent').length})
-            </button>
-          </div>
-
-          {/* Hazard Cards Grid or Empty State */}
-          {filteredHazards.length === 0 ? (
-            <EmptyState
-              icon={ClipboardCheck}
-              title="Queue is clear"
-              subtitle="Great job, all maintenance requests are resolved."
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {filteredHazards.map((ticket) => (
-                <div 
-                  key={ticket.id}
-                  onClick={() => onSelectTicket && onSelectTicket(ticket.id)}
-                  className="bg-white rounded-3xl p-6 border border-[#FFE0EB] hover:border-[#FF4B4A]/50 transition-all duration-200 active:scale-[0.98] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] cursor-pointer flex flex-col justify-between space-y-4 group"
-                >
+            {/* System & Security Settings Panel with allowAdminSignup Toggle */}
+            <div className="bg-[#1c1c21] border border-[#2a2a32] rounded-xl p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-[#2a2a32]">
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${
+                    allowAdminSignup
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  }`}>
+                    <ShieldAlert className="w-5 h-5" />
+                  </div>
                   <div>
-                    {/* Header: Hazard Tag & Status */}
-                    <div className="flex items-center justify-between gap-2 mb-2.5">
-                      <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-extrabold bg-[#FFE0EB] text-[#FF4B4A] border border-[#FF4B4A]/30 tracking-wide">
-                          <Flame className="w-3 h-3 text-[#FF4B4A]" />
-                          <span>HAZARD</span>
-                        </span>
-                        <span className="font-mono text-xs font-bold text-slate-900">
-                          #{ticket.id}
-                        </span>
-                      </div>
-
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30">
-                        {ticket.status}
+                    <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                      <span>System & Security Settings</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                        allowAdminSignup
+                          ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'
+                      }`}>
+                        {allowAdminSignup ? 'Admin Sign-Up Open' : 'Admin Sign-Up Locked'}
                       </span>
-                    </div>
-
-                    {/* Image & Fault Summary */}
-                    <div className="flex gap-4 mt-3">
-                      {(() => {
-                        const imageUrl = ticket.image || ticket.photo || ticket.imageUrl;
-                        const isS3Key = imageUrl && (imageUrl.startsWith('uploads/') || imageUrl.startsWith('s3://'));
-                        if (imageUrl && !isS3Key) {
-                          return (
-                            <div className="w-20 h-20 rounded-2xl overflow-hidden bg-[#F5F7FA] border border-[#E6EFF5] shrink-0 relative group-hover:scale-105 transition-transform">
-                              <img
-                                src={imageUrl}
-                                alt="Hazard photo"
-                                className="w-full h-full object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
-                                  if (e.currentTarget.parentElement) {
-                                    e.currentTarget.parentElement.style.display = 'none';
-                                  }
-                                }}
-                              />
-                            </div>
-                          );
-                        }
-                        return null;
-                      })()}
-                      <div className="flex-1 min-w-0">
-                        <h4 className="text-sm font-bold text-slate-900 group-hover:text-[#2D60FF] transition-colors line-clamp-1 font-['Plus_Jakarta_Sans']">
-                          {ticket.title}
-                        </h4>
-                        <p className="text-xs font-medium text-slate-500 line-clamp-2 mt-1 leading-relaxed">
-                          {ticket.description}
-                        </p>
-                        {ticket.location && (
-                          <p className="text-xs font-medium text-slate-500 flex items-center gap-1 mt-2">
-                            <MapPin className="w-3.5 h-3.5 text-[#2D60FF] shrink-0" />
-                            <span className="font-semibold text-slate-800">{ticket.location}</span>
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Actions & Assigned Tech */}
-                  <div className="pt-4 border-t border-[#E6EFF5] flex items-center justify-between gap-2 text-xs" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex items-center gap-1.5 text-slate-500 font-medium">
-                      <Wrench className="w-3.5 h-3.5 text-slate-400" />
-                      <span>Tech: <strong className="text-slate-900">{ticket.assignedTo || 'Unassigned'}</strong></span>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => onSelectTicket && onSelectTicket(ticket.id)}
-                        className="h-11 px-5 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white font-bold text-xs transition-all duration-200 active:scale-[0.98] flex items-center gap-1.5 shadow-md shadow-[#2D60FF]/25"
-                      >
-                        <span>Dispatch / Review</span>
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
+                    </h3>
+                    <p className="text-xs text-zinc-400 mt-0.5">
+                      Control account provisioning gates and external registration access.
+                    </p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* TAB 5: AUDIT TRAIL (IMMUTABLE LOGS)                                      */}
-      {/* ========================================================================= */}
-      {currentTab === 'audit' && (
-        <div className="space-y-6 animate-slide-up max-w-5xl text-slate-900">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 font-['Plus_Jakarta_Sans']">
-                <FileText className="w-6 h-6 text-[#2D60FF]" />
-                <span>Immutable System Audit Trail</span>
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
-                Real-time security log: Account registrations, admin approvals, ticket mutations, and dual-sign-offs.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={loadAuditLogs}
-                disabled={loadingAudit}
-                className="h-11 px-4 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all flex items-center gap-1.5 shadow-xs"
-              >
-                <RefreshCw className={`w-3.5 h-3.5 ${loadingAudit ? 'animate-spin' : ''}`} />
-                <span>Refresh</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleExportAuditJson}
-                className="h-11 px-4 rounded-2xl bg-[#E7EDFF] hover:bg-[#2D60FF]/15 text-[#2D60FF] text-xs font-semibold border border-[#2D60FF]/30 transition-all flex items-center gap-1.5 shadow-xs"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Export Audit JSON</span>
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-3xl border border-[#E6EFF5] overflow-hidden shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)]">
-            <div className="px-6 py-4 border-b border-[#E6EFF5] flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">
-                Audit Records ({auditLogs.length})
-              </h3>
-              <span className="text-xs text-slate-400 font-medium">Tenant: org_campus_main</span>
-            </div>
-
-            {auditLogs.length === 0 ? (
-              <EmptyState
-                icon={ClipboardCheck}
-                title="No audit events recorded"
-                subtitle="Actions like signups, approvals, status updates, and dual confirmations will appear here."
-              />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-[#F5F7FA] text-slate-500 border-b border-[#E6EFF5] text-xs font-semibold">
-                    <tr>
-                      <th className="px-6 py-4 font-bold">Timestamp</th>
-                      <th className="px-4 py-4 font-bold">Action</th>
-                      <th className="px-4 py-4 font-bold">Target</th>
-                      <th className="px-4 py-4 font-bold">Actor</th>
-                      <th className="px-6 py-4 font-bold">Details</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E6EFF5]">
-                    {auditLogs.map((log) => {
-                      let actionColor = "bg-slate-100 text-slate-700";
-                      if (log.action.includes('USER_APPROVED') || log.action.includes('TECH_CONFIRM')) {
-                        actionColor = "bg-emerald-50 text-emerald-700 border border-emerald-300";
-                      } else if (log.action.includes('USER_CONFIRM')) {
-                        actionColor = "bg-teal-50 text-teal-700 border border-teal-300";
-                      } else if (log.action.includes('REJECTED')) {
-                        actionColor = "bg-rose-50 text-rose-700 border border-rose-300";
-                      } else if (log.action.includes('CREATED')) {
-                        actionColor = "bg-blue-50 text-blue-700 border border-blue-300";
-                      }
-
-                      return (
-                        <tr key={log.id} className="hover:bg-[#F5F7FA]/75 transition-colors">
-                          <td className="px-6 py-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
-                            {new Date(log.timestamp).toLocaleString()}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap">
-                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${actionColor}`}>
-                              {log.action}
-                            </span>
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap font-mono text-slate-800 font-semibold">
-                            {log.target_id || '—'}
-                          </td>
-                          <td className="px-4 py-4 whitespace-nowrap text-slate-700">
-                            <span className="font-semibold">{log.actor_role}</span>
-                            <span className="text-slate-400 font-mono text-[10px] block">{log.actor_id}</span>
-                          </td>
-                          <td className="px-6 py-4 text-slate-600 max-w-xs truncate">
-                            {log.details ? (
-                              <span className="font-mono text-[11px] text-slate-700">
-                                {typeof log.details === 'string' ? log.details : JSON.stringify(log.details)}
-                              </span>
-                            ) : '—'}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#24242b] border border-[#32323b] text-xs font-medium text-zinc-300">
+                  {allowAdminSignup ? (
+                    <>
+                      <Unlock className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <span>Registration: Open</span>
+                    </>
+                  ) : (
+                    <>
+                      <Lock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                      <span>Registration: Locked</span>
+                    </>
+                  )}
+                </div>
               </div>
-            )}
-          </div>
-        </div>
-      )}
 
-      {/* ========================================================================= */}
-      {/* TAB 6: SETTINGS & OPERATIONS CONFIGURATION                                */}
-      {/* ========================================================================= */}
-      {currentTab === 'settings' && (
-        <div className="space-y-6 animate-slide-up max-w-4xl text-slate-900">
-          {/* Header */}
-          <div>
-            <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2.5 font-['Plus_Jakarta_Sans']">
-              <SettingsIcon className="w-6 h-6 text-[#2D60FF]" />
-              <span>Facilities Operations & Secure Foundation</span>
-            </h2>
-            <p className="text-sm font-medium text-slate-500 mt-1">
-              Authoritative backend configuration, multi-tenant isolation, and dual-approval facilities policies.
-            </p>
-          </div>
-
-          {/* System & Security Settings Panel */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E6EFF5]">
-              <div className="flex items-center gap-3">
-                <div className={`w-11 h-11 rounded-2xl flex items-center justify-center shadow-xs ${
-                  allowAdminSignup ? 'bg-[#E7EDFF] text-[#2D60FF]' : 'bg-amber-100 text-amber-700'
-                }`}>
-                  <ShieldAlert className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans'] flex items-center gap-2">
-                    <span>System & Security Settings</span>
-                    <span className={`text-[10px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                      allowAdminSignup ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-amber-100 text-amber-700 border border-amber-200'
-                    }`}>
-                      {allowAdminSignup ? 'Admin Sign-Up Open' : 'Admin Sign-Up Locked'}
-                    </span>
-                  </h3>
-                  <p className="text-xs font-medium text-slate-500">
-                    Control identity governance, account provisioning policies, and external registration gates.
+              {/* Interactive Toggle Switch Row */}
+              <div className="flex items-center justify-between p-4 rounded-lg bg-[#24242b] border border-[#32323b]">
+                <div className="pr-4">
+                  <div className="flex items-center gap-2">
+                    <ShieldAlert className="w-4 h-4 text-indigo-400" />
+                    <label
+                      htmlFor="admin-signup-settings-toggle"
+                      className="text-xs font-bold text-white cursor-pointer"
+                    >
+                      Allow New Administrator Sign-Ups
+                    </label>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                    When enabled, prospective administrators can register directly via the portal. When disabled, the Admin tab on the sign-up view is locked and requests are strictly blocked.
                   </p>
                 </div>
-              </div>
 
-              {/* Status pill */}
-              <div className="flex items-center gap-1.5 self-start sm:self-auto px-3.5 py-1.5 rounded-xl bg-[#F5F7FA] border border-[#DFEAF2] text-xs font-semibold text-slate-700">
-                {allowAdminSignup ? (
-                  <>
-                    <Unlock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span>Public Registration: Allowed</span>
-                  </>
-                ) : (
-                  <>
-                    <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span>Public Registration: Blocked</span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Interactive Toggle Switch Row */}
-            <div className="flex items-center justify-between p-4 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
-              <div className="pr-4">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-4 h-4 text-[#2D60FF]" />
-                  <label htmlFor="admin-signup-settings-toggle" className="text-xs font-bold text-slate-900 font-['Plus_Jakarta_Sans'] cursor-pointer">
-                    Allow New Administrator Sign-Ups
+                <div className="flex items-center gap-2 shrink-0">
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      id="admin-signup-settings-toggle"
+                      type="checkbox"
+                      checked={Boolean(allowAdminSignup)}
+                      onChange={handleAdminSignupToggle}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-[#18181c] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-zinc-400 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
                   </label>
                 </div>
-                <p className="text-xs font-medium text-slate-500 mt-1 leading-relaxed">
-                  When enabled, prospective administrators can register directly via the portal. When disabled, the Admin tab on the sign-up page is locked and requests are strictly rejected.
-                </p>
               </div>
+            </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <label className="relative inline-flex items-center cursor-pointer">
+            {/* Campus Facilities Policies */}
+            <div className="bg-[#1c1c21] border border-[#2a2a32] rounded-xl p-5 space-y-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-indigo-400" />
+                <span>Campus Facilities Operational Governance</span>
+              </h3>
+
+              <div className="space-y-3 divide-y divide-[#24242c]">
+                <div className="flex items-center justify-between pt-2">
+                  <div>
+                    <p className="text-xs font-bold text-white">Admin Gated Registration</p>
+                    <p className="text-xs text-zinc-400">Require Administrator review before accounts can access the dispatch queue.</p>
+                  </div>
                   <input
-                    id="admin-signup-settings-toggle"
                     type="checkbox"
-                    checked={Boolean(allowAdminSignup)}
-                    onChange={handleAdminSignupToggle}
-                    className="sr-only peer"
+                    checked={policies.strictGating}
+                    onChange={(e) => setPolicies({ ...policies, strictGating: e.target.checked })}
+                    className="w-4 h-4 rounded text-indigo-600 bg-[#24242b] border-[#32323b]"
                   />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2D60FF]"></div>
-                </label>
+                </div>
+
+                <div className="flex items-center justify-between pt-3">
+                  <div>
+                    <p className="text-xs font-bold text-white">Dual-Party Confirmation</p>
+                    <p className="text-xs text-zinc-400">Require both technician signoff and campus resident closure before ticket completes.</p>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={policies.dualApproval}
+                    onChange={(e) => setPolicies({ ...policies, dualApproval: e.target.checked })}
+                    className="w-4 h-4 rounded text-indigo-600 bg-[#24242b] border-[#32323b]"
+                  />
+                </div>
               </div>
             </div>
           </div>
+        )}
+      </main>
 
-          {/* Operational Policies Card */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-['Plus_Jakarta_Sans']">
-              <ShieldCheck className="w-4 h-4 text-[#2D60FF]" />
-              <span>Campus Facilities Policies</span>
-            </h3>
+      {/* 3. Right Sidebar Widgets (lg:col-span-3 space-y-6) */}
+      <div className="lg:col-span-3 space-y-6">
+        <SlaPriorityRingWidget
+          stats={adminStats}
+          tickets={tickets}
+        />
 
-            <div className="space-y-3 divide-y divide-[#E6EFF5]">
-              <div className="flex items-center justify-between pt-2">
-                <div>
-                  <p className="text-xs font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Admin Gated Registration</p>
-                  <p className="text-xs font-medium text-slate-500">Require Administrator review before new user and technician accounts can access the system.</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={policies.strictGating}
-                  onChange={(e) => setPolicies({ ...policies, strictGating: e.target.checked })}
-                  className="w-4 h-4 rounded text-[#2D60FF] focus:ring-[#2D60FF] border-[#DFEAF2]"
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Two-Party Dual Confirmation</p>
-                  <p className="text-xs font-medium text-slate-500">Work orders cannot be closed until reporting consumer verifies physical repair after technician signs off.</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={policies.dualApproval}
-                  onChange={(e) => setPolicies({ ...policies, dualApproval: e.target.checked })}
-                  className="w-4 h-4 rounded text-[#2D60FF] focus:ring-[#2D60FF] border-[#DFEAF2]"
-                />
-              </div>
-
-              <div className="flex items-center justify-between pt-3">
-                <div>
-                  <p className="text-xs font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Emergency Hazard Auto-Escalation</p>
-                  <p className="text-xs font-medium text-slate-500">Automatically flag electrical, gas, and pressurized water complaints with non-downgradable Emergency status.</p>
-                </div>
-                <input
-                  type="checkbox"
-                  checked={policies.autoRouting}
-                  onChange={(e) => setPolicies({ ...policies, autoRouting: e.target.checked })}
-                  className="w-4 h-4 rounded text-[#2D60FF] focus:ring-[#2D60FF] border-[#DFEAF2]"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 3. Data Backup & Reset */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
-            <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-['Plus_Jakarta_Sans']">
-              <Database className="w-4 h-4 text-[#2D60FF]" />
-              <span>Data Management & Maintenance</span>
-            </h3>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={handleExportJson}
-                className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all flex items-center gap-2 shadow-xs"
-              >
-                <Download className="w-4 h-4 text-slate-500" />
-                <span>Export All Tickets (JSON)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleExportAuditJson}
-                className="h-11 px-5 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold border border-[#DFEAF2] transition-all flex items-center gap-2 shadow-xs"
-              >
-                <Download className="w-4 h-4 text-slate-500" />
-                <span>Export Audit Logs (JSON)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleResetData}
-                className="h-11 px-5 rounded-2xl bg-[#FFE0EB] hover:bg-rose-100 text-[#FF4B4A] text-xs font-semibold border border-[#FF4B4A]/30 transition-all flex items-center gap-2 shadow-xs"
-              >
-                <Trash2 className="w-4 h-4" />
-                <span>Clear All Work Orders</span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        <ActivityCalendarWidget />
+      </div>
     </div>
   );
 }
