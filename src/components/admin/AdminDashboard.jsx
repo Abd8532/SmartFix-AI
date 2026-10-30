@@ -63,7 +63,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     fetchAuditLogs,
     isLoading
   } = useTickets();
-  const { users, pendingUsers, approvedUsers, approveUser, rejectUser } = useAuth();
+  const { users = [], pendingUsers = [], approvedUsers = [], approveUser, rejectUser } = useAuth();
 
   const [internalTab, setInternalTab] = useState(activeTab);
   const currentTab = activeTab || internalTab;
@@ -267,7 +267,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
       </div>
 
       {/* PENDING APPROVALS NOTICE (Visible in Overview if there are pending users) */}
-      {currentTab === 'overview' && pendingUsers.length > 0 && (
+      {currentTab === 'overview' && (pendingUsers?.length || 0) > 0 && (
         <div className="p-4 sm:p-6 rounded-3xl bg-[#FFF5D9] border border-[#FFBB38]/30 text-slate-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] animate-slide-up">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-2xl bg-white text-[#FFBB38] border border-[#FFBB38]/30 flex items-center justify-center shrink-0 shadow-xs">

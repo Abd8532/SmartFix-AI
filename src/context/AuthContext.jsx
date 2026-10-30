@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import apiClient, { clearToken } from '../services/apiClient';
 
 const AuthContext = createContext(null);
@@ -162,10 +162,21 @@ export function AuthProvider({ children }) {
     return { success: true, user: updatedUser };
   }, [currentUser]);
 
+  // Filter pending and approved users
+  const pendingUsers = useMemo(() => {
+    return (users || []).filter((u) => u.approvalStatus === 'Pending' || u.status === 'pending');
+  }, [users]);
+
+  const approvedUsers = useMemo(() => {
+    return (users || []).filter((u) => u.approvalStatus === 'Approved' || u.status === 'approved');
+  }, [users]);
+
   const value = {
     currentUser,
     token: null, // Legacy compatibility (null to enforce HttpOnly cookie credentials)
-    users,
+    users: users || [],
+    pendingUsers,
+    approvedUsers,
     isLoadingAuth,
     isAuthenticated: Boolean(currentUser && currentUser.approvalStatus === 'Approved'),
     loginUser: login,
