@@ -150,9 +150,11 @@
       "role": "technician",
       "roleDisplay": "Field Technician",
       "specialty": "Electrical",
-      "approvalStatus": "Pending",
+      "approvalStatus": "Approved",
       "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120",
-      "createdAt": "2026-10-30T17:29:09.698905Z"
+      "createdAt": "2026-10-30T17:29:09.698905Z",
+      "approvedAt": "2026-10-30T17:37:59.479541Z",
+      "approvedBy": "bpssarthak321@gmail.com"
     }
   ],
   "tickets": [
@@ -1269,6 +1271,48 @@
     }
   ],
   "audit_logs": [
+    {
+      "id": "aud_1793362079534",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "adm_1793368640345_253",
+      "actor_email": "bpssarthak321@gmail.com",
+      "actor_role": "admin",
+      "action": "USER_APPROVED",
+      "details": {
+        "approvedUserId": "tech_1793361549539_493",
+        "email": "manish@gmail.com"
+      },
+      "timestamp": "2026-10-30T17:37:59.503026Z"
+    },
+    {
+      "id": "aud_1793362059417",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_LOGIN",
+      "details": {
+        "email": "bpssarthak321@gmail.com",
+        "role": "admin"
+      },
+      "timestamp": "2026-10-30T17:37:39.415541Z"
+    },
+    {
+      "id": "aud_1793362007054",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_LOGIN",
+      "details": {
+        "email": "admin@campus.edu",
+        "role": "admin"
+      },
+      "timestamp": "2026-10-30T17:36:47.053210Z"
+    },
     {
       "id": "aud_1793361549761",
       "org_id": "org_campus_main",
