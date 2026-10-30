@@ -34,18 +34,18 @@ function AppContent() {
   const validRoles = ['user', 'technician', 'admin'];
   if (!validRoles.includes(currentUser.role)) {
     return (
-      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-slate-200 shadow-xl text-center space-y-4">
-          <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-2xs">
+      <div className="min-h-screen bg-[#F5F7FA] text-[#343C6A] flex items-center justify-center p-4 relative">
+        <div className="max-w-md w-full bg-white rounded-3xl p-8 border border-[#E6EFF5] shadow-xl text-center space-y-4">
+          <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-500 border border-rose-100 flex items-center justify-center mx-auto shadow-xs">
             <ShieldAlert className="w-8 h-8" />
           </div>
-          <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">Unauthorized Access</h2>
-          <p className="text-xs text-slate-500 leading-relaxed">
+          <h2 className="text-2xl font-extrabold text-[#343C6A] tracking-tight font-['Plus_Jakarta_Sans']">Unauthorized Access</h2>
+          <p className="text-xs text-[#718EBF] leading-relaxed">
             Your account ({currentUser.email}) has an unrecognized or restricted role (<code>{String(currentUser.role)}</code>). Access is denied to campus operational dashboards.
           </p>
           <button
             onClick={logout}
-            className="w-full py-3 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-2xs transition-all flex items-center justify-center gap-2"
+            className="w-full py-3.5 px-4 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white font-bold text-xs shadow-lg shadow-[#2D60FF]/25 transition-all flex items-center justify-center gap-2 active:scale-98"
           >
             <LogOut className="w-4 h-4" />
             <span>Log Out</span>
@@ -58,12 +58,12 @@ function AppContent() {
 
   // 3. Authorized View Layout with Strict Role-Based Dashboard Separation
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans selection:bg-slate-900 selection:text-white">
-      {/* Universal Header with currentUser data & role pill */}
+    <div className="min-h-screen bg-[#F5F7FA] text-[#343C6A] flex flex-col font-sans relative selection:bg-[#2D60FF] selection:text-white">
+      {/* Universal BankDash Header with currentUser data & role pill */}
       <Header currentUser={currentUser} onLogout={logout} />
 
       {/* Main Responsive Body with Sidebar attached flush to the left edge */}
-      <div className="flex-1 flex w-full">
+      <div className="flex-1 flex w-full relative z-0">
         <Sidebar adminTab={adminTab} setAdminTab={setAdminTab} />
 
         <main className="flex-1 min-w-0 p-4 sm:p-6 lg:p-8 pb-24 md:pb-12">

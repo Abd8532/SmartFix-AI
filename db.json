@@ -1,0 +1,77 @@
+{
+  "users": [
+    {
+      "id": "adm_1793368640345_253",
+      "name": "Sarthak Chaudhary",
+      "email": "bpssarthak321@gmail.com",
+      "password": "12345678",
+      "role": "admin",
+      "roleDisplay": "Administrator",
+      "specialty": null,
+      "approvalStatus": "Approved",
+      "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
+      "createdAt": "2026-10-30T13:57:20.345Z"
+    },
+    {
+      "id": "adm_master_1",
+      "name": "Master Administrator",
+      "email": "admin@campus.edu",
+      "password": "admin123",
+      "role": "admin",
+      "roleDisplay": "Administrator",
+      "department": "Campus Facilities Operations",
+      "approvalStatus": "Approved",
+      "avatar": "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80",
+      "createdAt": "2026-10-30T13:34:30.195Z"
+    },
+    {
+      "id": "tech_1",
+      "name": "Marcus Vance",
+      "email": "tech@campus.edu",
+      "password": "password123",
+      "role": "technician",
+      "roleDisplay": "Field Technician",
+      "specialty": "Plumbing",
+      "approvalStatus": "Approved",
+      "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
+      "createdAt": "2026-10-30T13:34:30.195Z"
+    },
+    {
+      "id": "tech_2",
+      "name": "Elena Rostova",
+      "email": "elena@campus.edu",
+      "password": "password123",
+      "role": "technician",
+      "roleDisplay": "Field Technician",
+      "specialty": "Electrical",
+      "approvalStatus": "Approved",
+      "avatar": "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=120&auto=format&fit=crop&q=80",
+      "createdAt": "2026-10-30T13:34:30.195Z"
+    },
+    {
+      "id": "tech_3",
+      "name": "Liam Smith",
+      "email": "liam@campus.edu",
+      "password": "password123",
+      "role": "technician",
+      "roleDisplay": "Field Technician",
+      "specialty": "HVAC",
+      "approvalStatus": "Approved",
+      "avatar": "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80",
+      "createdAt": "2026-10-30T13:34:30.195Z"
+    },
+    {
+      "id": "usr_default",
+      "name": "Campus User",
+      "email": "user@campus.edu",
+      "password": "password",
+      "role": "user",
+      "roleDisplay": "Campus User",
+      "department": "Campus Student Services",
+      "approvalStatus": "Approved",
+      "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
+      "createdAt": "2026-10-30T13:54:23.404Z"
+    }
+  ],
+  "tickets": []
+}

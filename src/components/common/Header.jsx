@@ -12,52 +12,53 @@ export default function Header({ currentUser: propUser, onLogout }) {
 
   if (!user) return null;
 
-  // Role pill styling
-  let roleBadgeClass = 'bg-blue-100 text-blue-800 border border-blue-200';
+  // Role pill styling in BankDash style
+  let roleBadgeClass = 'bg-[#E7EDFF] text-[#2D60FF] border border-[#2D60FF]/20';
   let roleLabel = user.roleDisplay || 'Campus User';
 
   if (user.role === 'admin') {
-    roleBadgeClass = 'bg-purple-100 text-purple-800 border border-purple-200';
+    roleBadgeClass = 'bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30';
     roleLabel = user.roleDisplay || 'Administrator';
   } else if (user.role === 'technician') {
-    roleBadgeClass = 'bg-amber-100 text-amber-800 border border-amber-200';
+    roleBadgeClass = 'bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30';
     roleLabel = user.roleDisplay || 'Field Technician';
   }
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-white border-b border-slate-200/90 shadow-xs">
-      <div className="w-full px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-        {/* Title: SmartFixFlow - AI */}
+    <header className="sticky top-0 z-30 w-full bg-white border-b border-[#E6EFF5] text-[#343C6A] shadow-xs">
+      <div className="w-full px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between gap-4">
+        {/* Title: SmartFixFlow - AI (BankDash Brand style) */}
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-sm">
-            <Wrench className="w-4 h-4" />
+          <div className="w-10 h-10 rounded-2xl bg-[#2D60FF] flex items-center justify-center text-white shadow-md shadow-[#2D60FF]/25">
+            <Wrench className="w-5 h-5" />
           </div>
-          <span className="font-extrabold text-lg tracking-tight text-slate-900">
-            SmartFixFlow <span className="text-sky-600">- AI</span>
+          <span className="font-extrabold text-xl tracking-tight text-[#343C6A] font-['Plus_Jakarta_Sans']">
+            SmartFixFlow <span className="text-[#2D60FF]">- AI</span>
           </span>
         </div>
 
-        {/* Right: User Account, Role Pill & Log out */}
-        <div className="flex items-center gap-4">
+        {/* Right: User Account & Log out */}
+        <div className="flex items-center gap-2.5 sm:gap-3.5">
+          {/* User Profile Pill button */}
           <button
             type="button"
             onClick={() => setIsProfileModalOpen(true)}
-            className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-100 transition-colors text-left group"
+            className="flex items-center gap-2.5 p-1 rounded-2xl hover:bg-[#F5F7FA] transition-all duration-200 active:scale-[0.98] text-left group border border-transparent hover:border-[#E6EFF5]"
             title="View profile & change photo"
           >
             <div className="relative">
               <Avatar
                 src={user?.avatar}
                 name={user?.name}
-                size="w-8 h-8"
-                className="ring-1 ring-slate-200"
+                size="w-10 h-10"
+                className="ring-2 ring-[#DFEAF2]"
               />
-              <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-slate-900 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <Camera className="w-2 h-2" />
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#2D60FF] text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-xs">
+                <Camera className="w-2.5 h-2.5" />
               </div>
             </div>
             <div className="text-left hidden sm:flex flex-col">
-              <p className="text-xs font-semibold text-slate-900 leading-tight group-hover:text-sky-700 transition-colors">{user?.name}</p>
+              <p className="text-xs font-bold text-slate-900 leading-tight group-hover:text-[#2D60FF] transition-colors font-['Plus_Jakarta_Sans']">{user?.name}</p>
               <div className="mt-0.5">
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold tracking-wide ${roleBadgeClass}`}>
                   {roleLabel}
@@ -68,7 +69,7 @@ export default function Header({ currentUser: propUser, onLogout }) {
 
           <button
             onClick={handleLogout}
-            className="px-4 py-1.5 text-xs font-semibold text-slate-700 hover:text-slate-900 bg-white hover:bg-slate-50 border border-slate-300 rounded-xl transition-all shadow-2xs"
+            className="h-10 px-4 text-xs font-bold text-slate-500 hover:text-rose-600 bg-[#F5F7FA] hover:bg-rose-50 border border-[#DFEAF2] rounded-full transition-all duration-200 active:scale-[0.98] shadow-xs"
             aria-label="Log out"
           >
             Log out

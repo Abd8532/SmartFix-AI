@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import { INITIAL_TICKETS, MOCK_USERS } from '../types/mockData';
+import { INITIAL_TICKETS } from '../types/mockData';
 import { useAuth } from './AuthContext';
 
 const TicketContext = createContext(null);
@@ -111,14 +111,6 @@ export function isUserTicket(ticket, user) {
     if (ticket.ReporterName && String(ticket.ReporterName).trim().toLowerCase() === userName) return true;
   }
 
-  // 4. Campus User Fallback:
-  // If the user has role 'user':
-  // Ensure the seeded campus maintenance tickets in database are linked & accessible
-  if (user.role === 'user') {
-    if (user.id === 'usr_1' || userEmail === 'alex@campus.edu') return true;
-    if (ticket.reporterId === 'usr_1' || ticket.reportedBy?.id === 'usr_1') return true;
-  }
-
   return false;
 }
 
@@ -143,17 +135,23 @@ export function TicketProvider({ children }) {
     }
   });
 
-  // Active tickets state
+  // Active tickets state - clean by default (no dummy tickets)
   const [tickets, setTickets] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEYS.TICKETS);
       if (saved) {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          // Filter out any legacy dummy/demo tickets
+          return parsed.filter(
+            (t) => !t.isDemo && !t.id?.startsWith('DEMO-') && !['REQ-10240', 'REQ-10237', 'REQ-10241'].includes(t.id)
+          );
+        }
       }
     } catch (e) {
       console.warn('Failed reading tickets from storage:', e);
     }
-    return INITIAL_TICKETS;
+    return [];
   });
 
   // Toast notification system
@@ -222,6 +220,44 @@ export function TicketProvider({ children }) {
     fetchTickets();
   }, [fetchTickets]);
 
+  // Helper to persist updated tickets array to shared /api/db on host
+  const persistTicketsToBackend = useCallback(async (updatedTickets) => {
+    try {
+      await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tickets: updatedTickets })
+      });
+    } catch (err) {
+      console.warn('[TicketContext] Failed saving tickets to /api/db:', err);
+    }
+  }, []);
+
+  // Poll /api/db on mount and every 3 seconds to keep laptop & phone tickets in real-time sync
+  const syncTicketsFromBackend = useCallback(async () => {
+    try {
+      const res = await fetch('/api/db');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.tickets)) {
+        setTickets((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(data.tickets)) {
+            return prev;
+          }
+          return data.tickets;
+        });
+      }
+    } catch (err) {
+      // Local storage fallback
+    }
+  }, []);
+
+  useEffect(() => {
+    syncTicketsFromBackend();
+    const interval = setInterval(syncTicketsFromBackend, 2000);
+    return () => clearInterval(interval);
+  }, [syncTicketsFromBackend]);
+
   // Persist tickets
   useEffect(() => {
     try {
@@ -254,13 +290,13 @@ export function TicketProvider({ children }) {
   }, [userTab]);
 
   // Auth actions
-  const loginAs = (newRole, userDetails = null) => {
+  const loginAs = async (newRole, userDetails = null) => {
     if (auth?.login) {
       const targetRole = typeof newRole === 'string' ? newRole : (userDetails?.role || 'user');
       const email = typeof newRole === 'string' 
         ? (newRole === 'admin' ? 'admin@campus.edu' : newRole === 'technician' ? 'tech@campus.edu' : 'alex@campus.edu')
         : (userDetails?.email || 'alex@campus.edu');
-      auth.login(email, targetRole === 'admin' ? 'admin123' : 'password123', targetRole);
+      await auth.login(email, targetRole === 'admin' ? 'admin123' : 'password123', targetRole);
     }
   };
 
@@ -289,9 +325,9 @@ export function TicketProvider({ children }) {
     const description = newTicketData.description || '';
 
     const reporterDetails = newTicketData.reportedBy || {
-      id: currentUser?.id || 'usr_1',
-      name: currentUser?.name || 'Alex Rivera',
-      email: currentUser?.email || 'alex@campus.edu',
+      id: currentUser?.id || `usr_${Date.now()}`,
+      name: currentUser?.name || 'Campus Reporter',
+      email: currentUser?.email || 'user@campus.edu',
       role: currentUser?.role || 'user',
       avatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120'
     };
@@ -347,7 +383,11 @@ export function TicketProvider({ children }) {
           createdRecord.reporterEmail = reporterDetails.email;
           createdRecord.reporterName = reporterDetails.name;
 
-          setTickets(prev => [createdRecord, ...prev]);
+          setTickets(prev => {
+            const nextTickets = [createdRecord, ...prev];
+            persistTicketsToBackend(nextTickets);
+            return nextTickets;
+          });
           addToast({
             type: 'success',
             title: `Airtable Record Created!`,
@@ -396,7 +436,11 @@ export function TicketProvider({ children }) {
       ...newTicketData
     };
 
-    setTickets((prev) => [createdRecord, ...prev]);
+    setTickets((prev) => {
+      const nextTickets = [createdRecord, ...prev];
+      persistTicketsToBackend(nextTickets);
+      return nextTickets;
+    });
 
     addToast({
       type: 'success',
@@ -427,18 +471,29 @@ export function TicketProvider({ children }) {
     const newTechStatus = newTechConfirmed ? "true" : "false";
     const newUserStatus = newUserConfirmed ? "true" : "false";
     
-    // Determine the overall status
-    let newStatus = ticket?.Status || ticket?.status || 'Assigned';
-    if (newTechStatus === "true" && newUserStatus === "false") newStatus = 'Pending User Verification';
-    if (newTechStatus === "true" && newUserStatus === "true") newStatus = 'Completed';
+    // Dual-Approval Rule:
+    // If BOTH confirmed -> 'Completed'
+    // If ONLY user confirmed -> 'Awaiting Tech Sign-off'
+    // If ONLY technician confirmed -> 'Pending User Verification'
+    let newStatus = 'Assigned';
+    if (newTechConfirmed && newUserConfirmed) {
+      newStatus = 'Completed';
+    } else if (newUserConfirmed && !newTechConfirmed) {
+      newStatus = 'Awaiting Tech Sign-off';
+    } else if (newTechConfirmed && !newUserConfirmed) {
+      newStatus = 'Pending User Verification';
+    } else {
+      newStatus = ticket?.Status || ticket?.status || 'Assigned';
+    }
 
     const token = airtablePat.trim();
     const hasValidToken = token && token !== 'your_actual_pat_token_here';
+    const airtableRecId = (ticketId && ticketId.startsWith('rec')) ? ticketId : ticket?.airtableId;
 
     // Patch the specific row in Airtable if it is an Airtable record
-    if (hasValidToken && ticketId && ticketId.startsWith('rec')) {
+    if (hasValidToken && airtableRecId) {
       try {
-        await fetch(`${AIRTABLE_URL}/${ticketId}`, {
+        await fetch(`${AIRTABLE_URL}/${airtableRecId}`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -452,43 +507,49 @@ export function TicketProvider({ children }) {
             }
           })
         });
-        console.log(`✓ Dual-approval patched to Airtable record: ${ticketId}`);
+        console.log(`✓ Dual-approval patched to Airtable record: ${airtableRecId}`);
       } catch (error) {
         console.error("Failed to update ticket in Airtable:", error);
       }
     }
 
-    // Update local React state to reflect the change immediately
-    setTickets((prev) => prev.map((t) => 
-      t.id === ticketId 
-        ? { 
-            ...t, 
-            TechConfirmed: newTechStatus, 
-            UserConfirmed: newUserStatus, 
-            Status: newStatus,
-            techConfirmed: newTechConfirmed,
-            userConfirmed: newUserConfirmed,
-            status: newStatus,
-            resolvedAt: newStatus === 'Completed' ? new Date().toISOString() : t.resolvedAt
-          } 
-        : t
-    ));
+    // Update local React state to reflect the change immediately and sync with backend
+    setTickets((prev) => {
+      const nextTickets = prev.map((t) => 
+        (t.id === ticketId || (airtableRecId && t.airtableId === airtableRecId))
+          ? { 
+              ...t, 
+              TechConfirmed: newTechStatus, 
+              UserConfirmed: newUserStatus, 
+              Status: newStatus,
+              techConfirmed: newTechConfirmed,
+              userConfirmed: newUserConfirmed,
+              status: newStatus,
+              resolvedAt: newStatus === 'Completed' ? (t.resolvedAt || new Date().toISOString()) : t.resolvedAt
+            } 
+          : t
+      );
+      persistTicketsToBackend(nextTickets);
+      return nextTickets;
+    });
 
-    if (role === 'technician') {
+    if (newStatus === 'Completed') {
+      addToast({
+        type: 'success',
+        title: 'Ticket Completed ✓',
+        message: 'Both user and technician have verified and confirmed resolution.'
+      });
+    } else if (isTech) {
       addToast({
         type: 'info',
         title: 'Work Marked as Fixed',
-        message: hasValidToken && ticketId?.startsWith('rec')
-          ? 'Synced to Airtable. Sent to user for verification.'
-          : 'Ticket sent to user for resolution verification.'
+        message: 'Technician sign-off recorded. Sent to user for verification.'
       });
-    } else if (role === 'user') {
+    } else if (isUser) {
       addToast({
-        type: 'success',
-        title: 'Resolution Confirmed',
-        message: hasValidToken && ticketId?.startsWith('rec')
-          ? 'Verified in Airtable and closed as Completed.'
-          : 'Ticket successfully verified and closed as Completed.'
+        type: 'info',
+        title: 'Marked Complete by User',
+        message: 'User sign-off recorded. Awaiting technician sign-off.'
       });
     }
   };
@@ -520,8 +581,8 @@ export function TicketProvider({ children }) {
       }
     }
 
-    setTickets((prev) =>
-      prev.map((t) => {
+    setTickets((prev) => {
+      const nextTickets = prev.map((t) => {
         if (t.id === ticketId) {
           return {
             ...t,
@@ -533,8 +594,10 @@ export function TicketProvider({ children }) {
           };
         }
         return t;
-      })
-    );
+      });
+      persistTicketsToBackend(nextTickets);
+      return nextTickets;
+    });
 
     addToast({
       type: isResolved ? 'success' : 'info',
@@ -547,34 +610,44 @@ export function TicketProvider({ children }) {
     const token = airtablePat.trim();
     const hasValidToken = token && token !== 'your_actual_pat_token_here';
 
-    if (hasValidToken && ticketId && ticketId.startsWith('rec')) {
+    const target = tickets.find((t) => t.id === ticketId || t.airtableId === ticketId);
+    const airtableRecId = (ticketId && ticketId.startsWith('rec')) ? ticketId : target?.airtableId;
+
+    if (hasValidToken && airtableRecId) {
       try {
-        await fetch(`${AIRTABLE_URL}/${ticketId}`, {
+        await fetch(`${AIRTABLE_URL}/${airtableRecId}`, {
           method: 'DELETE',
           headers: {
             'Authorization': `Bearer ${token}`
           }
         });
+        console.log(`✓ Record deleted from Airtable: ${airtableRecId}`);
       } catch (err) {
         console.warn('Airtable delete error:', err);
       }
     }
 
-    setTickets((prev) => prev.filter((t) => t.id !== ticketId));
+    setTickets((prev) => {
+      const nextTickets = prev.filter((t) => t.id !== ticketId && t.airtableId !== ticketId);
+      persistTicketsToBackend(nextTickets);
+      return nextTickets;
+    });
+
     addToast({
       type: 'warning',
       title: 'Ticket Deleted',
-      message: `Ticket has been removed.`
+      message: `Ticket #${ticketId} was permanently removed.`
     });
   };
 
   const resetMockData = () => {
-    setTickets(INITIAL_TICKETS);
+    setTickets([]);
+    persistTicketsToBackend([]);
     localStorage.removeItem(STORAGE_KEYS.TICKETS);
     addToast({
       type: 'info',
-      title: 'Sample Data Reset',
-      message: 'Tickets have been restored to initial sample state.'
+      title: 'Database Reset',
+      message: 'All maintenance tickets have been cleared from database.'
     });
   };
 
@@ -588,7 +661,13 @@ export function TicketProvider({ children }) {
   const stats = useMemo(() => {
     const total = tickets.length;
     const open = tickets.filter((t) => t.status === 'Open' || t.status === 'Assigned' || t.Status === 'Assigned').length;
-    const inProgress = tickets.filter((t) => t.status === 'In Progress' || t.status === 'Pending User Verification' || t.Status === 'Pending User Verification').length;
+    const inProgress = tickets.filter((t) => 
+      t.status === 'In Progress' || 
+      t.status === 'Pending User Verification' || 
+      t.status === 'Awaiting Tech Sign-off' ||
+      t.Status === 'Pending User Verification' ||
+      t.Status === 'Awaiting Tech Sign-off'
+    ).length;
     const done = tickets.filter((t) => t.status === 'Done' || t.status === 'Completed' || t.Status === 'Completed').length;
     const critical = tickets.filter((t) => (t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Urgent') && t.status !== 'Done' && t.status !== 'Completed').length;
     const resolutionRate = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -597,7 +676,8 @@ export function TicketProvider({ children }) {
     const userTickets = tickets.filter((t) => isUserTicket(t, currentUser));
     const userOpenCount = userTickets.filter((t) => 
       t.status === 'Open' || t.status === 'Assigned' || t.Status === 'Assigned' ||
-      t.status === 'In Progress' || t.status === 'Pending User Verification' || t.Status === 'Pending User Verification'
+      t.status === 'In Progress' || t.status === 'Pending User Verification' || t.status === 'Awaiting Tech Sign-off' ||
+      t.Status === 'Pending User Verification' || t.Status === 'Awaiting Tech Sign-off'
     ).length;
     const userResolvedCount = userTickets.filter((t) => 
       t.status === 'Done' || t.status === 'Completed' || t.Status === 'Completed'

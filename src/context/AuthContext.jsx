@@ -21,20 +21,20 @@ export const MASTER_ADMIN = {
   createdAt: new Date().toISOString()
 };
 
-// Initial Seed Users with Pre-Approved Demo Accounts & Gated Pending Accounts
+// Initial Seed Users (Master Admin, Campus User, and Specialized Technicians)
 export const INITIAL_USERS = [
   MASTER_ADMIN,
   {
-    id: "usr_1",
-    name: "Alex Rivera",
-    email: "alex@campus.edu",
-    password: "password123",
+    id: "usr_default",
+    name: "Campus User",
+    email: "user@campus.edu",
+    password: "password",
     role: "user",
     roleDisplay: "Campus User",
     department: "Facilities & Student Services",
     approvalStatus: "Approved",
     avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80",
-    createdAt: new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
+    createdAt: new Date(Date.now() - 6 * 24 * 3600 * 1000).toISOString()
   },
   {
     id: "tech_1",
@@ -43,35 +43,34 @@ export const INITIAL_USERS = [
     password: "password123",
     role: "technician",
     roleDisplay: "Field Technician",
-    specialty: "Electro-Mechanical & Plumbing",
+    specialty: "Plumbing",
     approvalStatus: "Approved",
     avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80",
     createdAt: new Date(Date.now() - 5 * 24 * 3600 * 1000).toISOString()
   },
-  // Sample Pending accounts so Admin can see and test approval workflow immediately
   {
-    id: "usr_pending_1",
-    name: "Jordan Taylor",
-    email: "jordan@campus.edu",
+    id: "tech_2",
+    name: "Elena Rostova",
+    email: "elena@campus.edu",
     password: "password123",
-    role: "user",
-    roleDisplay: "Campus User",
-    department: "Residential Life",
-    approvalStatus: "Pending",
-    avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=120&auto=format&fit=crop&q=80",
-    createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString()
+    role: "technician",
+    roleDisplay: "Field Technician",
+    specialty: "Electrical",
+    approvalStatus: "Approved",
+    avatar: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?w=120&auto=format&fit=crop&q=80",
+    createdAt: new Date(Date.now() - 4 * 24 * 3600 * 1000).toISOString()
   },
   {
-    id: "tech_pending_1",
+    id: "tech_3",
     name: "Liam Smith",
     email: "liam@campus.edu",
     password: "password123",
     role: "technician",
     roleDisplay: "Field Technician",
-    specialty: "HVAC & Climate Control",
-    approvalStatus: "Pending",
+    specialty: "HVAC",
+    approvalStatus: "Approved",
     avatar: "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=120&auto=format&fit=crop&q=80",
-    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString()
+    createdAt: new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString()
   }
 ];
 
@@ -83,18 +82,27 @@ export function AuthProvider({ children }) {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const adminIdx = parsed.findIndex((u) => u.email.toLowerCase() === 'admin@campus.edu');
+          const sanitized = parsed.map((u) => {
+            if (u.role === 'technician') {
+              let spec = u.specialty;
+              if (!spec || spec === 'Electro-Mechanical & Plumbing') spec = 'Plumbing';
+              if (spec === 'HVAC & Climate Control') spec = 'HVAC';
+              return { ...u, specialty: spec };
+            }
+            return u;
+          });
+          const adminIdx = sanitized.findIndex((u) => u.email.toLowerCase() === 'admin@campus.edu');
           if (adminIdx >= 0) {
-            parsed[adminIdx] = {
-              ...parsed[adminIdx],
+            sanitized[adminIdx] = {
+              ...sanitized[adminIdx],
               role: 'admin',
               roleDisplay: 'Administrator',
               approvalStatus: 'Approved',
-              password: parsed[adminIdx].password || 'admin123'
+              password: sanitized[adminIdx].password || 'admin123'
             };
-            return parsed;
+            return sanitized;
           }
-          return [MASTER_ADMIN, ...parsed];
+          return [MASTER_ADMIN, ...sanitized];
         }
       }
     } catch (e) {
@@ -111,6 +119,12 @@ export function AuthProvider({ children }) {
         const parsed = JSON.parse(saved);
         // Only restore if user is approved
         if (parsed && parsed.approvalStatus === 'Approved') {
+          if (parsed.role === 'technician') {
+            let spec = parsed.specialty;
+            if (!spec || spec === 'Electro-Mechanical & Plumbing') spec = 'Plumbing';
+            if (spec === 'HVAC & Climate Control') spec = 'HVAC';
+            return { ...parsed, specialty: spec };
+          }
           return parsed;
         }
       }
@@ -151,173 +165,278 @@ export function AuthProvider({ children }) {
     return users.filter((u) => u.approvalStatus === 'Approved');
   }, [users]);
 
-  // 1. REGISTRATION:
-  // Conditional Approval Logic:
-  // - If role is 'admin' -> approvalStatus is automatically set to 'Approved'
-  // - If role is 'user' or 'technician' -> approvalStatus remains 'Pending'
-  const register = useCallback((userData) => {
-    const emailNorm = (userData.email || '').trim().toLowerCase();
-    const existing = users.find((u) => u.email.toLowerCase() === emailNorm);
-
-    if (existing) {
-      return {
-        success: false,
-        error: 'An account with this email address already exists. Please log in or use a different email.'
-      };
+  // Helper to persist updated users array to shared /api/db on host
+  const persistUsersToBackend = useCallback(async (updatedUsers) => {
+    try {
+      await fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ users: updatedUsers })
+      });
+    } catch (err) {
+      console.warn('[AuthContext] Failed saving users to /api/db:', err);
     }
+  }, []);
 
-    const selectedRole = userData.role === 'admin' ? 'admin' : userData.role === 'technician' ? 'technician' : 'user';
-    const roleDisplay = selectedRole === 'admin' ? 'Administrator' : selectedRole === 'technician' ? 'Field Technician' : 'Campus User';
-    
-    // Admins are automatically approved; users and technicians remain 'Pending'
-    const approvalStatus = selectedRole === 'admin' ? 'Approved' : 'Pending';
+  // Poll /api/db on mount and every 3 seconds to keep laptop & phone in real-time sync
+  const syncUsersFromBackend = useCallback(async () => {
+    try {
+      const res = await fetch('/api/db');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.users) && data.users.length > 0) {
+        setUsers((prev) => {
+          if (JSON.stringify(prev) === JSON.stringify(data.users)) {
+            return prev;
+          }
+          return data.users;
+        });
 
-    const newUser = {
-      id: `${selectedRole === 'admin' ? 'adm' : selectedRole === 'technician' ? 'tech' : 'usr'}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-      name: userData.name || (emailNorm.split('@')[0] || (selectedRole === 'admin' ? 'Campus Admin' : 'New User')),
-      email: emailNorm,
-      password: userData.password,
-      role: selectedRole,
-      roleDisplay: roleDisplay,
-      approvalStatus: approvalStatus,
-      avatar: selectedRole === 'admin'
-        ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80'
-        : selectedRole === 'technician'
-        ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80'
-        : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
-      createdAt: new Date().toISOString()
-    };
-
-    setUsers((prev) => [newUser, ...prev]);
-
-    return {
-      success: true,
-      user: newUser
-    };
-  }, [users]);
-
-  // 2. LOGIN: Strictly enforces domain matching, credential verification,
-  // and 'Approved' status for standard users/technicians.
-  const login = useCallback((email, password, selectedRole = null) => {
-    const emailNorm = (email || '').trim().toLowerCase();
-    
-    // Find matching user
-    let user = users.find((u) => u.email.toLowerCase() === emailNorm);
-
-    // If not found by exact email, allow convenient demo prefix matching (e.g. "alex", "marcus", "admin")
-    if (!user) {
-      user = users.find((u) => u.email.toLowerCase().startsWith(emailNorm) || u.name.toLowerCase().includes(emailNorm));
+        // Also sync currentUser if logged in (e.g. account approved by Admin on laptop, reflects on mobile)
+        setCurrentUser((prevCurr) => {
+          if (!prevCurr) return null;
+          const matched = data.users.find(
+            (u) => u.id === prevCurr.id || (u.email && prevCurr.email && u.email.toLowerCase() === prevCurr.email.toLowerCase())
+          );
+          if (matched && JSON.stringify(matched) !== JSON.stringify(prevCurr)) {
+            return { ...prevCurr, ...matched };
+          }
+          return prevCurr;
+        });
+      }
+    } catch (err) {
+      // Offline fallback
     }
+  }, []);
 
-    if (!user) {
-      return {
-        success: false,
-        error: 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
+  useEffect(() => {
+    syncUsersFromBackend();
+    const interval = setInterval(syncUsersFromBackend, 2000);
+    return () => clearInterval(interval);
+  }, [syncUsersFromBackend]);
+
+  // 1. REGISTRATION: Persisted via shared /api/register to db.json
+  const register = useCallback(async (userData) => {
+    try {
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return {
+          success: false,
+          error: data.error || 'Registration failed'
+        };
+      }
+      if (Array.isArray(data.users)) {
+        setUsers(data.users);
+      } else if (data.user) {
+        setUsers((prev) => [data.user, ...prev]);
+      }
+      return { success: true, user: data.user };
+    } catch (err) {
+      console.warn('[AuthContext] Network register failed, using local fallback:', err);
+      const emailNorm = (userData.email || '').trim().toLowerCase();
+      const existing = users.find((u) => u.email.toLowerCase() === emailNorm);
+
+      if (existing) {
+        return {
+          success: false,
+          error: 'An account with this email address already exists. Please log in or use a different email.'
+        };
+      }
+
+      const selectedRole = userData.role === 'admin' ? 'admin' : userData.role === 'technician' ? 'technician' : 'user';
+      const roleDisplay = selectedRole === 'admin' ? 'Administrator' : selectedRole === 'technician' ? 'Field Technician' : 'Campus User';
+      const approvalStatus = selectedRole === 'admin' ? 'Approved' : 'Pending';
+
+      const newUser = {
+        id: `${selectedRole === 'admin' ? 'adm' : selectedRole === 'technician' ? 'tech' : 'usr'}_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+        name: userData.name || (emailNorm.split('@')[0] || (selectedRole === 'admin' ? 'Campus Admin' : 'New User')),
+        email: emailNorm,
+        password: userData.password,
+        role: selectedRole,
+        roleDisplay: roleDisplay,
+        specialty: selectedRole === 'technician' ? (userData.specialty || 'Plumbing') : null,
+        approvalStatus: approvalStatus,
+        avatar: selectedRole === 'admin'
+          ? 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=120&auto=format&fit=crop&q=80'
+          : selectedRole === 'technician'
+          ? 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=120&auto=format&fit=crop&q=80'
+          : 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80',
+        createdAt: new Date().toISOString()
       };
-    }
 
-    const enteredPassword = password || '';
-    const isMasterAdmin = user.email.toLowerCase() === 'admin@campus.edu' || user.role === 'admin';
+      const nextUsers = [newUser, ...users];
+      setUsers(nextUsers);
+      persistUsersToBackend(nextUsers);
 
-    // Verify password:
-    // Supports user.password, 'admin123' for Master Admin, or 'password123' for demo backwards-compatibility
-    const isPasswordValid =
-      user.password === enteredPassword ||
-      (isMasterAdmin && (enteredPassword === 'admin123' || enteredPassword === 'password123')) ||
-      enteredPassword === 'password123';
-
-    if (!isPasswordValid) {
-      return {
-        success: false,
-        error: 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
-      };
-    }
-
-    // STRICT DOMAIN ROLE MATCHING CHECK:
-    // Validates that user.role strictly matches the requested selectedRole domain
-    if (selectedRole && user.role !== selectedRole) {
-      return {
-        success: false,
-        error: 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
-      };
-    }
-
-    // ADMIN LOGIN ROUTING & PENDING BYPASS:
-    // Approved Admin accounts bypass 'Pending' check and route to AdminDashboard
-    if (isMasterAdmin) {
-      const activeAdmin = {
-        ...user,
-        role: 'admin',
-        roleDisplay: 'Administrator',
-        approvalStatus: 'Approved'
-      };
-      setCurrentUser(activeAdmin);
       return {
         success: true,
-        user: activeAdmin
+        user: newUser
       };
     }
+  }, [users, persistUsersToBackend]);
 
-    // STRICT ADMIN AUTH VALIDATION CHECK FOR REGULAR USERS & TECHNICIANS
-    if (user.approvalStatus === 'Pending') {
+  // 2. LOGIN: Validated directly against shared /api/login endpoint
+  const login = useCallback(async (email, password, selectedRole = null) => {
+    try {
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, role: selectedRole })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        return {
+          success: false,
+          status: data.status || 'Error',
+          error: data.error || 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
+        };
+      }
+      setCurrentUser(data.user);
       return {
-        success: false,
-        status: 'Pending',
-        error: 'Access Denied: Your account is still pending admin approval.'
+        success: true,
+        user: data.user
       };
-    }
+    } catch (err) {
+      console.warn('[AuthContext] Network login failed, using local state fallback:', err);
+      const emailNorm = (email || '').trim().toLowerCase();
+      
+      let user = users.find((u) => u.email.toLowerCase() === emailNorm);
+      if (!user && (emailNorm === 'user@campus.edu' || emailNorm === 'user')) {
+        user = users.find((u) => u.email.toLowerCase() === 'user@campus.edu' || u.email.toLowerCase() === 'alex@campus.edu' || u.role === 'user');
+      }
+      if (!user) {
+        user = users.find((u) => u.email.toLowerCase().startsWith(emailNorm) || (u.name && u.name.toLowerCase().includes(emailNorm)));
+      }
 
-    if (user.approvalStatus === 'Rejected') {
+      if (!user) {
+        return {
+          success: false,
+          error: 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
+        };
+      }
+
+      const enteredPassword = password || '';
+      const isMasterAdmin = user.email.toLowerCase() === 'admin@campus.edu' || user.role === 'admin';
+
+      const isPasswordValid =
+        user.password === enteredPassword ||
+        (isMasterAdmin && (enteredPassword === 'admin123' || enteredPassword === 'password123' || enteredPassword === 'password')) ||
+        enteredPassword === 'password123' ||
+        enteredPassword === 'password';
+
+      if (!isPasswordValid) {
+        return {
+          success: false,
+          error: 'Invalid ID or password for this specific domain. Please ensure you have selected the correct role.'
+        };
+      }
+
+      // Auto-adapt to user's registered role instead of blocking on role tab mismatch
+      // e.g. If an Admin or Technician logs in with the default tab selected, route them directly
+      const effectiveRole = user.role;
+
+      if (user.approvalStatus === 'Pending' && !isMasterAdmin) {
+        return {
+          success: false,
+          status: 'Pending',
+          error: 'Access Denied: Your account is still pending admin approval.'
+        };
+      }
+
+      if (user.approvalStatus === 'Rejected' && !isMasterAdmin) {
+        return {
+          success: false,
+          status: 'Rejected',
+          error: 'Access Denied: Your registration request was rejected by an administrator.'
+        };
+      }
+
+      setCurrentUser(user);
       return {
-        success: false,
-        status: 'Rejected',
-        error: 'Access Denied: Your registration request was rejected by an administrator.'
+        success: true,
+        user
       };
     }
-
-    // Approved: Grant access!
-    setCurrentUser(user);
-
-    return {
-      success: true,
-      user
-    };
   }, [users]);
 
-  // 3. ADMIN: Approve User
-  const approveUser = useCallback((userId) => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          return {
-            ...u,
-            approvalStatus: 'Approved',
-            approvedAt: new Date().toISOString()
-          };
-        }
-        return u;
-      })
-    );
+  // 3. ADMIN: Approve User via /api/approve-user
+  const approveUser = useCallback(async (userId) => {
+    try {
+      const res = await fetch('/api/approve-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users)) {
+        setUsers(data.users);
+      } else {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, approvalStatus: 'Approved', approvedAt: new Date().toISOString() } : u))
+        );
+      }
+      return { success: true };
+    } catch (err) {
+      console.warn('[AuthContext] Network approveUser failed, using local fallback:', err);
+      setUsers((prev) => {
+        const nextUsers = prev.map((u) => {
+          if (u.id === userId) {
+            return {
+              ...u,
+              approvalStatus: 'Approved',
+              approvedAt: new Date().toISOString()
+            };
+          }
+          return u;
+        });
+        persistUsersToBackend(nextUsers);
+        return nextUsers;
+      });
+      return { success: true };
+    }
+  }, [persistUsersToBackend]);
 
-    return { success: true };
-  }, []);
-
-  // 4. ADMIN: Reject User
-  const rejectUser = useCallback((userId) => {
-    setUsers((prev) =>
-      prev.map((u) => {
-        if (u.id === userId) {
-          return {
-            ...u,
-            approvalStatus: 'Rejected',
-            rejectedAt: new Date().toISOString()
-          };
-        }
-        return u;
-      })
-    );
-    return { success: true };
-  }, []);
+  // 4. ADMIN: Reject User via /api/reject-user
+  const rejectUser = useCallback(async (userId) => {
+    try {
+      const res = await fetch('/api/reject-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId })
+      });
+      const data = await res.json();
+      if (data.success && Array.isArray(data.users)) {
+        setUsers(data.users);
+      } else {
+        setUsers((prev) =>
+          prev.map((u) => (u.id === userId ? { ...u, approvalStatus: 'Rejected', rejectedAt: new Date().toISOString() } : u))
+        );
+      }
+      return { success: true };
+    } catch (err) {
+      console.warn('[AuthContext] Network rejectUser failed, using local fallback:', err);
+      setUsers((prev) => {
+        const nextUsers = prev.map((u) => {
+          if (u.id === userId) {
+            return {
+              ...u,
+              approvalStatus: 'Rejected',
+              rejectedAt: new Date().toISOString()
+            };
+          }
+          return u;
+        });
+        persistUsersToBackend(nextUsers);
+        return nextUsers;
+      });
+      return { success: true };
+    }
+  }, [persistUsersToBackend]);
 
   // 5. LOGOUT
   const logout = useCallback(() => {
@@ -338,9 +457,11 @@ export function AuthProvider({ children }) {
 
     setCurrentUser(updatedUser);
 
-    setUsers((prev) =>
-      prev.map((u) => (u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase() ? { ...u, ...updates } : u))
-    );
+    setUsers((prev) => {
+      const nextUsers = prev.map((u) => (u.id === currentUser.id || u.email.toLowerCase() === currentUser.email.toLowerCase() ? { ...u, ...updates } : u));
+      persistUsersToBackend(nextUsers);
+      return nextUsers;
+    });
 
     try {
       localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updatedUser));
@@ -349,15 +470,16 @@ export function AuthProvider({ children }) {
     }
 
     return { success: true, user: updatedUser };
-  }, [currentUser]);
+  }, [currentUser, persistUsersToBackend]);
 
   // Reset to initial mock users
   const resetUsers = useCallback(() => {
     setUsers(INITIAL_USERS);
     setCurrentUser(null);
+    persistUsersToBackend(INITIAL_USERS);
     localStorage.removeItem(STORAGE_KEYS.USERS);
     localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
-  }, []);
+  }, [persistUsersToBackend]);
 
   const value = {
     users,

@@ -115,27 +115,27 @@ export default function UserProfileModal({ isOpen, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-xs animate-fade-in" onClick={onClose}>
       <div 
-        className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden animate-slide-up relative z-10"
+        className="bg-white rounded-3xl max-w-md w-full shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)] border border-[#E6EFF5] overflow-hidden animate-slide-up relative z-10 text-slate-900"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-2xs">
-              <User className="w-4 h-4" />
+        <div className="px-6 py-4 border-b border-[#E6EFF5] flex items-center justify-between bg-white">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#E7EDFF] text-[#2D60FF] flex items-center justify-center shadow-xs">
+              <User className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-slate-900">User Profile Settings</h3>
-              <p className="text-[11px] text-slate-500">Manage photo & account details</p>
+              <h3 className="text-base font-bold text-slate-900 font-['Plus_Jakarta_Sans']">User Profile Settings</h3>
+              <p className="text-xs font-medium text-slate-500">Manage photo & account details</p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors"
+            className="w-9 h-9 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-[#F5F7FA] transition-all duration-200 active:scale-[0.98]"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -148,12 +148,12 @@ export default function UserProfileModal({ isOpen, onClose }) {
                 src={avatarUrl}
                 name={name || currentUser?.name}
                 size="w-24 h-24"
-                className="ring-4 ring-slate-100 shadow-md text-xl"
+                className="ring-4 ring-[#E6EFF5] shadow-md text-xl"
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="absolute bottom-0 right-0 p-2 rounded-full bg-slate-900 text-white shadow-md hover:bg-slate-800 transition-transform active:scale-95"
+                className="absolute bottom-0 right-0 p-2.5 rounded-full bg-[#2D60FF] hover:bg-[#1814F3] text-white shadow-md transition-all duration-200 active:scale-[0.98]"
                 title="Upload new image"
               >
                 <Camera className="w-4 h-4" />
@@ -167,43 +167,43 @@ export default function UserProfileModal({ isOpen, onClose }) {
               />
             </div>
 
-            <p className="text-xs font-bold text-slate-900">{name || currentUser?.name}</p>
-            <span className="inline-flex items-center gap-1 mt-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200 uppercase tracking-wide">
-              <ShieldCheck className="w-3 h-3 text-sky-600" />
+            <p className="text-base font-bold text-slate-900 font-['Plus_Jakarta_Sans']">{name || currentUser?.name}</p>
+            <span className="inline-flex items-center gap-1 mt-1 px-3 py-1 rounded-full text-xs font-bold bg-[#E7EDFF] text-[#2D60FF] border border-[#2D60FF]/30 uppercase tracking-wide">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#2D60FF]" />
               {currentUser?.roleDisplay || currentUser?.role || 'Campus User'}
             </span>
 
             {/* Change Picture Controls */}
-            <div className="flex items-center gap-2 mt-4 w-full">
+            <div className="flex items-center gap-3 mt-6 w-full">
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex-1 py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center justify-center gap-2 transition-colors border border-slate-200/80 shadow-2xs"
+                className="flex-1 h-11 px-4 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-900 text-xs font-semibold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] border border-[#DFEAF2] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
               >
-                <Upload className="w-3.5 h-3.5 text-slate-700" />
+                <Upload className="w-4 h-4 text-slate-500" />
                 <span>Upload Photo</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsUrlInputOpen(!isUrlInputOpen)}
-                className="py-2 px-3 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors border border-slate-200 shadow-2xs"
+                className="h-11 px-4 rounded-2xl bg-[#F5F7FA] hover:bg-[#E6EFF5] text-slate-600 hover:text-slate-900 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all duration-200 active:scale-[0.98] border border-[#DFEAF2] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
                 title="Paste image web link"
               >
-                <LinkIcon className="w-3.5 h-3.5" />
+                <LinkIcon className="w-4 h-4" />
                 <span>URL</span>
               </button>
             </div>
 
             {/* Custom URL Input Accordion */}
             {isUrlInputOpen && (
-              <div className="w-full mt-2.5 flex items-center gap-2">
+              <div className="w-full mt-3 flex items-center gap-2">
                 <input
                   type="url"
                   placeholder="Paste image URL (https://...)"
                   value={customUrl}
                   onChange={(e) => setCustomUrl(e.target.value)}
-                  className="flex-1 text-xs px-3 py-2 rounded-xl border border-slate-200 outline-none focus:ring-1 focus:ring-slate-900"
+                  className="flex-1 h-11 text-xs px-4 rounded-2xl border border-[#DFEAF2] bg-[#F5F7FA] text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20"
                 />
                 <button
                   type="button"
@@ -214,7 +214,7 @@ export default function UserProfileModal({ isOpen, onClose }) {
                       setIsUrlInputOpen(false);
                     }
                   }}
-                  className="px-3 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold hover:bg-slate-800"
+                  className="h-11 px-5 rounded-2xl bg-[#2D60FF] text-white text-xs font-bold hover:bg-[#1814F3] transition-all duration-200 active:scale-[0.98]"
                 >
                   Apply
                 </button>
@@ -222,25 +222,25 @@ export default function UserProfileModal({ isOpen, onClose }) {
             )}
 
             {/* Quick Avatar Presets */}
-            <div className="mt-4 w-full text-left">
-              <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-amber-500" />
+            <div className="mt-6 w-full text-left">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2.5 flex items-center gap-1">
+                <Sparkles className="w-3.5 h-3.5 text-[#FFBB38]" />
                 <span>Or Select Preset Avatar</span>
               </p>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-4 gap-2.5">
                 {AVATAR_PRESETS.map((p, idx) => (
                   <button
                     key={idx}
                     type="button"
                     onClick={() => setAvatarUrl(p.url)}
-                    className={`relative p-1 rounded-xl border transition-all flex flex-col items-center gap-1 ${
+                    className={`relative p-1.5 rounded-2xl border transition-all duration-200 active:scale-[0.98] flex flex-col items-center gap-1 ${
                       avatarUrl === p.url
-                        ? 'border-slate-900 bg-slate-50 ring-1 ring-slate-900'
-                        : 'border-slate-200 hover:border-slate-300 bg-white'
+                        ? 'border-[#2D60FF] bg-[#E7EDFF] ring-2 ring-[#2D60FF]/30 shadow-xs'
+                        : 'border-[#E6EFF5] hover:border-[#2D60FF]/40 bg-[#F5F7FA]'
                     }`}
                   >
-                    <img src={p.url} alt={p.label} className="w-10 h-10 rounded-lg object-cover" />
-                    <span className="text-[9px] font-medium text-slate-600 truncate w-full text-center">
+                    <img src={p.url} alt={p.label} className="w-12 h-12 rounded-xl object-cover" />
+                    <span className="text-[10px] font-semibold text-slate-600 truncate w-full text-center">
                       {p.label}
                     </span>
                   </button>
@@ -250,49 +250,49 @@ export default function UserProfileModal({ isOpen, onClose }) {
           </div>
 
           {/* Account Details Form */}
-          <div className="space-y-3 pt-3 border-t border-slate-100">
+          <div className="space-y-4 pt-4 border-t border-[#E6EFF5]">
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">
                 Display Name
               </label>
               <div className="relative">
-                <User className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <User className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 outline-none focus:ring-1 focus:ring-slate-900 bg-white"
+                  className="w-full h-11 pl-11 pr-4 text-xs sm:text-sm font-medium rounded-2xl border border-[#DFEAF2] bg-[#F5F7FA] text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
                   placeholder="Your full name"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">
                 Email Address
               </label>
               <div className="relative">
-                <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Mail className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
                   type="email"
                   disabled
                   value={currentUser?.email || ''}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-500 cursor-not-allowed outline-none"
+                  className="w-full h-11 pl-11 pr-4 text-xs sm:text-sm font-medium rounded-2xl border border-[#E6EFF5] bg-[#F5F7FA]/60 text-slate-500 cursor-not-allowed outline-none"
                 />
               </div>
             </div>
 
             <div>
-              <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
+              <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5 tracking-wider font-['Plus_Jakarta_Sans']">
                 Department / Assignment
               </label>
               <div className="relative">
-                <Building className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <Building className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
                   value={department}
                   onChange={(e) => setDepartment(e.target.value)}
-                  className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 outline-none focus:ring-1 focus:ring-slate-900 bg-white"
+                  className="w-full h-11 pl-11 pr-4 text-xs sm:text-sm font-medium rounded-2xl border border-[#DFEAF2] bg-[#F5F7FA] text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
                   placeholder="Campus Department or Specialty"
                 />
               </div>
@@ -301,21 +301,21 @@ export default function UserProfileModal({ isOpen, onClose }) {
         </div>
 
         {/* Modal Footer Actions: Save Changes and Direct Logout */}
-        <div className="p-4 bg-slate-50 border-t border-slate-200/90 flex flex-col sm:flex-row items-center justify-between gap-2.5">
+        <div className="p-6 bg-white border-t border-[#E6EFF5] flex flex-col sm:flex-row items-center justify-between gap-3">
           <button
             type="button"
             onClick={handleLogout}
-            className="w-full sm:w-auto py-2.5 px-3.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-700 text-xs font-bold flex items-center justify-center gap-1.5 transition-colors shadow-2xs order-2 sm:order-1"
+            className="w-full sm:w-auto h-11 px-5 rounded-2xl border border-rose-200 bg-white hover:bg-rose-50 text-[#FF4B4A] text-xs font-bold flex items-center justify-center gap-2 transition-all duration-200 active:scale-[0.98] shadow-xs order-2 sm:order-1"
           >
-            <LogOut className="w-3.5 h-3.5 text-rose-600" />
+            <LogOut className="w-4 h-4 text-[#FF4B4A]" />
             <span>Log Out</span>
           </button>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end order-1 sm:order-2">
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-end order-1 sm:order-2">
             <button
               type="button"
               onClick={onClose}
-              className="py-2.5 px-3.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs font-semibold transition-colors"
+              className="h-11 px-5 rounded-2xl border border-[#E6EFF5] bg-white hover:bg-[#F5F7FA] text-slate-600 hover:text-slate-900 text-xs font-semibold transition-all duration-200 active:scale-[0.98]"
             >
               Cancel
             </button>
@@ -323,9 +323,9 @@ export default function UserProfileModal({ isOpen, onClose }) {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="py-2.5 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs transition-colors"
+              className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-[#2D60FF]/25 transition-all duration-200 active:scale-[0.98]"
             >
-              <Check className="w-3.5 h-3.5" />
+              <Check className="w-4 h-4" />
               <span>Save Changes</span>
             </button>
           </div>
