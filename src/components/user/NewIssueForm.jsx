@@ -797,7 +797,7 @@ export default function NewIssueForm({ onTicketCreated }) {
             rows={4}
             value={complaint}
             onChange={(e) => setComplaint(e.target.value)}
-            placeholder="E.g., Water pipe burst under the cafeteria sink. Spraying cold water near electrical socket, urgent shutoff needed."
+            placeholder="Describe your issue..."
             maxLength={500}
             className="w-full p-4 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2] text-slate-900 placeholder-slate-400 focus:bg-white focus:outline-none focus:border-[#2D60FF] focus:ring-2 focus:ring-[#2D60FF]/20 text-sm transition-all shadow-[0_2px_8px_-2px_rgba(0,0,0,0.03)]"
           />
