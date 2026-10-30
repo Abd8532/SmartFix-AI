@@ -169,10 +169,16 @@ def extract_category_entity(complaint: str) -> str:
         return "General"
 
     lower = complaint.lower()
+    electrical_keywords = [
+        "electric", "electrical", "wire", "wiring", "breaker", "spark", "panel",
+        "voltage", "light", "lights", "bulb", "tube", "fan", "switch", "socket",
+        "outlet", "power", "short circuit", "blackout", "ups", "generator",
+        "inverter", "ward light", "fuse", "shock"
+    ]
+    if any(k in lower for k in electrical_keywords):
+        return "Electrical"
     if any(k in lower for k in ["pipe", "leak", "sink", "water", "drain", "toilet", "tap", "flood", "sewage", "faucet", "spraying", "flush"]):
         return "Plumbing"
-    if any(k in lower for k in ["breaker", "electric", "spark", "wire", "switch", "power", "short", "socket", "light", "fuse", "voltage", "blackout", "shock"]):
-        return "Electrical"
     if any(k in lower for k in ["ac", "air condition", "hvac", "heater", "cooling", "chiller", "ventilation", "compressor", "thermostat", "duct", "refriger"]):
         return "HVAC"
     if any(k in lower for k in ["server", "wifi", "wi-fi", "router", "network", "cable", "lan", "monitor", "pc", "computer", "ethernet", "internet"]):

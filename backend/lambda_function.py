@@ -92,6 +92,9 @@ def sync_to_airtable(ticket: dict, image_payload: str = None) -> bool:
         "Status": ticket.get("status", "Assigned"),
         "Location": ticket.get("location", "Campus Facilities"),
         "Reporter Email": ticket.get("reporterEmail", ""),
+        "Assigned To": ticket.get("assignedTo", "Electrical Specialist" if ticket.get("category") == "Electrical" else "General Maintenance"),
+        "Tech Confirmed": bool(ticket.get("techConfirmed", False)),
+        "User Confirmed": bool(ticket.get("userConfirmed", False)),
         "RAG Ticket Volume": ticket.get("ragTicketVolume", 1),
         "Priority Score": ticket.get("priorityScore", 40),
     }

@@ -14,13 +14,22 @@ const STORAGE_KEYS = {
 function normalizeTicketRecord(ticket) {
   if (!ticket) return null;
 
+  const isTechConfirmed = Boolean(ticket.techConfirmed === true || ticket.TechConfirmed === true || ticket.TechConfirmed === 'true');
+  const isUserConfirmed = Boolean(ticket.userConfirmed === true || ticket.UserConfirmed === true || ticket.UserConfirmed === 'true');
+
   const rawStatus = ticket.status || ticket.Status || 'Assigned';
   let status = rawStatus;
-  if (rawStatus === 'Open') status = 'Assigned';
-  if (rawStatus === 'Done') status = 'Completed';
-
-  const isTechConfirmed = Boolean(ticket.techConfirmed || ticket.TechConfirmed === true || ticket.TechConfirmed === 'true');
-  const isUserConfirmed = Boolean(ticket.userConfirmed || ticket.UserConfirmed === true || ticket.UserConfirmed === 'true');
+  if (isTechConfirmed && isUserConfirmed) {
+    status = 'Completed';
+  } else if (isTechConfirmed && !isUserConfirmed) {
+    status = 'Pending User Verification';
+  } else if (!isTechConfirmed && isUserConfirmed) {
+    status = 'Awaiting Tech Sign-off';
+  } else if (rawStatus === 'Open') {
+    status = 'Assigned';
+  } else if (rawStatus === 'Done') {
+    status = 'Completed';
+  }
 
   const title = ticket.title || ticket.Title || 'Maintenance Request';
   const description = ticket.description || ticket.Description || '';
@@ -33,7 +42,7 @@ function normalizeTicketRecord(ticket) {
   const reporterName = ticket.reporterName || ticket.reportedBy?.name || 'Campus Reporter';
   const reporterEmail = ticket.reporterEmail || ticket.reportedBy?.email || 'reporter@campus.edu';
 
-  const assignedTo = ticket.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : category === 'HVAC' ? 'HVAC Specialist' : category === 'IT' ? 'IT Support Specialist' : 'General Maintenance');
+  const assignedTo = ticket.assignedTo || (category === 'Electrical' ? 'Electrical Specialist' : category === 'Plumbing' ? 'Plumbing Tech' : category === 'HVAC' ? 'HVAC Specialist' : category === 'IT' ? 'IT Support Specialist' : 'General Maintenance');
   const assignedSpecialty = ticket.assignedSpecialty || category;
   const imagePayload = ticket.image || ticket.photo || ticket.imageUrl || ticket.Photo || ticket.Image || ticket.ImageUrl || null;
   const fileKey = ticket.fileKey || ticket.photoKey || ticket.FileKey || null;
@@ -122,8 +131,14 @@ export function extractLocationEntityClient(text = '') {
 // Client-side single-specialty department classifier
 export function extractCategoryEntityClient(text = '') {
   const lower = String(text).toLowerCase();
+  const electricalKeywords = [
+    'electric', 'electrical', 'wire', 'wiring', 'breaker', 'spark', 'panel',
+    'voltage', 'light', 'lights', 'bulb', 'tube', 'fan', 'switch', 'socket',
+    'outlet', 'power', 'short circuit', 'blackout', 'ups', 'generator',
+    'inverter', 'ward light', 'fuse', 'shock'
+  ];
+  if (electricalKeywords.some((k) => lower.includes(k))) return 'Electrical';
   if (/(pipe|leak|sink|water|drain|toilet|tap|flood|faucet|sewage|spraying)/.test(lower)) return 'Plumbing';
-  if (/(breaker|electric|spark|wire|switch|power|short|socket|light|fuse|voltage)/.test(lower)) return 'Electrical';
   if (/(ac|air condition|hvac|heater|cooling|chiller|ventilation|compressor)/.test(lower)) return 'HVAC';
   if (/(server|wifi|wi-fi|router|network|cable|lan|monitor|pc|computer|ethernet)/.test(lower)) return 'IT';
   return 'General';
@@ -409,6 +424,16 @@ export function TicketProvider({ children }) {
         effectiveDescription = `[RAG ESCALATION - ${clientRagVolume + 1} REPORTS DETECTED]: Vector search found ${clientRagVolume} prior/active ticket(s) for this equipment at ${clientLocation}. Priority escalated to ${clientMetrics.urgency} (Score: ${clientMetrics.priorityScore}/100).\n\n${complaintText}`;
       }
 
+      const assignedTo = clientCategory === 'Electrical'
+        ? 'Electrical Specialist'
+        : clientCategory === 'Plumbing'
+        ? 'Plumbing Tech'
+        : clientCategory === 'HVAC'
+        ? 'HVAC Specialist'
+        : clientCategory === 'IT'
+        ? 'IT Support Specialist'
+        : 'General Maintenance';
+
       const payload = {
         complaint: complaintText,
         title: newTicketData.title || `${clientCategory} Issue at ${clientLocation}`,
@@ -416,10 +441,14 @@ export function TicketProvider({ children }) {
         location: clientLocation,
         category: clientCategory,
         assignedSpecialty: clientCategory,
+        assignedTo,
         urgency: clientMetrics.urgency,
         priority: clientMetrics.urgency,
         priorityScore: clientMetrics.priorityScore,
         ragTicketVolume: clientRagVolume + 1,
+        techConfirmed: false,
+        userConfirmed: false,
+        status: 'Assigned',
         image: imgPayload,
         photo: imgPayload,
         imageUrl: imgPayload,
@@ -444,9 +473,42 @@ export function TicketProvider({ children }) {
       if (!returnedTicket.assignedSpecialty) {
         returnedTicket.assignedSpecialty = clientCategory;
       }
+      if (!returnedTicket.assignedTo) {
+        returnedTicket.assignedTo = assignedTo;
+      }
 
       const created = normalizeTicketRecord(returnedTicket);
-      setTickets((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
+
+      // Section 2 Requirement: Write to both /api/db (shared backend JSON) AND localStorage,
+      // and immediately append the ticket to the live React tickets state array
+      setTickets((prev) => {
+        const nextList = [created, ...prev.filter((t) => String(t.id) !== String(created.id))];
+        try {
+          localStorage.setItem('maintainx_tickets_v3', JSON.stringify(nextList));
+          localStorage.setItem('maintainx_tickets', JSON.stringify(nextList));
+          if (currentUser?.org_id && currentUser?.id) {
+            localStorage.setItem(`maintainx_tickets_${currentUser.org_id}_${currentUser.id}`, JSON.stringify(nextList));
+          }
+        } catch {}
+        return nextList;
+      });
+
+      // Synchronize immediately to /api/db
+      try {
+        const currentStored = (() => {
+          try {
+            return JSON.parse(localStorage.getItem('maintainx_tickets_v3') || '[]');
+          } catch { return []; }
+        })();
+        const allTicketsToSync = [created, ...currentStored.filter((t) => String(t.id) !== String(created.id))];
+        fetch('/api/db', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tickets: allTicketsToSync })
+        }).catch(() => {});
+      } catch (e) {
+        console.warn('Sync /api/db notice:', e);
+      }
 
       const volCount = created.ragTicketVolume || (clientRagVolume + 1);
       addToast({
@@ -588,14 +650,121 @@ export function TicketProvider({ children }) {
     }
   };
 
-  // Dual-Approval compatibility wrapper for existing component calls
-  const handleTicketClosure = async (ticketId, closureRole, resolutionNotes = '') => {
-    if (closureRole === 'technician') {
-      return await techCompleteTicket(ticketId, resolutionNotes);
-    } else if (closureRole === 'user') {
-      return await verifyTicketClosure(ticketId);
+  // 5. STRICT DUAL-APPROVAL COMPLETION LIFECYCLE
+  // When technician signs off: techConfirmed = true, techFeedback = note
+  // When user signs off: userConfirmed = true
+  // Both true -> Completed (triggers confetti + RAG knowledge ingestion)
+  const confirmTicketCompletion = async (ticketId, role, feedbackNote = '') => {
+    if (!currentUser) return;
+
+    let targetTicket = tickets.find((t) => String(t.id) === String(ticketId));
+    if (!targetTicket) {
+      try {
+        const cached = JSON.parse(localStorage.getItem('maintainx_tickets_v3') || '[]');
+        targetTicket = cached.find((t) => String(t.id) === String(ticketId));
+      } catch {}
     }
+    if (!targetTicket) return;
+
+    const isTech = role === 'technician';
+    const isUser = role === 'user';
+
+    const techConfirmed = isTech ? true : Boolean(targetTicket.techConfirmed);
+    const userConfirmed = isUser ? true : Boolean(targetTicket.userConfirmed);
+    const techFeedback = isTech ? (feedbackNote || targetTicket.techFeedback || '') : (targetTicket.techFeedback || '');
+
+    // Status Transition Rules:
+    // 1. techConfirmed && userConfirmed -> 'Completed'
+    // 2. techConfirmed && !userConfirmed -> 'Pending User Verification'
+    // 3. !techConfirmed && userConfirmed -> 'Awaiting Tech Sign-off'
+    // 4. Otherwise -> 'Assigned' or 'In Progress'
+    let status = targetTicket.status || 'Assigned';
+    if (techConfirmed && userConfirmed) {
+      status = 'Completed';
+    } else if (techConfirmed && !userConfirmed) {
+      status = 'Pending User Verification';
+    } else if (!techConfirmed && userConfirmed) {
+      status = 'Awaiting Tech Sign-off';
+    }
+
+    const updated = {
+      ...targetTicket,
+      techConfirmed,
+      TechConfirmed: techConfirmed ? 'true' : 'false',
+      userConfirmed,
+      UserConfirmed: userConfirmed ? 'true' : 'false',
+      techFeedback,
+      status,
+      Status: status,
+      resolvedAt: status === 'Completed' ? (targetTicket.resolvedAt || new Date().toISOString()) : targetTicket.resolvedAt,
+      resolutionNotes: feedbackNote || targetTicket.resolutionNotes
+    };
+
+    // Update tickets in state immediately
+    setTickets((prev) => {
+      const nextList = prev.map((t) => (String(t.id) === String(ticketId) ? updated : t));
+      try {
+        localStorage.setItem('maintainx_tickets_v3', JSON.stringify(nextList));
+        localStorage.setItem('maintainx_tickets', JSON.stringify(nextList));
+        if (currentUser?.org_id && currentUser?.id) {
+          localStorage.setItem(`maintainx_tickets_${currentUser.org_id}_${currentUser.id}`, JSON.stringify(nextList));
+        }
+      } catch {}
+      return nextList;
+    });
+
+    // Write to /api/db (shared backend JSON)
+    try {
+      fetch('/api/db', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tickets: tickets.map((t) => (String(t.id) === String(ticketId) ? updated : t))
+        })
+      }).catch(() => {});
+    } catch {}
+
+    // Status Transition Handlers & Notifications
+    if (status === 'Completed') {
+      try {
+        confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+      } catch {}
+
+      addToast({
+        type: 'success',
+        title: 'Ticket Completed ✓',
+        message: 'Dual-approval complete! Work order archived to trusted RAG knowledge base.'
+      });
+
+      try {
+        await apiClient.tickets.verifyClosure(ticketId, targetTicket.version);
+      } catch (err) {
+        console.warn('Backend verifyClosure notice:', err);
+      }
+    } else if (isTech) {
+      addToast({
+        type: 'info',
+        title: 'Repair Sign-off Recorded',
+        message: 'Technician sign-off logged. Sent to user for final verification.'
+      });
+
+      try {
+        await apiClient.tickets.techComplete(ticketId, feedbackNote, targetTicket.version);
+      } catch (err) {
+        console.warn('Backend techComplete notice:', err);
+      }
+    } else if (isUser) {
+      addToast({
+        type: 'info',
+        title: 'User Verification Recorded',
+        message: 'User marked done. Awaiting technician sign-off.'
+      });
+    }
+
+    return updated;
   };
+
+  const handleTicketClosure = confirmTicketCompletion;
 
   // 7. UPDATE STATUS: General status transitions using PATCH (Contract: PATCH /api/v1/tickets/:id/status + Optimistic Concurrency)
   const updateTicketStatus = async (ticketId, newStatus, resolutionNotes = '') => {
@@ -755,6 +924,7 @@ export function TicketProvider({ children }) {
     verifyTicketClosure,
     rejectTicketClosure,
     handleTicketClosure,
+    confirmTicketCompletion,
     updateTicketStatus,
     deleteTicket,
     fetchAuditLogs,

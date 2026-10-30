@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useTickets } from '../../context/TicketContext';
+import { useTickets, extractCategoryEntityClient } from '../../context/TicketContext';
 import apiClient from '../../services/apiClient';
 import { 
   Camera, 
@@ -448,8 +448,13 @@ export default function NewIssueForm({ onTicketCreated }) {
       setCurrentRagStep(3);
       setAiStatusMessage(RAG_STAGES[2].text);
 
+      const clientCategory = extractCategoryEntityClient(complaint.trim());
+
       const created = await addTicket({
         complaint: complaint.trim(),
+        category: clientCategory,
+        assignedSpecialty: clientCategory,
+        assignedTo: clientCategory === 'Electrical' ? 'Electrical Specialist' : undefined,
         image: base64DataUrl,
         photo: base64DataUrl,
         imageUrl: base64DataUrl,

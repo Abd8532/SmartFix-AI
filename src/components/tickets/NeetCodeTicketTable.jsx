@@ -61,17 +61,18 @@ export default function NeetCodeTicketTable({
       {/* Table Column Headers */}
       <div className="hidden sm:grid grid-cols-12 gap-3 text-[11px] font-semibold uppercase tracking-wider text-zinc-400 border-b border-[#2a2a32] px-4 py-3 bg-[#18181c]">
         <div className="col-span-1 text-center">Status</div>
-        <div className="col-span-5">Ticket / Issue</div>
-        <div className="col-span-3">Location</div>
+        <div className="col-span-4">Ticket / Issue</div>
+        <div className="col-span-2">Location</div>
         <div className="col-span-2">Priority</div>
-        <div className="col-span-1 text-right">Actions</div>
+        <div className="col-span-3 text-right">Actions / Dual Sign-off</div>
       </div>
 
       {/* Row List */}
       <div className="divide-y divide-[#24242c]">
         {tickets.map((ticket) => {
           const isResolved = ticket.status === 'Completed' || ticket.status === 'Done' || ticket.status === 'Resolved';
-          const isAwaitingVerification = ticket.status === 'Pending User Verification';
+          const isPendingUser = ticket.status === 'Pending User Verification' || (ticket.techConfirmed && !ticket.userConfirmed);
+          const isAwaitingTech = ticket.status === 'Awaiting Tech Sign-off' || (!ticket.techConfirmed && ticket.userConfirmed);
           const rawImage = ticket.image || ticket.photo || ticket.imageUrl;
           const ragVolume = Number(ticket.ragTicketVolume || 1);
           const priorityScore = ticket.priorityScore !== undefined ? ticket.priorityScore : 40;
@@ -92,12 +93,12 @@ export default function NeetCodeTicketTable({
               >
                 <button
                   type="button"
-                  title={isResolved ? "Completed" : "Mark as verified/complete"}
+                  title={isResolved ? "Completed ✓" : isPendingUser ? "Waiting for User Verification" : isAwaitingTech ? "Needs Tech Sign-off" : "Mark Complete"}
                   className={`w-5 h-5 rounded-full border flex items-center justify-center transition-all ${
                     isResolved
                       ? 'bg-emerald-500 border-emerald-500 text-white'
-                      : isAwaitingVerification
-                      ? 'border-amber-400 hover:border-amber-300 text-amber-400 hover:bg-amber-400/10'
+                      : isPendingUser || isAwaitingTech
+                      ? 'border-amber-400 bg-amber-400/10 text-amber-400'
                       : 'border-zinc-600 hover:border-zinc-400 text-transparent hover:text-zinc-500'
                   }`}
                 >
@@ -105,8 +106,8 @@ export default function NeetCodeTicketTable({
                 </button>
               </div>
 
-              {/* Column 2: Title, Thumbnail & RAG Badge */}
-              <div className="col-span-5 min-w-0 flex items-center gap-3">
+              {/* Column 2: Title, Thumbnail, RAG Badge & Dual-Status Pill */}
+              <div className="col-span-4 min-w-0 flex items-center gap-3">
                 {/* Thumbnail Preview */}
                 <div className="w-10 h-10 rounded-lg bg-[#24242b] border border-[#32323b] overflow-hidden shrink-0 flex items-center justify-center text-zinc-500">
                   {rawImage ? (
@@ -131,8 +132,8 @@ export default function NeetCodeTicketTable({
                     </span>
                   </div>
 
-                  {/* RAG Escalation & Volume Badge */}
-                  <div className="flex items-center gap-2 mt-0.5">
+                  {/* Dual-Confirmation Status Badge & RAG History */}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                     <span className="text-[10px] text-zinc-400 font-medium">
                       {ticket.category || 'General'}
                     </span>
@@ -141,12 +142,24 @@ export default function NeetCodeTicketTable({
                       <span>📊 RAG History: {ragVolume} {ragVolume === 1 ? 'Report' : 'Reports'}</span>
                       <span className="text-zinc-400">({priorityScore}/100)</span>
                     </span>
+
+                    {isPendingUser && !isResolved && (
+                      <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 border border-amber-500/25 px-1.5 py-0.2 rounded">
+                        Tech Fixed • Waiting for User Verification
+                      </span>
+                    )}
+
+                    {isAwaitingTech && !isResolved && (
+                      <span className="text-[10px] font-semibold text-amber-400 bg-amber-500/15 border border-amber-500/25 px-1.5 py-0.2 rounded">
+                        User Marked Done • Needs Tech Sign-off
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
 
               {/* Column 3: Location */}
-              <div className="col-span-3 flex items-center gap-1.5 text-xs text-zinc-300 truncate">
+              <div className="col-span-2 flex items-center gap-1.5 text-xs text-zinc-300 truncate">
                 <MapPin className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
                 <span className="truncate">{ticket.location || 'Campus Facilities'}</span>
               </div>
@@ -156,11 +169,76 @@ export default function NeetCodeTicketTable({
                 {getUrgencyBadge(ticket.urgency || ticket.priority)}
               </div>
 
-              {/* Column 5: Action buttons */}
+              {/* Column 5: Action buttons & Dual-Approval Controls */}
               <div 
-                className="col-span-1 flex items-center justify-end gap-1.5"
+                className="col-span-3 flex items-center justify-end gap-2"
                 onClick={(e) => e.stopPropagation()}
               >
+                {/* Technician-specific Dual-Approval Control */}
+                {role === 'technician' && (
+                  <>
+                    {!ticket.techConfirmed && !isResolved ? (
+                      <button
+                        type="button"
+                        onClick={() => onToggleComplete && onToggleComplete(ticket)}
+                        className="h-7 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold flex items-center gap-1 transition shadow-sm"
+                        title="Mark this work order as repaired"
+                      >
+                        <Check className="w-3 h-3 stroke-[3]" />
+                        <span>Mark Fixed</span>
+                      </button>
+                    ) : ticket.techConfirmed && !ticket.userConfirmed ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg">
+                        <span>✓ Signed Off (Awaiting User)</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span>Completed</span>
+                      </span>
+                    )}
+                  </>
+                )}
+
+                {/* User-specific Dual-Approval Control */}
+                {role === 'user' && (
+                  <>
+                    {!ticket.userConfirmed && !isResolved ? (
+                      ticket.techConfirmed ? (
+                        <button
+                          type="button"
+                          onClick={() => onToggleComplete && onToggleComplete(ticket)}
+                          className="h-7 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold flex items-center gap-1 transition shadow-sm"
+                          title="Verify technician's repair and close ticket"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <span>Tech Fixed — Click to Verify & Close</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => onToggleComplete && onToggleComplete(ticket)}
+                          className="h-7 px-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium flex items-center gap-1 transition shadow-sm"
+                          title="Confirm issue is resolved"
+                        >
+                          <Check className="w-3 h-3 stroke-[2.5]" />
+                          <span>Confirm Resolved</span>
+                        </button>
+                      )
+                    ) : ticket.userConfirmed && !ticket.techConfirmed ? (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2 py-0.5 rounded-lg">
+                        <Clock className="w-3 h-3 text-amber-400" />
+                        <span>Marked Done (Waiting for Tech)</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-lg">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                        <span>Completed</span>
+                      </span>
+                    )}
+                  </>
+                )}
+
                 <button
                   type="button"
                   onClick={() => onSelectTicket && onSelectTicket(ticket.id)}

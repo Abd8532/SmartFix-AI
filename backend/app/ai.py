@@ -34,8 +34,10 @@ FACILITY_EQUIPMENT_KEYWORDS = {
         "valve", "flush", "spray", "puddle", "overflow", "drip", "sewage", "basin", "clog"
     ],
     "electrical": [
-        "spark", "wire", "switch", "breaker", "socket", "outlet", "light", "fixture",
-        "bulb", "flicker", "flickering", "power", "short", "panel", "cord", "electric"
+        "spark", "wire", "wiring", "switch", "breaker", "socket", "outlet", "light", "lights",
+        "fixture", "bulb", "tube", "fan", "flicker", "flickering", "power", "short", "short circuit",
+        "panel", "cord", "electric", "electrical", "voltage", "blackout", "ups", "generator",
+        "inverter", "ward light"
     ],
     "hvac": [
         "ac", "air conditioner", "heater", "heating", "thermostat", "chiller",
@@ -453,7 +455,7 @@ Respond ONLY with valid JSON with this exact structure:
         assigned_to = "Plumbing Tech"
         assigned_specialty = "Plumbing"
     elif final_category == Specialty.ELECTRICAL:
-        assigned_to = "Electrical Tech"
+        assigned_to = "Electrical Specialist"
         assigned_specialty = "Electrical"
     elif final_category == Specialty.HVAC:
         assigned_to = "HVAC Specialist"
@@ -555,7 +557,7 @@ def _deterministic_fallback_triage(
     if category == Specialty.PLUMBING:
         assigned_to = "Plumbing Tech"
     elif category == Specialty.ELECTRICAL:
-        assigned_to = "Electrical Tech"
+        assigned_to = "Electrical Specialist"
     elif category == Specialty.HVAC:
         assigned_to = "HVAC Specialist"
     elif category == Specialty.IT:

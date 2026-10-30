@@ -8,7 +8,7 @@ import NewIssueForm from './NewIssueForm';
 import { History, Sparkles, Layers, ArrowLeft } from 'lucide-react';
 
 export default function UserView({ onSelectTicket }) {
-  const { tickets, userTab, setUserTab, verifyTicketClosure, addToast } = useTickets();
+  const { tickets, userTab, setUserTab, verifyTicketClosure, confirmTicketCompletion, handleTicketClosure, addToast } = useTickets();
   const { currentUser } = useAuth();
 
   const [selectedCategory, setSelectedCategory] = useState('All');
@@ -79,32 +79,23 @@ export default function UserView({ onSelectTicket }) {
 
   // Handle user completing verification
   const handleToggleComplete = async (ticket) => {
-    if (ticket.status === 'Pending User Verification') {
-      try {
-        await verifyTicketClosure(ticket.id, 'Confirmed repaired by resident');
-        addToast({
-          type: 'success',
-          title: 'Ticket Closed',
-          message: `Ticket #${ticket.id} dual-confirmed and completed.`
-        });
-      } catch (e) {
-        addToast({
-          type: 'error',
-          title: 'Verification Failed',
-          message: e.message || 'Could not verify ticket completion.'
-        });
-      }
-    } else if (ticket.status === 'Completed' || ticket.status === 'Done') {
+    if (ticket.status === 'Completed' || ticket.status === 'Done') {
       addToast({
         type: 'info',
         title: 'Already Completed',
         message: 'This ticket has already been resolved and archived.'
       });
-    } else {
+      return;
+    }
+
+    try {
+      const fn = confirmTicketCompletion || handleTicketClosure || verifyTicketClosure;
+      await fn(ticket.id, 'user');
+    } catch (e) {
       addToast({
-        type: 'info',
-        title: 'Work In Progress',
-        message: 'A field technician is assigned. You will be prompted to verify once work is finished.'
+        type: 'error',
+        title: 'Verification Failed',
+        message: e?.message || 'Could not verify ticket completion.'
       });
     }
   };

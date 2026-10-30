@@ -6,22 +6,46 @@ import DashboardHeroBanner from '../common/DashboardHeroBanner';
 import NeetCodeTicketTable from '../tickets/NeetCodeTicketTable';
 import confetti from 'canvas-confetti';
 
+// Flexible Trade Normalizer
+const normalizeTrade = (str = '') => {
+  const s = String(str || '').toLowerCase().trim();
+  if (s.includes('elec')) return 'electrical';
+  if (s.includes('plumb') || s.includes('water') || s.includes('pipe')) return 'plumbing';
+  if (s.includes('hvac') || s.includes('ac') || s.includes('cool') || s.includes('heat')) return 'hvac';
+  if (s.includes('it') || s.includes('net') || s.includes('wifi')) return 'it';
+  if (s.includes('gen')) return 'general';
+  return s;
+};
+
 export default function TechnicianDashboard({ onSelectTicket }) {
-  const { tickets, handleTicketClosure, addToast } = useTickets();
+  const { tickets, handleTicketClosure, confirmTicketCompletion, addToast } = useTickets();
   const { currentUser } = useAuth();
 
   const [activeSegment, setActiveSegment] = useState('all'); // 'all' | 'active' | 'resolved'
-  const [selectedCategory, setSelectedCategory] = useState(currentUser?.specialty || 'All');
+  
+  // Default to technician's normalized trade on initial load, while allowing 'All' preview
+  const [selectedCategory, setSelectedCategory] = useState(() => {
+    const raw = currentUser?.specialty || '';
+    const norm = normalizeTrade(raw);
+    if (norm === 'electrical') return 'Electrical';
+    if (norm === 'plumbing') return 'Plumbing';
+    if (norm === 'hvac') return 'HVAC';
+    if (norm === 'it') return 'IT';
+    if (norm === 'general') return 'General';
+    return 'All';
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFeatureFilter, setActiveFeatureFilter] = useState('all');
 
-  // Strict Single-Specialty Department Queue Filtering & RAG Priority Sorting
+  // Flexible Trade Matching & RAG Priority Sorting
   const myDepartmentTickets = useMemo(() => {
     const deptFiltered = tickets.filter((ticket) => {
-      if (!currentUser?.specialty) return true;
-      const spec = currentUser.specialty.toLowerCase().trim();
-      const cat = (ticket.category || '').toLowerCase().trim();
-      return cat === spec;
+      // Allow clicking 'All Categories' in left sidebar to preview all tickets
+      if (selectedCategory === 'All') return true;
+
+      const targetSpec = selectedCategory || currentUser?.specialty || '';
+      return normalizeTrade(ticket.category) === normalizeTrade(targetSpec);
     });
 
     return [...deptFiltered].sort((a, b) => {
@@ -34,7 +58,7 @@ export default function TechnicianDashboard({ onSelectTicket }) {
       const volB = Number(b.ragTicketVolume || 1);
       return volB - volA;
     });
-  }, [tickets, currentUser]);
+  }, [tickets, currentUser, selectedCategory]);
 
   // Department-specific KPI stats
   const deptStats = useMemo(() => {
@@ -72,12 +96,6 @@ export default function TechnicianDashboard({ onSelectTicket }) {
       if (activeSegment === 'active' && isResolved) return false;
       if (activeSegment === 'resolved' && !isResolved) return false;
 
-      // Category filter (if technician chooses to inspect other categories or their own)
-      if (selectedCategory !== 'All') {
-        const cat = (ticket.category || '').toLowerCase();
-        if (cat !== selectedCategory.toLowerCase()) return false;
-      }
-
       // Feature filter
       if (activeFeatureFilter === 'urgent') {
         const p = (ticket.priority || ticket.urgency || '').toLowerCase();
@@ -106,9 +124,9 @@ export default function TechnicianDashboard({ onSelectTicket }) {
 
       return true;
     });
-  }, [myDepartmentTickets, activeSegment, selectedCategory, activeFeatureFilter, searchQuery]);
+  }, [myDepartmentTickets, activeSegment, activeFeatureFilter, searchQuery]);
 
-  // Handle Technician completion toggle
+  // Handle Technician completion toggle / Mark Fixed
   const handleToggleComplete = async (ticket) => {
     if (ticket.status === 'Completed' || ticket.status === 'Done') {
       addToast({
@@ -123,19 +141,14 @@ export default function TechnicianDashboard({ onSelectTicket }) {
       addToast({
         type: 'info',
         title: 'Verification In Flight',
-        message: 'Technician signoff already logged. Awaiting campus user confirmation.'
+        message: 'Technician sign-off already logged. Awaiting campus user confirmation.'
       });
       return;
     }
 
     try {
-      await handleTicketClosure(ticket.id, 'technician');
-      confetti({ particleCount: 40, spread: 60, origin: { y: 0.7 } });
-      addToast({
-        type: 'success',
-        title: 'Work Order Signed Off',
-        message: `Work finished on #${ticket.id}. Sent for user closure confirmation.`
-      });
+      const fn = confirmTicketCompletion || handleTicketClosure;
+      await fn(ticket.id, 'technician');
     } catch (e) {
       addToast({
         type: 'error',

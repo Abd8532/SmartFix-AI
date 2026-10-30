@@ -249,21 +249,21 @@ function TicketItem({ ticket, onSelectTicket, deleteTicket, handleTicketClosure 
               }}
               className={`h-10 px-4 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all duration-200 active:scale-[0.98] shadow-sm ${
                 ticket.techConfirmed
-                  ? 'bg-[#16DBCC] hover:bg-emerald-600 text-white shadow-emerald-500/25'
-                  : 'bg-[#2D60FF] hover:bg-[#1814F3] text-white shadow-[#2D60FF]/25'
+                  ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-500/25 ring-2 ring-emerald-400/50'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white shadow-indigo-500/25'
               }`}
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>{ticket.techConfirmed ? 'Verify & Complete' : 'Mark Complete'}</span>
+              <span>{ticket.techConfirmed ? 'Tech Fixed — Click to Verify & Close' : 'Confirm Resolved'}</span>
             </button>
           ) : !ticket.techConfirmed ? (
-            <div className="h-10 px-3.5 rounded-xl bg-[#FFF5D9] text-[#FFBB38] border border-[#FFBB38]/30 text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-default">
-              <Clock className="w-3.5 h-3.5 text-[#FFBB38]" />
+            <div className="h-10 px-3.5 rounded-xl bg-amber-500/10 text-amber-500 border border-amber-500/30 text-xs font-bold flex items-center gap-1.5 shadow-sm cursor-default">
+              <Clock className="w-3.5 h-3.5 text-amber-500" />
               <span>Marked Done (Waiting for Tech)</span>
             </div>
           ) : (
-            <div className="h-10 px-3.5 rounded-xl bg-[#DCFAF8] text-[#16DBCC] border border-[#16DBCC]/30 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
-              <CheckCircle2 className="w-4 h-4 text-[#16DBCC]" />
+            <div className="h-10 px-3.5 rounded-xl bg-emerald-500/10 text-emerald-500 border border-emerald-500/30 text-xs font-bold flex items-center gap-1.5 shadow-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-500" />
               <span>Completed ✓</span>
             </div>
           )}

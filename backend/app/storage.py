@@ -342,45 +342,39 @@ class JsonFileRepository(BaseRepository):
                     assigned_tech_id = clean_t.get("assignedTechId")
                     status = clean_t.get("status") or TicketStatus.ASSIGNED
 
+                    def _norm_trade(val):
+                        s = (val or "").strip().lower()
+                        if "elec" in s:
+                            return "electrical"
+                        if "plumb" in s or "water" in s or "pipe" in s:
+                            return "plumbing"
+                        if "hvac" in s or "ac" in s or "cool" in s or "heat" in s:
+                            return "hvac"
+                        if "it" in s or "net" in s or "wifi" in s:
+                            return "it"
+                        if "gen" in s:
+                            return "general"
+                        return s
+
+                    cat_norm = _norm_trade(clean_t.get("category"))
+                    spec_norm = _norm_trade(specialty)
+
                     # Queue 1: 'claimable' (Unassigned Claim Queue)
                     if queue == "claimable":
                         if assigned_tech_id is not None:
                             continue
                         if status not in (TicketStatus.ASSIGNED, "Assigned"):
                             continue
-
-                        # Skill restriction: general tech CANNOT bypass skill restrictions!
-                        cat = (clean_t.get("category") or "").strip().lower()
-                        spec = (specialty or "").strip().lower()
-                        specialized = {"plumbing", "electrical", "hvac", "lift"}
-
-                        if cat in specialized:
-                            if spec != cat:
-                                continue
-                        else:
-                            # General/Other category
-                            if spec not in ("general", "other", "") and spec != cat:
-                                continue
-
+                        if spec_norm and cat_norm != spec_norm:
+                            continue
                         filtered.append(clean_t)
 
-                    # Queue 2: 'assigned' (Personal Work Queue - Default)
-                    elif queue == "assigned" or queue is None:
+                    # Queue 2: 'assigned' or None or 'all'
+                    else:
                         if assigned_tech_id == user_id:
                             filtered.append(clean_t)
-
-                    # Queue 3: 'all' (Assigned to caller + claimable)
-                    elif queue == "all":
-                        if assigned_tech_id == user_id:
-                            filtered.append(clean_t)
-                        elif assigned_tech_id is None and status in (TicketStatus.ASSIGNED, "Assigned"):
-                            cat = (clean_t.get("category") or "").strip().lower()
-                            spec = (specialty or "").strip().lower()
-                            specialized = {"plumbing", "electrical", "hvac", "lift"}
-                            if cat in specialized:
-                                if spec == cat:
-                                    filtered.append(clean_t)
-                            else:
+                        elif assigned_tech_id is None:
+                            if not spec_norm or cat_norm == spec_norm or spec_norm == "general":
                                 filtered.append(clean_t)
 
                 else:
