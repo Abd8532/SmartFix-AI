@@ -1434,46 +1434,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
             </div>
           </div>
 
-          {/* 1. Secure Backend Architecture Card */}
-          <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-[#E7EDFF] text-[#2D60FF] flex items-center justify-center shadow-xs">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Authoritative Multi-Tenant Platform</h3>
-                <p className="text-xs font-medium text-slate-500">Security claims derived strictly from verified JWT tokens.</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
-              <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
-                <p className="text-slate-400 font-semibold uppercase text-[10px]">Active Organisation</p>
-                <p className="text-sm font-bold text-slate-900 mt-0.5 font-mono">org_campus_main</p>
-                <p className="text-[11px] text-slate-500 mt-1">Strict multi-tenant data boundary isolation</p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
-                <p className="text-slate-400 font-semibold uppercase text-[10px]">Password Protection</p>
-                <p className="text-sm font-bold text-emerald-700 mt-0.5">PBKDF2-HMAC-SHA256</p>
-                <p className="text-[11px] text-slate-500 mt-1">100k iterations with 16-byte cryptographically secure salt</p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
-                <p className="text-slate-400 font-semibold uppercase text-[10px]">RAG Vector Search</p>
-                <p className="text-sm font-bold text-[#2D60FF] mt-0.5">text-embedding-004 + Fallback</p>
-                <p className="text-[11px] text-slate-500 mt-1">Ingestion gated strictly on dual-verified completion</p>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-[#F5F7FA] border border-[#DFEAF2]">
-                <p className="text-slate-400 font-semibold uppercase text-[10px]">Safety Priority Overrides</p>
-                <p className="text-sm font-bold text-red-600 mt-0.5">Deterministic Guardrails</p>
-                <p className="text-[11px] text-slate-500 mt-1">Gas leaks, sparking, live wires clamp to Emergency Hazard</p>
-              </div>
-            </div>
-          </div>
-
-          {/* 2. Operational Policies Card */}
+          {/* Operational Policies Card */}
           <div className="p-6 rounded-3xl bg-white border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05)] space-y-4">
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2 font-['Plus_Jakarta_Sans']">
               <ShieldCheck className="w-4 h-4 text-[#2D60FF]" />
