@@ -1137,11 +1137,28 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
 
                     {/* Image & Fault Summary */}
                     <div className="flex gap-4 mt-3">
-                      {ticket.photo && (
-                        <div className="w-20 h-20 rounded-2xl overflow-hidden bg-[#F5F7FA] border border-[#E6EFF5] shrink-0 relative group-hover:scale-105 transition-transform">
-                          <img src={ticket.photo} alt="Hazard photo" className="w-full h-full object-cover" />
-                        </div>
-                      )}
+                      {(() => {
+                        const imageUrl = ticket.image || ticket.photo || ticket.imageUrl;
+                        const isS3Key = imageUrl && (imageUrl.startsWith('uploads/') || imageUrl.startsWith('s3://'));
+                        if (imageUrl && !isS3Key) {
+                          return (
+                            <div className="w-20 h-20 rounded-2xl overflow-hidden bg-[#F5F7FA] border border-[#E6EFF5] shrink-0 relative group-hover:scale-105 transition-transform">
+                              <img
+                                src={imageUrl}
+                                alt="Hazard photo"
+                                className="w-full h-full object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                  if (e.currentTarget.parentElement) {
+                                    e.currentTarget.parentElement.style.display = 'none';
+                                  }
+                                }}
+                              />
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
                       <div className="flex-1 min-w-0">
                         <h4 className="text-sm font-bold text-slate-900 group-hover:text-[#2D60FF] transition-colors line-clamp-1 font-['Plus_Jakarta_Sans']">
                           {ticket.title}

@@ -33,6 +33,7 @@ export default function NewIssueForm({ onTicketCreated }) {
   // Form State
   const [complaint, setComplaint] = useState('');
   const [imagePreview, setImagePreview] = useState(null);
+  const [photoBase64, setPhotoBase64] = useState(null);
   const [imageFile, setImageFile] = useState(null);
   const [imageMimeType, setImageMimeType] = useState('image/jpeg');
 
@@ -121,6 +122,7 @@ export default function NewIssueForm({ onTicketCreated }) {
       const compressedDataUrl = await compressImage(file, 1280, 1280, 0.85);
       if (compressedDataUrl) {
         setImagePreview(compressedDataUrl);
+        setPhotoBase64(compressedDataUrl);
         setImageMimeType('image/jpeg');
 
         try {
@@ -134,7 +136,9 @@ export default function NewIssueForm({ onTicketCreated }) {
       } else {
         const reader = new FileReader();
         reader.onload = (e) => {
-          setImagePreview(e.target?.result);
+          const res = e.target?.result;
+          setImagePreview(res);
+          setPhotoBase64(res);
           setImageFile(file);
           setImageMimeType(file.type || 'image/jpeg');
         };
@@ -144,7 +148,9 @@ export default function NewIssueForm({ onTicketCreated }) {
       console.warn('Image compression warning, using original:', err);
       const reader = new FileReader();
       reader.onload = (e) => {
-        setImagePreview(e.target?.result);
+        const res = e.target?.result;
+        setImagePreview(res);
+        setPhotoBase64(res);
         setImageFile(file);
         setImageMimeType(file.type || 'image/jpeg');
       };
@@ -166,6 +172,7 @@ export default function NewIssueForm({ onTicketCreated }) {
 
   const handleRemovePhoto = () => {
     setImagePreview(null);
+    setPhotoBase64(null);
     setImageFile(null);
     if (cameraInputRef.current) cameraInputRef.current.value = '';
     if (filePickerRef.current) filePickerRef.current.value = '';
@@ -274,7 +281,9 @@ export default function NewIssueForm({ onTicketCreated }) {
     const rawDataUrl = canvas.toDataURL('image/jpeg', 0.85);
     const compressedDataUrl = await compressImage(rawDataUrl, 1280, 1280, 0.85);
 
-    setImagePreview(compressedDataUrl || rawDataUrl);
+    const finalDataUrl = compressedDataUrl || rawDataUrl;
+    setImagePreview(finalDataUrl);
+    setPhotoBase64(finalDataUrl);
     setImageMimeType('image/jpeg');
 
     try {
@@ -303,6 +312,9 @@ export default function NewIssueForm({ onTicketCreated }) {
   }, []);
 
   const getBase64DataUrl = async () => {
+    if (photoBase64 && photoBase64.startsWith('data:')) {
+      return photoBase64;
+    }
     if (imagePreview && imagePreview.startsWith('data:')) {
       return imagePreview;
     }
@@ -349,7 +361,7 @@ export default function NewIssueForm({ onTicketCreated }) {
     }, 900);
 
     try {
-      const base64DataUrl = await getBase64DataUrl();
+      const base64DataUrl = photoBase64 || (await getBase64DataUrl());
 
       // 1. Full S3 Presigned Upload Flow: Request URL -> Upload Binary -> Save Key (Phase 6 requirement 3)
       let s3FileKey = null;
@@ -395,8 +407,10 @@ export default function NewIssueForm({ onTicketCreated }) {
       const created = await addTicket({
         complaint: complaint.trim(),
         image: base64DataUrl,
-        photo: s3FileKey || base64DataUrl,
+        photo: base64DataUrl,
+        imageUrl: base64DataUrl,
         fileKey: s3FileKey,
+        photoKey: s3FileKey,
         mimeType: imageMimeType
       });
 
@@ -412,9 +426,15 @@ export default function NewIssueForm({ onTicketCreated }) {
         });
       } catch {}
 
-      setSuccessTicket(created);
+      setSuccessTicket({
+        ...created,
+        image: created?.image || created?.photo || created?.imageUrl || base64DataUrl || imagePreview,
+        photo: created?.photo || created?.image || created?.imageUrl || base64DataUrl || imagePreview,
+        imageUrl: created?.imageUrl || created?.image || created?.photo || base64DataUrl || imagePreview,
+      });
       setComplaint('');
       setImagePreview(null);
+      setPhotoBase64(null);
       setImageFile(null);
     } catch (err) {
       clearInterval(stepInterval);
@@ -503,11 +523,25 @@ export default function NewIssueForm({ onTicketCreated }) {
             </p>
           </div>
 
-          {successTicket.photo && (
-            <div className="mt-3 rounded-2xl overflow-hidden border border-[#E6EFF5] max-h-48 shadow-xs">
-              <img src={successTicket.photo} alt="Fault" className="w-full h-full object-cover" />
-            </div>
-          )}
+          {(() => {
+            const successImg = successTicket.image || successTicket.photo || successTicket.imageUrl;
+            if (!successImg) return null;
+            return (
+              <div className="mt-3 rounded-2xl overflow-hidden border border-[#E6EFF5] max-h-48 shadow-xs bg-[#F5F7FA]">
+                <img
+                  src={successImg}
+                  alt="Fault"
+                  className="w-full h-full object-cover"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                    if (e.currentTarget.parentElement) {
+                      e.currentTarget.parentElement.style.display = 'none';
+                    }
+                  }}
+                />
+              </div>
+            );
+          })()}
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3">

@@ -32,6 +32,10 @@ function normalizeTicketRecord(ticket) {
   const reporterName = ticket.reporterName || ticket.reportedBy?.name || 'Campus Reporter';
   const reporterEmail = ticket.reporterEmail || ticket.reportedBy?.email || 'reporter@campus.edu';
 
+  const assignedTo = ticket.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : 'General Maintenance');
+  const imagePayload = ticket.image || ticket.photo || ticket.imageUrl || ticket.Photo || ticket.Image || ticket.ImageUrl || null;
+  const fileKey = ticket.fileKey || ticket.photoKey || ticket.FileKey || null;
+
   return {
     id: ticket.id,
     title,
@@ -52,9 +56,13 @@ function normalizeTicketRecord(ticket) {
     TechConfirmed: isTechConfirmed ? 'true' : 'false',
     userConfirmed: isUserConfirmed,
     UserConfirmed: isUserConfirmed ? 'true' : 'false',
-    assignedTo: ticket.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : 'General Maintenance'),
+    assignedTo,
     assignedTechId: ticket.assignedTechId || null,
-    photo: ticket.photo || ticket.Photo || null,
+    photo: imagePayload,
+    image: imagePayload,
+    imageUrl: imagePayload,
+    fileKey,
+    photoKey: fileKey,
     createdAt,
     updatedAt: ticket.updatedAt || ticket.UpdatedAt || createdAt,
     resolvedAt: ticket.resolvedAt || ticket.ResolvedAt || null,
@@ -271,6 +279,9 @@ export function TicketProvider({ children }) {
     }
 
     try {
+      const imgPayload = newTicketData.image || newTicketData.photo || newTicketData.imageUrl || null;
+      const fileKey = newTicketData.fileKey || newTicketData.photoKey || null;
+
       const payload = {
         complaint: newTicketData.complaint || newTicketData.description || newTicketData.title || '',
         title: newTicketData.title,
@@ -278,13 +289,22 @@ export function TicketProvider({ children }) {
         location: newTicketData.location,
         category: newTicketData.category,
         urgency: newTicketData.urgency || newTicketData.priority,
-        image: newTicketData.fileKey ? null : (newTicketData.photo || newTicketData.image || null),
-        fileKey: newTicketData.fileKey || newTicketData.photoKey || null,
+        image: imgPayload,
+        photo: imgPayload,
+        imageUrl: imgPayload,
+        fileKey: fileKey,
+        photoKey: fileKey,
         mimeType: newTicketData.mimeType || 'image/jpeg'
       };
 
       const data = await apiClient.tickets.create(payload);
-      const created = normalizeTicketRecord(data.ticket);
+      const returnedTicket = data.ticket || {};
+      if (imgPayload && (!returnedTicket.image || returnedTicket.image.startsWith('uploads/'))) {
+        returnedTicket.image = imgPayload;
+        returnedTicket.photo = imgPayload;
+        returnedTicket.imageUrl = imgPayload;
+      }
+      const created = normalizeTicketRecord(returnedTicket);
       setTickets((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
 
       addToast({

@@ -38,19 +38,27 @@ export default function TicketDetailModal({ ticketId, onClose }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [presignedViewUrl, setPresignedViewUrl] = useState(null);
 
+  const rawImage = ticket?.image || ticket?.photo || ticket?.imageUrl;
+  const isDirectUrl = Boolean(
+    rawImage &&
+    !rawImage.startsWith('uploads/') &&
+    !rawImage.startsWith('s3://')
+  );
+
   useEffect(() => {
-    if (ticket?.fileKey && (!ticket.photo || ticket.photo.startsWith('s3://'))) {
-      apiClient.uploads.getViewUrl(ticket.fileKey)
+    const rawKey = ticket?.fileKey || (ticket?.photo && ticket.photo.startsWith('uploads/') ? ticket.photo : null);
+    if (rawKey && ticket?.id && !isDirectUrl) {
+      apiClient.uploads.getViewUrl(rawKey, ticket.id)
         .then((res) => {
           if (res?.viewUrl) setPresignedViewUrl(res.viewUrl);
         })
         .catch(() => {});
     }
-  }, [ticket?.fileKey, ticket?.photo]);
+  }, [ticket?.fileKey, ticket?.photo, ticket?.id, isDirectUrl]);
 
   if (!ticket) return null;
 
-  const displayPhoto = presignedViewUrl || (ticket.photo && !ticket.photo.startsWith('s3://') ? ticket.photo : null);
+  const displayPhoto = presignedViewUrl || (isDirectUrl ? rawImage : null);
 
   const statusStyle = STATUS_CONFIG[ticket.status] || STATUS_CONFIG.Open;
 
@@ -166,6 +174,12 @@ export default function TicketDetailModal({ ticketId, onClose }) {
               src={displayPhoto}
               alt="Submitted fault documentation"
               className="w-full h-full object-contain max-h-80"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                if (e.currentTarget.parentElement) {
+                  e.currentTarget.parentElement.style.display = 'none';
+                }
+              }}
             />
             <a
               href={displayPhoto}

@@ -583,6 +583,12 @@ def handle_api_request(
             specialty=user.specialty,
             queue=queue
         )
+        for t in tickets:
+            img = t.get("image") or t.get("photo") or t.get("imageUrl")
+            if img:
+                t["image"] = img
+                t["photo"] = img
+                t["imageUrl"] = img
         return _json_response(200, {"success": True, "tickets": tickets, "count": len(tickets)}, req_origin)
 
     # POST /api/v1/tickets: Create ticket with mandatory image + server-side validation + AI triage
@@ -593,7 +599,7 @@ def handle_api_request(
             return _json_response(429, {"success": False, "error": tck_err}, req_origin)
 
         complaint = body.get("complaint") or body.get("description") or ""
-        image_data = body.get("image") or body.get("photo") or ""
+        image_data = body.get("image") or body.get("photo") or body.get("imageUrl") or ""
         file_key = body.get("fileKey") or body.get("photoKey") or ""
         mime_type = body.get("mimeType", "image/jpeg")
 
@@ -652,8 +658,8 @@ def handle_api_request(
             ticket_id = f"TCK-{secrets.token_hex(6).upper()}"
             now_iso = datetime.utcnow().isoformat() + "Z"
 
-            # Phase 6 Requirement 3: Avoid storing duplicate base64 images in DynamoDB when S3 key is available
-            ticket_photo = file_key if file_key else image_data
+            # Ensure image payload is preserved across image, photo, and imageUrl
+            img_payload = image_data if image_data else (file_key or None)
 
             ticket = {
                 "id": ticket_id,
@@ -673,7 +679,9 @@ def handle_api_request(
                 "location": triage["location"],
                 "assignedTo": triage["assignedTo"],
                 "assignedTechId": None,
-                "photo": ticket_photo,
+                "photo": img_payload,
+                "image": img_payload,
+                "imageUrl": img_payload,
                 "fileKey": file_key or None,
                 "photoKey": file_key or None,
                 "reporterId": user.id,
@@ -755,6 +763,11 @@ def handle_api_request(
 
         # GET /api/v1/tickets/:id
         if norm_path == f"/api/v1/tickets/{ticket_id}" and method == "GET":
+            img = ticket.get("image") or ticket.get("photo") or ticket.get("imageUrl")
+            if img:
+                ticket["image"] = img
+                ticket["photo"] = img
+                ticket["imageUrl"] = img
             return _json_response(200, {"success": True, "ticket": ticket}, req_origin)
 
         # POST /api/v1/tickets/:id/claim (Atomic Technician Claim Operation)

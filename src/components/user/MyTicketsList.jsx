@@ -9,6 +9,7 @@ import {
   CheckCircle2, 
   ExternalLink,
   ImageIcon,
+  CameraOff,
   ClipboardCheck,
   Trash2,
   Clock
@@ -168,19 +169,40 @@ export default function MyTicketsList({ onSelectTicket }) {
                   </div>
 
                   <div className="flex gap-4 mb-4">
-                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-[#F5F7FA] border border-[#E6EFF5] shrink-0 relative">
-                      {ticket.photo ? (
-                        <img
-                          src={ticket.photo}
-                          alt="Ticket preview"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center text-slate-400">
-                          <ImageIcon className="w-6 h-6 mb-1" />
-                          <span className="text-[10px]">No photo</span>
-                        </div>
-                      )}
+                    <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl overflow-hidden bg-[#F5F7FA] border border-[#E6EFF5] shrink-0 relative flex items-center justify-center">
+                      {(() => {
+                        const imageUrl = ticket.image || ticket.photo || ticket.imageUrl;
+                        const isS3Key = imageUrl && (imageUrl.startsWith('uploads/') || imageUrl.startsWith('s3://'));
+                        if (imageUrl && !isS3Key) {
+                          return (
+                            <img
+                              src={imageUrl}
+                              alt="Fault"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                if (e.currentTarget.nextElementSibling) {
+                                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                                }
+                              }}
+                            />
+                          );
+                        }
+                        return null;
+                      })()}
+                      <div
+                        className="w-full h-full flex flex-col items-center justify-center text-slate-400 p-1"
+                        style={{
+                          display:
+                            (!ticket.image && !ticket.photo && !ticket.imageUrl) ||
+                            (ticket.photo && (ticket.photo.startsWith('uploads/') || ticket.photo.startsWith('s3://')))
+                              ? 'flex'
+                              : 'none'
+                        }}
+                      >
+                        <CameraOff className="w-6 h-6 mb-1 text-slate-400" />
+                        <span className="text-[10px] font-medium leading-none">No photo</span>
+                      </div>
                     </div>
 
                     <div className="flex-1 min-w-0">
@@ -288,3 +310,5 @@ export default function MyTicketsList({ onSelectTicket }) {
     </div>
   );
 }
+
+export { default as TicketCard } from '../tickets/TicketCard';
