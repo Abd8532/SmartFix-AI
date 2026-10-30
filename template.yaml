@@ -220,13 +220,17 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
+                # Least-privilege actions:
+                # - GetItem, PutItem, UpdateItem, DeleteItem: Direct item CRUD scoped to partition/sort keys
+                # - Query: Tenant-isolated partition index queries (PK=ORG#<id>)
+                # - DescribeTable: Health check verification of table status and GSIs
+                # NOTE: dynamodb:Scan is strictly omitted to prevent unbounded table scans and cross-tenant leakage.
                 Action:
                   - dynamodb:GetItem
                   - dynamodb:PutItem
                   - dynamodb:UpdateItem
                   - dynamodb:DeleteItem
                   - dynamodb:Query
-                  - dynamodb:Scan
                   - dynamodb:DescribeTable
                 Resource:
                   - !GetAtt SmartFixDynamoDBTable.Arn
@@ -236,6 +240,12 @@ Resources:
             Version: '2012-10-17'
             Statement:
               - Effect: Allow
+                # Least-privilege object operations strictly confined to tenant upload prefix (uploads/*)
+                # - PutObject: Allows presigned URL generation and writing verified attachments
+                # - GetObject: Presigned view generation and server-side AI vision analysis retrieval
+                # - DeleteObject: Cleanup of orphaned uploads on aborted ticket transactions
+                # - HeadObject: Verifying attachment presence and MIME/size metadata
+                # - AbortMultipartUpload: Cleaning aborted multipart transfers
                 Action:
                   - s3:PutObject
                   - s3:GetObject
@@ -243,12 +253,7 @@ Resources:
                   - s3:HeadObject
                   - s3:AbortMultipartUpload
                 Resource:
-                  - !Sub "${SmartFixS3Bucket.Arn}/*"
-              - Effect: Allow
-                Action:
-                  - s3:ListBucket
-                Resource:
-                  - !GetAtt SmartFixS3Bucket.Arn
+                  - !Sub "${SmartFixS3Bucket.Arn}/uploads/*"
 
   # ============================================================================
   # 5. SERVERLESS API & LAMBDA BACKEND

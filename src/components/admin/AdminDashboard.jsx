@@ -175,10 +175,10 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
   const filteredHazards = useMemo(() => {
     return hazardTickets.filter((t) => {
       if (hazardFilter === 'Critical') {
-        return t.priority === 'Critical' || t.priority === 'Emergency';
+        return t.isHazard || t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Emergency' || t.urgency === 'Emergency';
       }
       if (hazardFilter === 'Urgent') {
-        return t.priority === 'Urgent' || t.Urgency === 'Urgent';
+        return t.priority === 'Urgent' || t.Urgency === 'Urgent' || t.urgency === 'Urgent';
       }
       return true;
     });
@@ -1087,7 +1087,7 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
                   : 'bg-white hover:bg-[#F5F7FA] text-slate-600 border border-[#E6EFF5] shadow-[0_2px_8px_-2px_rgba(0,0,0,0.05),_0_4px_16px_-4px_rgba(0,0,0,0.05)]'
               }`}
             >
-              Critical / Emergency Only ({hazardTickets.filter(t => t.priority === 'Critical' || t.priority === 'Emergency').length})
+              Critical / Emergency Only ({hazardTickets.filter(t => t.isHazard || t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Emergency' || t.urgency === 'Emergency').length})
             </button>
             <button
               type="button"

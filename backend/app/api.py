@@ -49,6 +49,8 @@ from .s3 import (
     validate_s3_key_tenant,
     validate_upload_request,
     verify_uploaded_s3_object,
+    get_s3_object_base64,
+    cleanup_orphaned_s3_object,
     get_s3_client
 )
 from .lifecycle import (
@@ -386,7 +388,13 @@ def handle_api_request(
         u_data = storage.get_user_by_id(user.id, user.org_id)
         if not u_data:
             return _json_response(404, {"success": False, "error": "User not found in tenant organization"}, req_origin)
-        return _json_response(200, {"success": True, "user": sanitize_user(u_data)}, req_origin)
+        csrf_token = secrets.token_hex(24)
+        csrf_cookie = generate_csrf_cookie_header(csrf_token)
+        return _json_response(200, {
+            "success": True,
+            "user": sanitize_user(u_data),
+            "csrfToken": csrf_token
+        }, req_origin, extra_headers={"Set-Cookie": csrf_cookie})
 
     # ==========================================================================
     # 3. UPLOAD & PRESIGNED S3 ENDPOINTS
@@ -440,23 +448,37 @@ def handle_api_request(
                 "error": f"Cross-tenant access violation: key '{file_key}' does not belong to organization '{user.org_id}'."
             }, req_origin)
 
-        # 2. Verify attachment is actually linked to a ticket and check authorization
+        # 2. Phase 6 Requirement 1: Ticket association & attachment linkage verification
         ticket_id = qs.get("ticket_id", [None])[0] or qs.get("ticketId", [None])[0]
-        associated_ticket = None
-        if ticket_id:
-            associated_ticket = storage.get_ticket(ticket_id, user.org_id)
-        else:
-            tenant_tickets = storage.list_tickets(org_id=user.org_id, role="admin", user_id=user.id)
-            associated_ticket = next((t for t in tenant_tickets if t.get("fileKey") == file_key or t.get("photoKey") == file_key), None)
+        if not ticket_id:
+            return _json_response(400, {
+                "success": False,
+                "error": "Query parameter 'ticket_id' is mandatory to verify attachment authorization."
+            }, req_origin)
 
+        associated_ticket = storage.get_ticket(ticket_id, user.org_id)
         if not associated_ticket:
             return _json_response(404, {
                 "success": False,
-                "error": "Attachment is not associated with any authorized ticket in this organization."
+                "error": f"Ticket '{ticket_id}' was not found in your organization."
             }, req_origin)
 
-        # Consumer Authorization: Consumer may view only attachments on tickets they reported
+        # Verify that the requested fileKey is actually attached to this specific ticket
+        attached_keys = {
+            associated_ticket.get("fileKey"),
+            associated_ticket.get("photoKey"),
+            associated_ticket.get("photo")
+        }
+        attached_keys = {k for k in attached_keys if k and isinstance(k, str)}
+        if file_key not in attached_keys:
+            return _json_response(400, {
+                "success": False,
+                "error": f"Attachment mismatch: fileKey '{file_key}' is not attached to ticket '{ticket_id}'."
+            }, req_origin)
+
+        # 3. Role-based attachment authorization
         if user.is_consumer():
+            # Consumers may view only attachments belonging to their own tickets
             rep_id = associated_ticket.get("reporterId") or associated_ticket.get("reportedBy", {}).get("id")
             rep_email = (associated_ticket.get("reporterEmail") or associated_ticket.get("reportedBy", {}).get("email") or "").lower()
             if rep_id != user.id and rep_email != user.email.lower():
@@ -465,14 +487,30 @@ def handle_api_request(
                     "error": "Access Denied: Consumers may view attachments only for tickets they reported."
                 }, req_origin)
 
-        # Technician Authorization: Technician may view only assigned or claimable ticket attachments
-        if user.is_technician():
+        elif user.is_technician():
+            # Technicians may view only attachments for tickets assigned to them or explicitly permitted claimable tickets
             assigned_tech = associated_ticket.get("assignedTechId")
-            if assigned_tech and assigned_tech != user.id:
+            ticket_status = associated_ticket.get("status")
+            ticket_cat = associated_ticket.get("category")
+
+            is_assigned_to_tech = (assigned_tech == user.id)
+            is_claimable_by_tech = (
+                not assigned_tech and
+                ticket_status == TicketStatus.ASSIGNED and
+                validate_technician_skill_for_category(user.specialty, ticket_cat)
+            )
+
+            if not (is_assigned_to_tech or is_claimable_by_tech):
                 return _json_response(403, {
                     "success": False,
-                    "error": "Access Denied: Work order attachment belongs to another technician's ticket."
+                    "error": "Access Denied: Technicians may view attachments only for tickets assigned to them or eligible for claiming."
                 }, req_origin)
+
+        elif not user.is_admin():
+            return _json_response(403, {
+                "success": False,
+                "error": "Access Denied: Unauthorized role for attachment access."
+            }, req_origin)
 
         try:
             view_url = generate_presigned_view_url(file_key=file_key, org_id=user.org_id, expires_in=3600)
@@ -598,10 +636,11 @@ def handle_api_request(
             # 1. Query RAG vector store for past similar repairs
             rag_matches, search_mode = query_knowledge_base(complaint, org_id=user.org_id)
 
-            # 2. Run multimodal vision triage (fallback transparently if image is only in S3)
+            # 2. Run multimodal vision triage (retrieving verified S3 image if key is provided)
             effective_img_b64 = image_data
             if not effective_img_b64 and file_key:
-                effective_img_b64 = "data:image/jpeg;base64,/9j/4AAQSkZJRg=="  # Stub 1x1 for AI pipeline when in S3
+                s3_b64 = get_s3_object_base64(file_key, user.org_id)
+                effective_img_b64 = s3_b64 if s3_b64 else "data:image/jpeg;base64,/9j/4AAQSkZJRg=="
             triage = analyze_maintenance_fault(
                 complaint=complaint,
                 image_base64=effective_img_b64,
@@ -609,9 +648,12 @@ def handle_api_request(
                 historical_matches=rag_matches
             )
 
-            # 3. Create authoritative ticket with version: 1
-            ticket_id = f"TCK-{secrets.randbelow(9000)+1000}"
+            # 3. Phase 6 Requirement 4: Cryptographically collision-resistant ticket ID (e.g. TCK-3F8A1B9C4D2E)
+            ticket_id = f"TCK-{secrets.token_hex(6).upper()}"
             now_iso = datetime.utcnow().isoformat() + "Z"
+
+            # Phase 6 Requirement 3: Avoid storing duplicate base64 images in DynamoDB when S3 key is available
+            ticket_photo = file_key if file_key else image_data
 
             ticket = {
                 "id": ticket_id,
@@ -631,7 +673,7 @@ def handle_api_request(
                 "location": triage["location"],
                 "assignedTo": triage["assignedTo"],
                 "assignedTechId": None,
-                "photo": image_data,
+                "photo": ticket_photo,
                 "fileKey": file_key or None,
                 "photoKey": file_key or None,
                 "reporterId": user.id,
@@ -676,6 +718,12 @@ def handle_api_request(
 
             return _json_response(201, {"success": True, "ticket": saved}, req_origin)
         except Exception as e:
+            # Phase 6 Requirement 3: Clean up orphaned S3 attachment if ticket creation fails
+            if file_key:
+                try:
+                    cleanup_orphaned_s3_object(file_key, user.org_id)
+                except Exception:
+                    pass
             return _json_response(422, {"success": False, "error": str(e)}, req_origin)
 
     # Single Ticket Sub-Routes

@@ -1,84 +1,57 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import apiClient, { getToken, setToken as saveTokenToStorage, clearToken } from '../services/apiClient';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import apiClient, { clearToken } from '../services/apiClient';
 
 const AuthContext = createContext(null);
 
-const STORAGE_KEYS = {
-  CURRENT_USER: 'maintainx_current_user_v3'
-};
-
 export function AuthProvider({ children }) {
-  const [token, setTokenState] = useState(() => getToken());
-
-  const [currentUser, setCurrentUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (parsed && parsed.approvalStatus === 'Approved') {
-          return parsed;
-        }
-      }
-    } catch {
-      return null;
-    }
-    return null;
-  });
-
+  const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
-  // Auth headers helper for components that need headers directly
+  // Auth headers helper for programmatic components
   const getAuthHeaders = useCallback(() => {
-    const headers = { 'Content-Type': 'application/json' };
-    const currentTok = token || getToken();
-    if (currentTok) {
-      headers['Authorization'] = `Bearer ${currentTok}`;
-    }
-    return headers;
-  }, [token]);
+    return { 'Content-Type': 'application/json' };
+  }, []);
 
-  // Sync current user session on mount using centralized API client
+  // Phase 6 Requirement 2: Restore session on mount using HttpOnly cookie credentials
   useEffect(() => {
-    const currentTok = token || getToken();
-    if (!currentTok) return;
-
     apiClient.auth.getMe()
       .then((data) => {
-        if (data && data.success && data.user) {
+        if (data?.success && data?.user && data.user.approvalStatus === 'Approved') {
           setCurrentUser(data.user);
-          localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(data.user));
         } else {
-          logout();
+          setCurrentUser(null);
         }
       })
-      .catch((err) => {
-        if (err.status === 401 || err.status === 403) {
-          logout();
-        }
+      .catch(() => {
+        setCurrentUser(null);
+      })
+      .finally(() => {
+        setIsLoadingAuth(false);
       });
-  }, [token]);
+  }, []);
 
   // Fetch tenant users for admin
   const syncUsers = useCallback(async () => {
-    const currentTok = token || getToken();
-    if (!currentTok || currentUser?.role !== 'admin') return;
+    if (currentUser?.role !== 'admin') return;
     try {
       const data = await apiClient.admin.getUsers();
-      if (data.success && Array.isArray(data.users)) {
+      if (data?.success && Array.isArray(data.users)) {
         setUsers(data.users);
       }
     } catch {}
-  }, [token, currentUser]);
+  }, [currentUser]);
 
   useEffect(() => {
-    syncUsers();
     if (currentUser?.role === 'admin') {
-      const interval = setInterval(syncUsers, 3000);
+      syncUsers();
+      const interval = setInterval(syncUsers, 4000);
       return () => clearInterval(interval);
     }
   }, [syncUsers, currentUser]);
 
   // 1. LOGIN (POST /api/v1/auth/login via apiClient)
+  // Browser stores session in HttpOnly cookie; no JWT stored in localStorage
   const login = useCallback(async (email, password) => {
     try {
       const data = await apiClient.auth.login(email, password);
@@ -91,20 +64,9 @@ export function AuthProvider({ children }) {
         };
       }
 
-      const receivedToken = data.token;
       const user = data.user;
-
-      saveTokenToStorage(receivedToken);
-      setTokenState(receivedToken);
       setCurrentUser(user);
-
-      try {
-        localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(user));
-      } catch (e) {
-        console.warn('Storage write failed:', e);
-      }
-
-      return { success: true, user, token: receivedToken };
+      return { success: true, user };
     } catch (err) {
       return {
         success: false,
@@ -166,17 +128,16 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
-  // 5. LOGOUT
+  // 5. LOGOUT (Invalidates HttpOnly cookie and session on backend)
   const logout = useCallback(() => {
     try {
       apiClient.auth.logout().catch(() => {});
     } catch {}
     clearToken();
-    setTokenState(null);
     setCurrentUser(null);
     setUsers([]);
     try {
-      localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      localStorage.removeItem('maintainx_current_user_v3');
       localStorage.removeItem('maintainx_tickets_v1');
       localStorage.removeItem('maintainx_tickets_v3');
       localStorage.removeItem('maintainx_tickets');
@@ -196,33 +157,18 @@ export function AuthProvider({ children }) {
   // 6. UPDATE PROFILE
   const updateUserProfile = useCallback((updates) => {
     if (!currentUser) return { success: false, error: 'No user is currently logged in.' };
-    const updated = { ...currentUser, ...updates };
-    setCurrentUser(updated);
-    try {
-      localStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(updated));
-    } catch {}
-    return { success: true, user: updated };
+    const updatedUser = { ...currentUser, ...updates };
+    setCurrentUser(updatedUser);
+    return { success: true, user: updatedUser };
   }, [currentUser]);
 
-  const pendingUsers = useMemo(
-    () => users.filter((u) => u.approvalStatus === 'Pending' && u.role !== 'admin'),
-    [users]
-  );
-
-  const approvedUsers = useMemo(
-    () => users.filter((u) => u.approvalStatus === 'Approved'),
-    [users]
-  );
-
   const value = {
-    token,
     currentUser,
+    token: null, // Legacy compatibility (null to enforce HttpOnly cookie credentials)
     users,
-    pendingUsers,
-    approvedUsers,
-    login,
+    isLoadingAuth,
+    isAuthenticated: Boolean(currentUser && currentUser.approvalStatus === 'Approved'),
     loginUser: login,
-    register,
     registerUser: register,
     approveUser,
     rejectUser,

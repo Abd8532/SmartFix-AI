@@ -73,6 +73,10 @@ class TestPhase5S3ContentInspection(unittest.TestCase):
 
     def tearDown(self):
         set_s3_client(None)
+        try:
+            storage.delete_ticket(self.ticket_alpha["id"], "org_alpha")
+        except Exception:
+            pass
 
     def test_presigned_post_configures_content_length_range_and_prefix(self):
         """Verifies generate_presigned_post_data enforces size ranges and tenant key prefixes."""
@@ -263,6 +267,10 @@ class TestPhase5PresignedViewAuthorization(unittest.TestCase):
 
     def tearDown(self):
         set_s3_client(None)
+        try:
+            storage.delete_ticket(self.ticket_alpha["id"], "org_alpha")
+        except Exception:
+            pass
 
     def test_view_url_allowed_for_ticket_reporter(self):
         """Reporter of the ticket in org_alpha can retrieve the presigned view URL."""

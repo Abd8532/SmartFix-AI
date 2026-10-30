@@ -171,7 +171,7 @@ export function TicketProvider({ children }) {
 
   // 1. READ: Fetch isolated tickets from authoritative Python backend
   const fetchTickets = useCallback(async () => {
-    if (!token) return;
+    if (!currentUser) return;
 
     try {
       const data = await apiClient.tickets.list();
@@ -186,7 +186,7 @@ export function TicketProvider({ children }) {
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [currentUser]);
 
   // Clear cached tickets immediately on account/organisation switch or logout (Phase 4 requirement 3)
   useEffect(() => {
@@ -197,27 +197,27 @@ export function TicketProvider({ children }) {
       if (!currentUser) {
         for (let i = localStorage.length - 1; i >= 0; i--) {
           const k = localStorage.key(i);
-          if (k && k.startsWith('maintainx_tickets_')) {
+          if (k && (k.startsWith('maintainx_tickets_') || k === STORAGE_KEYS.TICKETS)) {
             localStorage.removeItem(k);
           }
         }
       }
     } catch {}
 
-    if (token && currentUser) {
+    if (currentUser) {
       setIsLoading(true);
       fetchTickets();
     }
-  }, [currentUser?.id, currentUser?.org_id]);
+  }, [currentUser?.id, currentUser?.org_id, fetchTickets]);
 
   // Initial fetch and continuous real-time polling
   useEffect(() => {
-    if (token && currentUser) {
+    if (currentUser) {
       fetchTickets();
       const interval = setInterval(fetchTickets, 3000);
       return () => clearInterval(interval);
     }
-  }, [token, currentUser, fetchTickets]);
+  }, [currentUser, fetchTickets]);
 
   // Persist tickets cache locally scoped by tenant and user ID
   useEffect(() => {
@@ -266,7 +266,7 @@ export function TicketProvider({ children }) {
 
   // 2. CREATE: Submit new issue to authoritative backend API via apiClient
   const addTicket = async (newTicketData) => {
-    if (!token) {
+    if (!currentUser) {
       throw new Error('Authentication required to submit maintenance request.');
     }
 
@@ -278,7 +278,7 @@ export function TicketProvider({ children }) {
         location: newTicketData.location,
         category: newTicketData.category,
         urgency: newTicketData.urgency || newTicketData.priority,
-        image: newTicketData.photo || newTicketData.image || null,
+        image: newTicketData.fileKey ? null : (newTicketData.photo || newTicketData.image || null),
         fileKey: newTicketData.fileKey || newTicketData.photoKey || null,
         mimeType: newTicketData.mimeType || 'image/jpeg'
       };
@@ -311,7 +311,7 @@ export function TicketProvider({ children }) {
 
   // 3. TECHNICIAN SIGN-OFF: Mark work as completed by technician (Contract: resolutionNotes + Optimistic Concurrency)
   const techCompleteTicket = async (ticketId, resolutionNotes = '') => {
-    if (!token) return;
+    if (!currentUser) return;
 
     const target = tickets.find((t) => t.id === ticketId);
     try {
@@ -338,7 +338,7 @@ export function TicketProvider({ children }) {
 
   // 4. USER VERIFICATION: Confirm physical repair & complete ticket (triggers trusted RAG + Optimistic Concurrency)
   const verifyTicketClosure = async (ticketId) => {
-    if (!token) return;
+    if (!currentUser) return;
 
     const target = tickets.find((t) => t.id === ticketId);
     try {
@@ -365,7 +365,7 @@ export function TicketProvider({ children }) {
 
   // 5. USER REJECTION: Reject unsatisfactory repair & reopen ticket with reason (Contract: rejectionReason + Optimistic Concurrency)
   const rejectTicketClosure = async (ticketId, rejectionReason) => {
-    if (!token) return;
+    if (!currentUser) return;
 
     if (!rejectionReason || !rejectionReason.trim()) {
       addToast({
@@ -401,7 +401,7 @@ export function TicketProvider({ children }) {
 
   // 6. TECHNICIAN: CLAIM UNASSIGNED WORK ORDER (Atomic Optimistic Concurrency)
   const claimTicket = async (ticketId) => {
-    if (!token) return;
+    if (!currentUser) return;
 
     const target = tickets.find((t) => t.id === ticketId);
     try {
@@ -437,7 +437,7 @@ export function TicketProvider({ children }) {
 
   // 7. UPDATE STATUS: General status transitions using PATCH (Contract: PATCH /api/v1/tickets/:id/status + Optimistic Concurrency)
   const updateTicketStatus = async (ticketId, newStatus, resolutionNotes = '') => {
-    if (!token) return;
+    if (!currentUser) return;
 
     // Backend state machine strictly blocks jumping directly to Completed
     if (newStatus === 'Done' || newStatus === 'Completed') {
@@ -473,7 +473,7 @@ export function TicketProvider({ children }) {
 
   // 7. DELETE: Permanent ticket removal (Contract: DELETE /api/v1/tickets/:id)
   const deleteTicket = async (ticketId) => {
-    if (!token) return;
+    if (!currentUser) return;
 
     try {
       await apiClient.tickets.delete(ticketId);
@@ -496,7 +496,7 @@ export function TicketProvider({ children }) {
 
   // 8. AUDIT LOGS: Retrieve immutable audit trail (Contract: consistent auditLogs field)
   const fetchAuditLogs = async () => {
-    if (!token) return [];
+    if (!currentUser) return [];
 
     try {
       const data = await apiClient.admin.getAuditLogs();
@@ -514,6 +514,12 @@ export function TicketProvider({ children }) {
         localStorage.removeItem(`maintainx_tickets_${currentUser.org_id}_${currentUser.id}`);
       }
       localStorage.removeItem(STORAGE_KEYS.TICKETS);
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const k = localStorage.key(i);
+        if (k && (k.startsWith('maintainx_tickets_') || k === STORAGE_KEYS.TICKETS)) {
+          localStorage.removeItem(k);
+        }
+      }
     } catch {}
     addToast({
       type: 'info',
@@ -531,7 +537,7 @@ export function TicketProvider({ children }) {
   // Computed metrics
   const stats = useMemo(() => {
     const total = tickets.length;
-    const open = tickets.filter((t) => t.status === 'Open' || t.status === 'Assigned' || t.Status === 'Assigned').length;
+    const open = tickets.filter((t) => t.status !== 'Done' && t.status !== 'Completed' && t.Status !== 'Completed').length;
     const inProgress = tickets.filter((t) => 
       t.status === 'In Progress' || 
       t.status === 'Pending User Verification' || 
@@ -540,15 +546,13 @@ export function TicketProvider({ children }) {
       t.Status === 'Awaiting Tech Sign-off'
     ).length;
     const done = tickets.filter((t) => t.status === 'Done' || t.status === 'Completed' || t.Status === 'Completed').length;
-    const critical = tickets.filter((t) => (t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Emergency' || t.isHazard) && t.status !== 'Done' && t.status !== 'Completed').length;
+    const critical = tickets.filter((t) => (t.priority === 'Critical' || t.priority === 'Emergency' || t.Urgency === 'Emergency' || t.isHazard) && t.status !== 'Done' && t.status !== 'Completed' && t.Status !== 'Completed').length;
     const resolutionRate = total > 0 ? Math.round((done / total) * 100) : 0;
 
     // Filter tickets raised by / belonging to current user from central database
     const userTickets = tickets.filter((t) => isUserTicket(t, currentUser));
     const userOpenCount = userTickets.filter((t) => 
-      t.status === 'Open' || t.status === 'Assigned' || t.Status === 'Assigned' ||
-      t.status === 'In Progress' || t.status === 'Pending User Verification' || t.status === 'Awaiting Tech Sign-off' ||
-      t.Status === 'Pending User Verification' || t.Status === 'Awaiting Tech Sign-off'
+      t.status !== 'Done' && t.status !== 'Completed' && t.Status !== 'Completed'
     ).length;
     const userResolvedCount = userTickets.filter((t) => 
       t.status === 'Done' || t.status === 'Completed' || t.Status === 'Completed'

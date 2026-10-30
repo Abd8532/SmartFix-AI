@@ -6,6 +6,7 @@ unassigned claim vs assigned work queues, and cloud-ready DynamoDB partitioning.
 import os
 import json
 import threading
+import time
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 from datetime import datetime
@@ -408,6 +409,12 @@ class JsonFileRepository(BaseRepository):
                 existing = data["tickets"][found_idx]
                 curr_version = int(existing.get("version", 1) or 1)
 
+                # Phase 6 Requirement 4: Enforce collision resistance & prevent duplicate ID overwrites
+                if expected_version is None:
+                    raise ConcurrencyError(
+                        f"Duplicate ticket ID collision: ticket '{ticket_id}' already exists in organization '{org_id}'."
+                    )
+
                 # Optimistic Concurrency Check
                 if expected_version is not None and curr_version != expected_version:
                     raise ConcurrencyError(
@@ -743,16 +750,25 @@ class DynamoDBRepository(BaseRepository):
             else:
                 curr_version = int(clean_t.get("version", 1) or 1)
                 clean_t["version"] = curr_version
-                table.put_item(Item=clean_t)
+                # Phase 6 Requirement 4: Conditional write ensures unique ticket IDs cannot collide or overwrite
+                table.put_item(
+                    Item=clean_t,
+                    ConditionExpression="attribute_not_exists(PK) AND attribute_not_exists(SK)"
+                )
 
             return clean_t
         except Exception as e:
             err_str = str(e)
             if "ConditionalCheckFailedException" in err_str:
-                raise ConcurrencyError(
-                    f"Optimistic concurrency conflict on ticket '{ticket_id}' in DynamoDB: "
-                    f"expected version {expected_version}."
-                )
+                if expected_version is not None:
+                    raise ConcurrencyError(
+                        f"Optimistic concurrency conflict on ticket '{ticket_id}' in DynamoDB: "
+                        f"expected version {expected_version}."
+                    )
+                else:
+                    raise ConcurrencyError(
+                        f"Duplicate ticket ID collision in DynamoDB: ticket '{ticket_id}' already exists."
+                    )
             raise RuntimeError(f"DynamoDB save ticket failed: {e}")
 
     def delete_ticket(self, ticket_id: str, org_id: str) -> bool:

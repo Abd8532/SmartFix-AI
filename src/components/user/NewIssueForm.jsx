@@ -351,39 +351,42 @@ export default function NewIssueForm({ onTicketCreated }) {
     try {
       const base64DataUrl = await getBase64DataUrl();
 
-      // 1. Full S3 Presigned Upload Flow: Request URL -> Upload Binary -> Save Key (Phase 4 requirement 1)
+      // 1. Full S3 Presigned Upload Flow: Request URL -> Upload Binary -> Save Key (Phase 6 requirement 3)
       let s3FileKey = null;
-      try {
-        let binaryBlob = imageFile;
-        if (!binaryBlob && base64DataUrl) {
-          const byteString = atob(base64DataUrl.split(',')[1]);
-          const mimeStr = base64DataUrl.split(',')[0].split(':')[1].split(';')[0];
-          const ab = new ArrayBuffer(byteString.length);
-          const ia = new Uint8Array(ab);
-          for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-          }
-          binaryBlob = new Blob([ab], { type: mimeStr });
+      let binaryBlob = imageFile;
+      if (!binaryBlob && base64DataUrl) {
+        const byteString = atob(base64DataUrl.split(',')[1]);
+        const mimeStr = base64DataUrl.split(',')[0].split(':')[1].split(';')[0];
+        const ab = new ArrayBuffer(byteString.length);
+        const ia = new Uint8Array(ab);
+        for (let i = 0; i < byteString.length; i++) {
+          ia[i] = byteString.charCodeAt(i);
         }
+        binaryBlob = new Blob([ab], { type: mimeStr });
+      }
 
-        if (binaryBlob) {
+      if (binaryBlob) {
+        try {
           const presignRes = await apiClient.uploads.presign({
             fileName: imageFile?.name || 'maintenance-photo.jpg',
             mimeType: imageMimeType || binaryBlob.type || 'image/jpeg',
             fileSize: binaryBlob.size
           });
 
-          if (presignRes?.uploadUrl) {
-            await apiClient.uploads.uploadToS3(
-              presignRes.uploadUrl,
-              binaryBlob,
-              imageMimeType || binaryBlob.type || 'image/jpeg'
-            );
-            s3FileKey = presignRes.fileKey;
+          if (!presignRes?.uploadUrl || !presignRes?.fileKey) {
+            throw new Error('Storage service failed to issue presigned upload authorization.');
           }
+
+          await apiClient.uploads.uploadToS3(
+            presignRes.uploadUrl,
+            binaryBlob,
+            imageMimeType || binaryBlob.type || 'image/jpeg'
+          );
+          s3FileKey = presignRes.fileKey;
+        } catch (uploadErr) {
+          console.error('Presigned upload error:', uploadErr);
+          throw new Error(`Attachment upload failed: ${uploadErr.message || 'S3 transmission rejected'}. Please check your connection and retry.`);
         }
-      } catch (uploadErr) {
-        console.warn('Presigned upload notice (proceeding with verified payload):', uploadErr);
       }
 
       setCurrentRagStep(3);
@@ -391,8 +394,8 @@ export default function NewIssueForm({ onTicketCreated }) {
 
       const created = await addTicket({
         complaint: complaint.trim(),
-        image: base64DataUrl,
-        photo: base64DataUrl,
+        image: s3FileKey ? null : base64DataUrl,
+        photo: s3FileKey || base64DataUrl,
         fileKey: s3FileKey,
         mimeType: imageMimeType
       });
@@ -716,6 +719,15 @@ export default function NewIssueForm({ onTicketCreated }) {
                 </button>
               </div>
               <p className="mt-1 font-medium leading-relaxed">{errorMessage}</p>
+              <div className="mt-2.5 flex items-center gap-2">
+                <button
+                  type="submit"
+                  disabled={isProcessing}
+                  className="px-3.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs transition-all active:scale-[0.98]"
+                >
+                  Retry Submission
+                </button>
+              </div>
             </div>
           </div>
         )}

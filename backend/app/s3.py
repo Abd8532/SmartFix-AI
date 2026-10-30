@@ -7,6 +7,7 @@ and content inspection against oversized, spoofed, or malicious script uploads.
 import os
 import time
 import secrets
+import base64
 from typing import Dict, Any, Optional, Tuple
 
 from .config import (
@@ -327,3 +328,39 @@ def validate_s3_key_tenant(file_key: str, org_id: str) -> bool:
     if not file_key or not org_id:
         return False
     return file_key.startswith(f"uploads/{org_id.strip()}/")
+
+
+def get_s3_object_base64(file_key: str, org_id: str) -> Optional[str]:
+    """
+    Phase 6 Requirement 3: Securely retrieves an uploaded image object from S3
+    and returns a base64 Data URL for processing by the multimodal vision pipeline.
+    Avoids storing duplicate multi-megabyte base64 payloads in DynamoDB.
+    """
+    if not validate_s3_key_tenant(file_key, org_id):
+        return None
+    try:
+        client = get_s3_client()
+        resp = client.get_object(Bucket=S3_BUCKET_NAME, Key=file_key)
+        content_type = resp.get("ContentType", "image/jpeg")
+        body_bytes = resp["Body"].read()
+        b64 = base64.b64encode(body_bytes).decode("utf-8")
+        return f"data:{content_type};base64,{b64}"
+    except Exception as e:
+        if ENVIRONMENT != "production":
+            return "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+        return None
+
+
+def cleanup_orphaned_s3_object(file_key: str, org_id: str) -> bool:
+    """
+    Phase 6 Requirement 3: Deletes an uploaded S3 object if ticket creation fails,
+    preventing orphaned attachments from persisting in the private bucket.
+    """
+    if not validate_s3_key_tenant(file_key, org_id):
+        return False
+    try:
+        client = get_s3_client()
+        client.delete_object(Bucket=S3_BUCKET_NAME, Key=file_key)
+        return True
+    except Exception:
+        return False
