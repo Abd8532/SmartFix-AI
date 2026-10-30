@@ -125,9 +125,11 @@ export function TicketProvider({ children }) {
     }
   });
 
-  // Active tickets state
+  // Active tickets state - never flash stale data from logged-out or another user
   const [tickets, setTickets] = useState(() => {
     try {
+      const activeUser = localStorage.getItem('maintainx_current_user_v3');
+      if (!activeUser) return [];
       const saved = localStorage.getItem(STORAGE_KEYS.TICKETS);
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -183,23 +185,39 @@ export function TicketProvider({ children }) {
     }
   }, [token]);
 
+  // Clear cached tickets immediately on account/organisation switch or logout (Requirement 5)
+  useEffect(() => {
+    setTickets([]);
+    setSelectedTicketId(null);
+    try {
+      localStorage.removeItem(STORAGE_KEYS.TICKETS);
+    } catch {}
+
+    if (token && currentUser) {
+      setIsLoading(true);
+      fetchTickets();
+    }
+  }, [currentUser?.id, currentUser?.org_id]);
+
   // Initial fetch and continuous real-time polling
   useEffect(() => {
-    if (token) {
+    if (token && currentUser) {
       fetchTickets();
       const interval = setInterval(fetchTickets, 3000);
       return () => clearInterval(interval);
     }
-  }, [token, fetchTickets]);
+  }, [token, currentUser, fetchTickets]);
 
-  // Persist tickets cache locally for smooth reloads
+  // Persist tickets cache locally only when active user is logged in
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
-    } catch (e) {
-      console.warn('Failed saving tickets to storage:', e);
+    if (currentUser && tickets.length > 0) {
+      try {
+        localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
+      } catch (e) {
+        console.warn('Failed saving tickets to storage:', e);
+      }
     }
-  }, [tickets]);
+  }, [tickets, currentUser]);
 
   // Persist user tab
   useEffect(() => {
@@ -274,12 +292,13 @@ export function TicketProvider({ children }) {
 
   const createTicket = addTicket;
 
-  // 3. TECHNICIAN SIGN-OFF: Mark work as completed by technician (Contract: resolutionNotes)
+  // 3. TECHNICIAN SIGN-OFF: Mark work as completed by technician (Contract: resolutionNotes + Optimistic Concurrency)
   const techCompleteTicket = async (ticketId, resolutionNotes = '') => {
     if (!token) return;
 
+    const target = tickets.find((t) => t.id === ticketId);
     try {
-      const data = await apiClient.tickets.techComplete(ticketId, resolutionNotes);
+      const data = await apiClient.tickets.techComplete(ticketId, resolutionNotes, target?.version);
       const updated = normalizeTicketRecord(data.ticket);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
 
@@ -293,19 +312,20 @@ export function TicketProvider({ children }) {
       console.error('techCompleteTicket error:', err);
       addToast({
         type: 'error',
-        title: 'Sign-off Failed',
+        title: err.status === 409 ? 'Concurrency Conflict' : 'Sign-off Failed',
         message: err.data?.error || err.message || 'Failed to record technician resolution.'
       });
       throw err;
     }
   };
 
-  // 4. USER VERIFICATION: Confirm physical repair & complete ticket (triggers trusted RAG)
+  // 4. USER VERIFICATION: Confirm physical repair & complete ticket (triggers trusted RAG + Optimistic Concurrency)
   const verifyTicketClosure = async (ticketId) => {
     if (!token) return;
 
+    const target = tickets.find((t) => t.id === ticketId);
     try {
-      const data = await apiClient.tickets.verifyClosure(ticketId);
+      const data = await apiClient.tickets.verifyClosure(ticketId, target?.version);
       const updated = normalizeTicketRecord(data.ticket);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
 
@@ -319,14 +339,14 @@ export function TicketProvider({ children }) {
       console.error('verifyTicketClosure error:', err);
       addToast({
         type: 'error',
-        title: 'Verification Failed',
+        title: err.status === 409 ? 'Concurrency Conflict' : 'Verification Failed',
         message: err.data?.error || err.message || 'Failed to complete ticket verification.'
       });
       throw err;
     }
   };
 
-  // 5. USER REJECTION: Reject unsatisfactory repair & reopen ticket with reason (Contract: rejectionReason)
+  // 5. USER REJECTION: Reject unsatisfactory repair & reopen ticket with reason (Contract: rejectionReason + Optimistic Concurrency)
   const rejectTicketClosure = async (ticketId, rejectionReason) => {
     if (!token) return;
 
@@ -339,8 +359,9 @@ export function TicketProvider({ children }) {
       throw new Error('Rejection reason is mandatory.');
     }
 
+    const target = tickets.find((t) => t.id === ticketId);
     try {
-      const data = await apiClient.tickets.rejectClosure(ticketId, rejectionReason.trim());
+      const data = await apiClient.tickets.rejectClosure(ticketId, rejectionReason.trim(), target?.version);
       const updated = normalizeTicketRecord(data.ticket);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
 
@@ -354,8 +375,35 @@ export function TicketProvider({ children }) {
       console.error('rejectTicketClosure error:', err);
       addToast({
         type: 'error',
-        title: 'Rejection Error',
+        title: err.status === 409 ? 'Concurrency Conflict' : 'Rejection Error',
         message: err.data?.error || err.message || 'Could not reject ticket.'
+      });
+      throw err;
+    }
+  };
+
+  // 6. TECHNICIAN: CLAIM UNASSIGNED WORK ORDER (Atomic Optimistic Concurrency)
+  const claimTicket = async (ticketId) => {
+    if (!token) return;
+
+    const target = tickets.find((t) => t.id === ticketId);
+    try {
+      const data = await apiClient.tickets.claim(ticketId, target?.version);
+      const updated = normalizeTicketRecord(data.ticket);
+      setTickets((prev) => [updated, ...prev.filter((t) => t.id !== ticketId)]);
+
+      addToast({
+        type: 'success',
+        title: 'Work Order Claimed',
+        message: `You have successfully claimed ticket #${ticketId}.`
+      });
+      return updated;
+    } catch (err) {
+      console.error('claimTicket error:', err);
+      addToast({
+        type: 'error',
+        title: err.status === 409 ? 'Claim Conflict' : 'Claim Failed',
+        message: err.data?.error || err.message || 'Could not claim work order.'
       });
       throw err;
     }
@@ -370,7 +418,7 @@ export function TicketProvider({ children }) {
     }
   };
 
-  // 6. UPDATE STATUS: General status transitions using PATCH (Contract: PATCH /api/v1/tickets/:id/status)
+  // 7. UPDATE STATUS: General status transitions using PATCH (Contract: PATCH /api/v1/tickets/:id/status + Optimistic Concurrency)
   const updateTicketStatus = async (ticketId, newStatus, resolutionNotes = '') => {
     if (!token) return;
 
@@ -384,8 +432,9 @@ export function TicketProvider({ children }) {
       return;
     }
 
+    const target = tickets.find((t) => t.id === ticketId);
     try {
-      const data = await apiClient.tickets.updateStatus(ticketId, newStatus, resolutionNotes);
+      const data = await apiClient.tickets.updateStatus(ticketId, newStatus, resolutionNotes, target?.version);
       const updated = normalizeTicketRecord(data.ticket);
       setTickets((prev) => prev.map((t) => (t.id === ticketId ? updated : t)));
 
@@ -399,7 +448,7 @@ export function TicketProvider({ children }) {
       console.error('updateTicketStatus error:', err);
       addToast({
         type: 'error',
-        title: 'Update Failed',
+        title: err.status === 409 ? 'Concurrency Conflict' : 'Update Failed',
         message: err.data?.error || err.message || 'Failed to update ticket status.'
       });
     }
@@ -513,6 +562,7 @@ export function TicketProvider({ children }) {
     logout,
     addTicket,
     createTicket,
+    claimTicket,
     techCompleteTicket,
     verifyTicketClosure,
     rejectTicketClosure,

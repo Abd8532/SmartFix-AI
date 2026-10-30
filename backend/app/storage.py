@@ -1,9 +1,7 @@
 """
-Multi-Tenant Persistence Architecture for SmartFix AI
-Defines the BaseRepository interface and provides:
-1. JsonFileRepository: Local development and testing adapter.
-2. DynamoDBRepository: Cloud-native AWS DynamoDB multi-tenant adapter.
-Guarantees strict organization data boundary isolation across all entities.
+Multi-Tenant Storage Architecture for SmartFix AI
+Enforces strict organization boundary isolation, optimistic concurrency locking,
+unassigned claim vs assigned work queues, and cloud-ready DynamoDB partitioning.
 """
 import os
 import json
@@ -11,26 +9,53 @@ import threading
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List, Optional
 from datetime import datetime
-from .config import DB_FILE_PATH, DEFAULT_ORG_ID, DEFAULT_ORG_NAME, DATA_BACKEND, DYNAMODB_TABLE_NAME
-from .models import sanitize_ticket, sanitize_user
 
-_lock = threading.Lock()
+from .config import (
+    DB_FILE_PATH,
+    DEFAULT_ORG_ID,
+    DEFAULT_ORG_NAME,
+    DEV_DEFAULT_ORG_ID,
+    DATA_BACKEND,
+    DYNAMODB_TABLE_NAME,
+    ENVIRONMENT
+)
+from .models import sanitize_ticket, sanitize_user, TicketStatus
+
+_lock = threading.RLock()
+
+
+class ConcurrencyError(Exception):
+    """Raised when an optimistic concurrency check detects a version mismatch."""
+    pass
 
 
 # ==============================================================================
-# REPOSITORY INTERFACE (TASK 5)
+# ABSTRACT REPOSITORY INTERFACE
 # ==============================================================================
 class BaseRepository(ABC):
-    """Abstract interface defining the multi-tenant persistence contract."""
+    """
+    Abstract Base Class defining the authoritative multi-tenant persistence contract.
+    All data queries and mutations MUST be bounded by org_id.
+    """
+
+    @abstractmethod
+    def get_organization(self, org_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch tenant organization record by id."""
+        pass
+
+    @abstractmethod
+    def save_organization(self, org: Dict[str, Any]) -> Dict[str, Any]:
+        """Save tenant organization record."""
+        pass
 
     @abstractmethod
     def get_user_by_email(self, email: str, org_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Fetch user by email, optionally enforcing organization membership."""
+        """Retrieve user profile by unique email within tenant scope."""
         pass
 
     @abstractmethod
     def get_user_by_id(self, user_id: str, org_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Fetch user by ID strictly within the organization boundary."""
+        """Retrieve user profile by primary user ID strictly within tenant scope."""
         pass
 
     @abstractmethod
@@ -40,12 +65,12 @@ class BaseRepository(ABC):
 
     @abstractmethod
     def save_user(self, user: Dict[str, Any]) -> Dict[str, Any]:
-        """Save or update user record scoped by verified organization ID."""
+        """Insert or update a user record within tenant scope."""
         pass
 
     @abstractmethod
     def get_ticket(self, ticket_id: str, org_id: str) -> Optional[Dict[str, Any]]:
-        """Fetch a ticket by ID strictly enforcing organization boundary."""
+        """Retrieve a single ticket by ID strictly within the organization boundary."""
         pass
 
     @abstractmethod
@@ -54,14 +79,28 @@ class BaseRepository(ABC):
         org_id: str,
         role: str,
         user_id: str,
-        specialty: Optional[str] = None
+        specialty: Optional[str] = None,
+        queue: Optional[str] = None
     ) -> List[Dict[str, Any]]:
-        """Return tickets strictly filtered by organization boundary, role, and assignment."""
+        """
+        List organization tickets with queue separation:
+        - For technicians: 'assigned' (personal queue) vs 'claimable' (unassigned eligible queue).
+        - For consumers: strictly tickets reported by caller.
+        - For administrators: all tickets within the organization.
+        """
         pass
 
     @abstractmethod
-    def save_ticket(self, ticket: Dict[str, Any], org_id: str) -> Dict[str, Any]:
-        """Insert or update a ticket within the organization boundary."""
+    def save_ticket(
+        self,
+        ticket: Dict[str, Any],
+        org_id: str,
+        expected_version: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """
+        Insert or atomically update a ticket with optimistic concurrency control.
+        Raises ConcurrencyError if expected_version does not match current version.
+        """
         pass
 
     @abstractmethod
@@ -86,7 +125,7 @@ class BaseRepository(ABC):
 class JsonFileRepository(BaseRepository):
     """
     Local multi-tenant file repository backed by db.json.
-    Retained as the active local development and test adapter.
+    Active development adapter with optimistic locking and queue separation.
     """
     def __init__(self, db_path: str = DB_FILE_PATH):
         self.db_path = db_path
@@ -95,10 +134,13 @@ class JsonFileRepository(BaseRepository):
     def _ensure_db(self):
         with _lock:
             if not os.path.exists(self.db_path):
+                # In production, seed zero dummy data!
+                # In development, create initial tenant and default structures
+                initial_org_id = DEV_DEFAULT_ORG_ID if ENVIRONMENT != "production" else "org_default"
                 initial = {
                     "organizations": [
                         {
-                            "id": DEFAULT_ORG_ID,
+                            "id": initial_org_id,
                             "name": DEFAULT_ORG_NAME,
                             "domain": "campus.edu",
                             "createdAt": datetime.utcnow().isoformat() + "Z"
@@ -108,7 +150,7 @@ class JsonFileRepository(BaseRepository):
                     "tickets": [],
                     "audit_logs": []
                 }
-                os.makedirs(os.path.dirname(self.db_path), exist_ok=True)
+                os.makedirs(os.path.dirname(os.path.abspath(self.db_path)), exist_ok=True)
                 with open(self.db_path, "w", encoding="utf-8") as f:
                     json.dump(initial, f, indent=2)
 
@@ -125,14 +167,7 @@ class JsonFileRepository(BaseRepository):
             data = {}
 
         if "organizations" not in data or not isinstance(data["organizations"], list):
-            data["organizations"] = [
-                {
-                    "id": DEFAULT_ORG_ID,
-                    "name": DEFAULT_ORG_NAME,
-                    "domain": "campus.edu",
-                    "createdAt": datetime.utcnow().isoformat() + "Z"
-                }
-            ]
+            data["organizations"] = []
         if "users" not in data or not isinstance(data["users"], list):
             data["users"] = []
         if "tickets" not in data or not isinstance(data["tickets"], list):
@@ -147,6 +182,33 @@ class JsonFileRepository(BaseRepository):
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
         os.replace(tmp_path, self.db_path)
+
+    def get_organization(self, org_id: str) -> Optional[Dict[str, Any]]:
+        if not org_id:
+            return None
+        with _lock:
+            data = self._read_data()
+            for org in data.get("organizations", []):
+                if org.get("id") == org_id:
+                    return dict(org)
+            return None
+
+    def save_organization(self, org: Dict[str, Any]) -> Dict[str, Any]:
+        with _lock:
+            data = self._read_data()
+            org_id = org.get("id")
+            if not org_id:
+                raise ValueError("Organization id is required")
+            found = False
+            for idx, existing in enumerate(data.get("organizations", [])):
+                if existing.get("id") == org_id:
+                    data["organizations"][idx] = {**existing, **org}
+                    found = True
+                    break
+            if not found:
+                data["organizations"].append(org)
+            self._write_data(data)
+            return org
 
     def get_user_by_email(self, email: str, org_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         with _lock:
@@ -165,53 +227,60 @@ class JsonFileRepository(BaseRepository):
             for u in data["users"]:
                 if u.get("id") == user_id:
                     if org_id and (u.get("org_id") or u.get("orgId")) != org_id:
-                        return None
+                        continue
                     return dict(u)
             return None
 
     def list_users(self, org_id: str) -> List[Dict[str, Any]]:
+        if not org_id:
+            raise ValueError("Tenant isolation: org_id is required to list users")
         with _lock:
             data = self._read_data()
-            result = []
+            scoped = []
             for u in data["users"]:
-                u_org = u.get("org_id") or u.get("orgId") or DEFAULT_ORG_ID
+                u_org = u.get("org_id") or u.get("orgId")
                 if u_org == org_id:
-                    result.append(sanitize_user(u))
-            return result
+                    scoped.append(sanitize_user(u))
+            return scoped
 
     def save_user(self, user: Dict[str, Any]) -> Dict[str, Any]:
         with _lock:
             data = self._read_data()
-            user_id = user.get("id")
-            norm_email = user.get("email", "").strip().lower()
-            org_id = user.get("org_id") or user.get("orgId") or DEFAULT_ORG_ID
-            user["org_id"] = org_id
-            user["orgId"] = org_id
+            org_id = user.get("org_id") or user.get("orgId")
+            if not org_id:
+                if ENVIRONMENT == "production":
+                    raise ValueError("Tenant isolation error: org_id is required to save user.")
+                org_id = DEV_DEFAULT_ORG_ID
+                user["org_id"] = org_id
+                user["orgId"] = org_id
+
+            clean_user = dict(user)
+            user_id = clean_user["id"]
 
             found_idx = -1
             for idx, existing in enumerate(data["users"]):
-                if existing.get("id") == user_id or existing.get("email", "").strip().lower() == norm_email:
+                if existing.get("id") == user_id:
                     found_idx = idx
                     break
 
             if found_idx >= 0:
-                data["users"][found_idx] = {**data["users"][found_idx], **user}
+                data["users"][found_idx] = {**data["users"][found_idx], **clean_user}
                 saved = data["users"][found_idx]
             else:
-                data["users"].append(user)
-                saved = user
+                data["users"].append(clean_user)
+                saved = clean_user
 
             self._write_data(data)
             return sanitize_user(saved)
 
     def get_ticket(self, ticket_id: str, org_id: str) -> Optional[Dict[str, Any]]:
+        if not org_id:
+            raise ValueError("Tenant isolation: org_id is required to fetch ticket")
         with _lock:
             data = self._read_data()
             for t in data["tickets"]:
-                if t.get("id") == ticket_id:
-                    t_org = t.get("org_id") or t.get("orgId") or DEFAULT_ORG_ID
-                    if t_org != org_id:
-                        return None
+                t_org = t.get("org_id") or t.get("orgId")
+                if t.get("id") == ticket_id and t_org == org_id:
                     return sanitize_ticket(t)
             return None
 
@@ -220,14 +289,17 @@ class JsonFileRepository(BaseRepository):
         org_id: str,
         role: str,
         user_id: str,
-        specialty: Optional[str] = None
+        specialty: Optional[str] = None,
+        queue: Optional[str] = None
     ) -> List[Dict[str, Any]]:
+        if not org_id:
+            raise ValueError("Tenant isolation: org_id is required to list tickets")
         with _lock:
             data = self._read_data()
             filtered = []
 
             for t in data["tickets"]:
-                t_org = t.get("org_id") or t.get("orgId") or DEFAULT_ORG_ID
+                t_org = t.get("org_id") or t.get("orgId")
                 if t_org != org_id:
                     continue
 
@@ -237,24 +309,49 @@ class JsonFileRepository(BaseRepository):
                     filtered.append(clean_t)
                 elif role == "technician":
                     assigned_tech_id = clean_t.get("assignedTechId")
-                    # If ticket is assigned specifically to someone else, hide from other technicians
-                    if assigned_tech_id and assigned_tech_id != user_id:
-                        continue
+                    status = clean_t.get("status") or TicketStatus.ASSIGNED
 
-                    # If assigned specifically to this technician, include it
-                    if assigned_tech_id == user_id:
-                        filtered.append(clean_t)
-                        continue
+                    # Queue 1: 'claimable' (Unassigned Claim Queue)
+                    if queue == "claimable":
+                        if assigned_tech_id is not None:
+                            continue
+                        if status not in (TicketStatus.ASSIGNED, "Assigned"):
+                            continue
 
-                    # If unassigned, show to matching department
-                    cat = (clean_t.get("category") or "").lower()
-                    assigned = (clean_t.get("assignedTo") or "").lower()
-                    spec = (specialty or "").lower()
+                        # Skill restriction: general tech CANNOT bypass skill restrictions!
+                        cat = (clean_t.get("category") or "").strip().lower()
+                        spec = (specialty or "").strip().lower()
+                        specialized = {"plumbing", "electrical", "hvac", "lift"}
 
-                    if not spec or spec == "general":
+                        if cat in specialized:
+                            if spec != cat:
+                                continue
+                        else:
+                            # General/Other category
+                            if spec not in ("general", "other", "") and spec != cat:
+                                continue
+
                         filtered.append(clean_t)
-                    elif cat == spec or spec in assigned:
-                        filtered.append(clean_t)
+
+                    # Queue 2: 'assigned' (Personal Work Queue - Default)
+                    elif queue == "assigned" or queue is None:
+                        if assigned_tech_id == user_id:
+                            filtered.append(clean_t)
+
+                    # Queue 3: 'all' (Assigned to caller + claimable)
+                    elif queue == "all":
+                        if assigned_tech_id == user_id:
+                            filtered.append(clean_t)
+                        elif assigned_tech_id is None and status in (TicketStatus.ASSIGNED, "Assigned"):
+                            cat = (clean_t.get("category") or "").strip().lower()
+                            spec = (specialty or "").strip().lower()
+                            specialized = {"plumbing", "electrical", "hvac", "lift"}
+                            if cat in specialized:
+                                if spec == cat:
+                                    filtered.append(clean_t)
+                            else:
+                                filtered.append(clean_t)
+
                 else:
                     # Consumer / User: strictly their reported tickets
                     rep_id = clean_t.get("reporterId") or clean_t.get("reportedBy", {}).get("id")
@@ -264,7 +361,15 @@ class JsonFileRepository(BaseRepository):
             filtered.sort(key=lambda x: int(x.get("priorityScore", 0) or 0), reverse=True)
             return filtered
 
-    def save_ticket(self, ticket: Dict[str, Any], org_id: str) -> Dict[str, Any]:
+    def save_ticket(
+        self,
+        ticket: Dict[str, Any],
+        org_id: str,
+        expected_version: Optional[int] = None
+    ) -> Dict[str, Any]:
+        if not org_id:
+            raise ValueError("Tenant isolation: org_id is required to save ticket")
+
         with _lock:
             data = self._read_data()
             ticket["org_id"] = org_id
@@ -275,16 +380,31 @@ class JsonFileRepository(BaseRepository):
             found_idx = -1
             for idx, existing in enumerate(data["tickets"]):
                 if existing.get("id") == ticket_id:
-                    t_org = existing.get("org_id") or existing.get("orgId") or DEFAULT_ORG_ID
+                    t_org = existing.get("org_id") or existing.get("orgId")
                     if t_org != org_id:
                         raise PermissionError("Cross-tenant ticket modification is forbidden")
                     found_idx = idx
                     break
 
             if found_idx >= 0:
-                data["tickets"][found_idx] = {**data["tickets"][found_idx], **clean_t}
+                existing = data["tickets"][found_idx]
+                curr_version = int(existing.get("version", 1) or 1)
+
+                # Optimistic Concurrency Check
+                if expected_version is not None and curr_version != expected_version:
+                    raise ConcurrencyError(
+                        f"Optimistic concurrency conflict on ticket '{ticket_id}': "
+                        f"current version is {curr_version}, but operation expected version {expected_version}."
+                    )
+
+                new_version = curr_version + 1
+                clean_t["version"] = new_version
+                # Merge existing to protect immutable root creation fields
+                data["tickets"][found_idx] = {**existing, **clean_t, "version": new_version}
                 saved = data["tickets"][found_idx]
             else:
+                # Brand new ticket creation
+                clean_t["version"] = 1
                 data["tickets"].insert(0, clean_t)
                 saved = clean_t
 
@@ -292,12 +412,14 @@ class JsonFileRepository(BaseRepository):
             return sanitize_ticket(saved)
 
     def delete_ticket(self, ticket_id: str, org_id: str) -> bool:
+        if not org_id:
+            raise ValueError("Tenant isolation: org_id is required to delete ticket")
         with _lock:
             data = self._read_data()
             orig_len = len(data["tickets"])
             data["tickets"] = [
                 t for t in data["tickets"]
-                if not (t.get("id") == ticket_id and (t.get("org_id") or t.get("orgId") or DEFAULT_ORG_ID) == org_id)
+                if not (t.get("id") == ticket_id and (t.get("org_id") or t.get("orgId")) == org_id)
             ]
             if len(data["tickets"]) < orig_len:
                 self._write_data(data)
@@ -305,12 +427,19 @@ class JsonFileRepository(BaseRepository):
             return False
 
     def log_audit(self, entry: Dict[str, Any]) -> Dict[str, Any]:
+        org_id = entry.get("org_id")
+        if not org_id:
+            if ENVIRONMENT == "production":
+                raise ValueError("Tenant isolation: org_id is required for audit logs")
+            org_id = DEV_DEFAULT_ORG_ID
+            entry["org_id"] = org_id
+
         with _lock:
             data = self._read_data()
             entry_id = f"aud_{int(datetime.utcnow().timestamp() * 1000)}"
             record = {
                 "id": entry.get("id", entry_id),
-                "org_id": entry.get("org_id", DEFAULT_ORG_ID),
+                "org_id": org_id,
                 "ticket_id": entry.get("ticket_id"),
                 "actor_id": entry.get("actor_id", "system"),
                 "actor_email": entry.get("actor_email", "system"),
@@ -324,11 +453,13 @@ class JsonFileRepository(BaseRepository):
             return record
 
     def list_audit_logs(self, org_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+        if not org_id:
+            raise ValueError("Tenant isolation: org_id is required to list audit logs")
         with _lock:
             data = self._read_data()
             results = [
                 log for log in data["audit_logs"]
-                if (log.get("org_id") or DEFAULT_ORG_ID) == org_id
+                if (log.get("org_id") or log.get("orgId")) == org_id
             ]
             return results[:limit]
 
@@ -342,9 +473,7 @@ class DynamoDBRepository(BaseRepository):
     Partition Key: PK = ORG#<org_id>
     Sort Key: SK = USER#<user_id> | TICKET#<ticket_id> | AUDIT#<timestamp>#<id>
     GSI1 (Email index): GSI1PK = EMAIL#<email>, GSI1SK = ORG#<org_id>
-
-    Note: Designed for AWS Serverless deployments. Requires provisioned DynamoDB
-    table before running in production.
+    Supports atomic conditional writes for optimistic concurrency.
     """
     def __init__(self, table_name: str = DYNAMODB_TABLE_NAME):
         self.table_name = table_name
@@ -362,6 +491,21 @@ class DynamoDBRepository(BaseRepository):
                     f"Ensure AWS credentials and DynamoDB table '{self.table_name}' exist."
                 )
         return self._table
+
+    def get_organization(self, org_id: str) -> Optional[Dict[str, Any]]:
+        table = self._get_table()
+        try:
+            res = table.get_item(Key={"PK": f"ORG#{org_id}", "SK": "METADATA"})
+            return res.get("Item")
+        except Exception:
+            return None
+
+    def save_organization(self, org: Dict[str, Any]) -> Dict[str, Any]:
+        table = self._get_table()
+        org_id = org["id"]
+        item = {**org, "PK": f"ORG#{org_id}", "SK": "METADATA"}
+        table.put_item(Item=item)
+        return org
 
     def get_user_by_email(self, email: str, org_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
         table = self._get_table()
@@ -405,7 +549,9 @@ class DynamoDBRepository(BaseRepository):
 
     def save_user(self, user: Dict[str, Any]) -> Dict[str, Any]:
         table = self._get_table()
-        org_id = user.get("org_id") or DEFAULT_ORG_ID
+        org_id = user.get("org_id")
+        if not org_id:
+            raise ValueError("Tenant isolation error: org_id is required to save user.")
         user_id = user["id"]
         norm_email = user.get("email", "").strip().lower()
         item = {
@@ -435,7 +581,8 @@ class DynamoDBRepository(BaseRepository):
         org_id: str,
         role: str,
         user_id: str,
-        specialty: Optional[str] = None
+        specialty: Optional[str] = None,
+        queue: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         table = self._get_table()
         try:
@@ -451,16 +598,29 @@ class DynamoDBRepository(BaseRepository):
                     filtered.append(clean_t)
                 elif role == "technician":
                     assigned_tech_id = clean_t.get("assignedTechId")
-                    if assigned_tech_id and assigned_tech_id != user_id:
-                        continue
-                    if assigned_tech_id == user_id:
+                    status = clean_t.get("status") or TicketStatus.ASSIGNED
+
+                    if queue == "claimable":
+                        if assigned_tech_id is not None or status not in (TicketStatus.ASSIGNED, "Assigned"):
+                            continue
+                        cat = (clean_t.get("category") or "").strip().lower()
+                        spec = (specialty or "").strip().lower()
+                        specialized = {"plumbing", "electrical", "hvac", "lift"}
+                        if cat in specialized:
+                            if spec != cat:
+                                continue
+                        else:
+                            if spec not in ("general", "other", "") and spec != cat:
+                                continue
                         filtered.append(clean_t)
-                        continue
-                    cat = (clean_t.get("category") or "").lower()
-                    assigned = (clean_t.get("assignedTo") or "").lower()
-                    spec = (specialty or "").lower()
-                    if not spec or spec == "general" or cat == spec or spec in assigned:
-                        filtered.append(clean_t)
+                    elif queue == "assigned" or queue is None:
+                        if assigned_tech_id == user_id:
+                            filtered.append(clean_t)
+                    elif queue == "all":
+                        if assigned_tech_id == user_id:
+                            filtered.append(clean_t)
+                        elif assigned_tech_id is None and status in (TicketStatus.ASSIGNED, "Assigned"):
+                            filtered.append(clean_t)
                 else:
                     rep_id = clean_t.get("reporterId") or clean_t.get("reportedBy", {}).get("id")
                     if rep_id == user_id:
@@ -471,19 +631,46 @@ class DynamoDBRepository(BaseRepository):
         except Exception as e:
             raise RuntimeError(f"DynamoDB list tickets failed: {e}")
 
-    def save_ticket(self, ticket: Dict[str, Any], org_id: str) -> Dict[str, Any]:
+    def save_ticket(
+        self,
+        ticket: Dict[str, Any],
+        org_id: str,
+        expected_version: Optional[int] = None
+    ) -> Dict[str, Any]:
         table = self._get_table()
         ticket_id = ticket["id"]
-        item = {
-            **ticket,
-            "PK": f"ORG#{org_id}",
-            "SK": f"TICKET#{ticket_id}",
-            "org_id": org_id
-        }
+        pk = f"ORG#{org_id}"
+        sk = f"TICKET#{ticket_id}"
+
+        clean_t = sanitize_ticket(ticket)
+        clean_t["PK"] = pk
+        clean_t["SK"] = sk
+        clean_t["org_id"] = org_id
+
         try:
-            table.put_item(Item=item)
-            return sanitize_ticket(item)
+            if expected_version is not None:
+                # Conditional optimistic write requiring version to match
+                new_version = expected_version + 1
+                clean_t["version"] = new_version
+                table.put_item(
+                    Item=clean_t,
+                    ConditionExpression="attribute_exists(PK) AND #v = :expected_version",
+                    ExpressionAttributeNames={"#v": "version"},
+                    ExpressionAttributeValues={":expected_version": expected_version}
+                )
+            else:
+                curr_version = int(clean_t.get("version", 1) or 1)
+                clean_t["version"] = curr_version
+                table.put_item(Item=clean_t)
+
+            return clean_t
         except Exception as e:
+            err_str = str(e)
+            if "ConditionalCheckFailedException" in err_str:
+                raise ConcurrencyError(
+                    f"Optimistic concurrency conflict on ticket '{ticket_id}' in DynamoDB: "
+                    f"expected version {expected_version}."
+                )
             raise RuntimeError(f"DynamoDB save ticket failed: {e}")
 
     def delete_ticket(self, ticket_id: str, org_id: str) -> bool:
@@ -496,7 +683,9 @@ class DynamoDBRepository(BaseRepository):
 
     def log_audit(self, entry: Dict[str, Any]) -> Dict[str, Any]:
         table = self._get_table()
-        org_id = entry.get("org_id", DEFAULT_ORG_ID)
+        org_id = entry.get("org_id")
+        if not org_id:
+            raise ValueError("Tenant isolation: org_id is required for audit logs")
         timestamp = entry.get("timestamp", datetime.utcnow().isoformat() + "Z")
         entry_id = entry.get("id") or f"aud_{int(datetime.utcnow().timestamp() * 1000)}"
         item = {

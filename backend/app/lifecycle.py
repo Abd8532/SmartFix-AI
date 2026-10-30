@@ -9,10 +9,89 @@ Enforces that:
 - Rejection reason is persistently recorded and increments reopen count.
 """
 import re
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 from datetime import datetime
 from .models import TicketStatus, TicketPriority
 from .auth import AuthenticatedUser
+from .config import MAX_TECHNICIAN_ACTIVE_WORKLOAD
+
+# Specialized skill requirements: General technicians CANNOT claim or bypass these
+SPECIALIZED_CATEGORIES = {"plumbing", "electrical", "hvac", "lift"}
+
+
+def validate_technician_skill_for_category(
+    specialty: Optional[str],
+    category: Optional[str]
+) -> Tuple[bool, Optional[str]]:
+    """
+    Strict skill matching rules:
+    General technician CANNOT bypass specialized repair restrictions.
+    """
+    cat = (category or "").strip().lower()
+    spec = (specialty or "").strip().lower()
+
+    if cat in SPECIALIZED_CATEGORIES:
+        if spec != cat:
+            return False, f"Skill restriction: Category '{category}' requires '{category}' specialty. Technicians with '{specialty or 'General'}' cannot claim or work on this ticket."
+    return True, None
+
+
+def can_technician_work_on_ticket(ticket: Dict[str, Any], user: AuthenticatedUser) -> bool:
+    """
+    Checks if a technician is authorized to work on this ticket.
+    A technician can only complete or modify a ticket if it is assigned to them.
+    """
+    if not user.is_technician():
+        return False
+
+    assigned_tech_id = ticket.get("assignedTechId")
+    if not assigned_tech_id:
+        return False
+
+    return assigned_tech_id == user.id
+
+
+def claim_ticket_for_technician(
+    ticket: Dict[str, Any],
+    actor: AuthenticatedUser,
+    active_workload_count: int = 0
+) -> Dict[str, Any]:
+    """
+    Validates all rules for a technician claiming an unassigned ticket:
+    - Actor must be a technician.
+    - Category must match technician's specialty (general tech cannot bypass specialized tickets).
+    - Ticket must currently be unassigned.
+    - Status must be 'Assigned'.
+    - Workload must be under maximum active limit.
+    """
+    if not actor.is_technician():
+        raise PermissionError("Only field technicians can claim unassigned work orders.")
+
+    if ticket.get("assignedTechId"):
+        raise PermissionError("Conflict: Work order has already been claimed by another technician.")
+
+    status = ticket.get("status") or TicketStatus.ASSIGNED
+    if status not in (TicketStatus.ASSIGNED, "Assigned"):
+        raise ValueError(f"Cannot claim ticket in '{status}' status. Only unassigned tickets in 'Assigned' state can be claimed.")
+
+    is_valid, skill_err = validate_technician_skill_for_category(actor.specialty, ticket.get("category"))
+    if not is_valid:
+        raise PermissionError(f"Access Denied: {skill_err}")
+
+    if active_workload_count >= MAX_TECHNICIAN_ACTIVE_WORKLOAD:
+        raise ValueError(
+            f"Workload limit reached: You currently have {active_workload_count} active work orders in progress "
+            f"(maximum allowed is {MAX_TECHNICIAN_ACTIVE_WORKLOAD}). Please complete existing work before claiming new tickets."
+        )
+
+    now_iso = datetime.utcnow().isoformat() + "Z"
+    ticket["assignedTechId"] = actor.id
+    ticket["assignedTo"] = actor.name
+    ticket["status"] = TicketStatus.IN_PROGRESS
+    ticket["Status"] = TicketStatus.IN_PROGRESS
+    ticket["claimedAt"] = now_iso
+    ticket["updatedAt"] = now_iso
+    return ticket
 
 # Safety-critical regex patterns that trigger mandatory Emergency elevation
 SAFETY_CRITICAL_PATTERNS = [
@@ -100,8 +179,9 @@ def transition_ticket_status(
 
             # If unassigned, technician claims the ticket on starting work if specialty matches
             if not assigned_tech_id:
-                if user_spec != "general" and user_spec and cat != user_spec:
-                    raise PermissionError(f"Access Denied: Ticket category '{ticket.get('category')}' does not match your specialty '{actor.specialty}'.")
+                is_valid, skill_err = validate_technician_skill_for_category(actor.specialty, ticket.get("category"))
+                if not is_valid:
+                    raise PermissionError(f"Access Denied: {skill_err}")
                 ticket["assignedTechId"] = actor.id
                 ticket["assignedTo"] = actor.name
 

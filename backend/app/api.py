@@ -1,15 +1,25 @@
 """
 REST API Router & Request Handler for SmartFix AI
-Serves standard HTTP requests, local development servers, and AWS Lambda API Gateway proxy events.
 Authoritative routing with strict JWT verification, multi-tenant isolation,
-and dual-approval state machine enforcement.
+optimistic concurrency control, queue separation, presigned uploads, and dual-approval enforcement.
 """
 import json
 import secrets
+import base64
+import time
 from datetime import datetime
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, Tuple, Optional
 
-from .config import DEFAULT_ORG_ID
+from .config import (
+    DEFAULT_ORG_ID,
+    DEV_DEFAULT_ORG_ID,
+    ENVIRONMENT,
+    ALLOWED_ORIGINS,
+    MAX_UPLOAD_SIZE_BYTES,
+    ALLOWED_MIME_TYPES,
+    S3_BUCKET_NAME,
+    S3_REGION
+)
 from .auth import (
     authenticate_request,
     hash_password,
@@ -27,13 +37,15 @@ from .models import (
     sanitize_user,
     sanitize_ticket
 )
-from .storage import storage
+from .storage import storage, ConcurrencyError
 from .lifecycle import (
     transition_ticket_status,
     tech_complete_ticket,
     consumer_verify_closure,
     consumer_reject_closure,
-    can_technician_work_on_ticket
+    can_technician_work_on_ticket,
+    claim_ticket_for_technician,
+    validate_technician_skill_for_category
 )
 from .rag import (
     query_knowledge_base,
@@ -43,17 +55,69 @@ from .ai import analyze_maintenance_fault
 from .audit import record_audit_event
 
 
-def _json_response(status_code: int, body: Any) -> Dict[str, Any]:
+def _json_response(status_code: int, body: Any, req_origin: Optional[str] = None) -> Dict[str, Any]:
+    """Build standardized JSON response with strict CORS origin verification."""
+    allow_origin = None
+    if req_origin:
+        clean_req = req_origin.rstrip("/")
+        for allowed in ALLOWED_ORIGINS:
+            if clean_req == allowed.rstrip("/"):
+                allow_origin = req_origin
+                break
+
+    if not allow_origin:
+        allow_origin = ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "http://localhost:5173"
+
     return {
         "statusCode": status_code,
         "headers": {
             "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": allow_origin,
+            "Access-Control-Allow-Credentials": "true",
             "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
             "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS"
         },
         "body": json.dumps(body) if not isinstance(body, str) else body
     }
+
+
+def validate_image_payload(image_data: str) -> Tuple[bool, Optional[str], Optional[str]]:
+    """
+    Validates MIME type, file size, and magic bytes for image uploads.
+    Returns (is_valid, detected_mime, error_message).
+    """
+    if not image_data or not isinstance(image_data, str):
+        return False, None, "Image data is missing or empty"
+
+    clean_b64 = image_data
+    if "," in clean_b64:
+        clean_b64 = clean_b64.split(",", 1)[1]
+
+    try:
+        raw_bytes = base64.b64decode(clean_b64)
+    except Exception as e:
+        return False, None, f"Malformed base64 image data: {str(e)}"
+
+    if len(raw_bytes) > MAX_UPLOAD_SIZE_BYTES:
+        return False, None, f"Image exceeds maximum allowed size of {MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB"
+
+    if len(raw_bytes) < 12:
+        return False, None, "Image payload is too small to contain valid headers"
+
+    # Magic Bytes Validation
+    # JPEG: \xFF\xD8\xFF
+    if raw_bytes[:3] == b"\xff\xd8\xff":
+        return True, "image/jpeg", None
+
+    # PNG: \x89PNG\r\n\x1a\n
+    if raw_bytes[:8] == b"\x89PNG\r\n\x1a\n":
+        return True, "image/png", None
+
+    # WebP: starts with RIFF and has WEBP at offset 8..12
+    if raw_bytes[:4] == b"RIFF" and raw_bytes[8:12] == b"WEBP":
+        return True, "image/webp", None
+
+    return False, None, "Invalid or corrupted image format. Only authentic JPEG, PNG, or WebP images are permitted."
 
 
 def handle_api_request(
@@ -65,15 +129,29 @@ def handle_api_request(
     """
     Main dispatch router matching the API specification.
     Normalizes path and method, enforces JWT authentication, tenant isolation,
-    and returns standard JSON responses.
+    optimistic concurrency, and returns standard JSON responses.
     """
-    # Normalize path: strip trailing slash and ensure leading slash
-    norm_path = "/" + path.strip("/")
+    req_origin = headers.get("Origin") or headers.get("origin")
+
+    # Normalize path and extract query parameters
+    raw_path = "/" + path.strip("/")
+    query_params: Dict[str, str] = {}
+    if "?" in raw_path:
+        norm_path, query_str = raw_path.split("?", 1)
+        for param in query_str.split("&"):
+            if "=" in param:
+                k, v = param.split("=", 1)
+                query_params[k.strip().lower()] = v.strip()
+            else:
+                query_params[param.strip().lower()] = "true"
+    else:
+        norm_path = raw_path
+
     method = method.upper()
 
     # Pre-flight OPTIONS CORS support
     if method == "OPTIONS":
-        return _json_response(200, {"success": True})
+        return _json_response(200, {"success": True}, req_origin)
 
     # Parse body
     if isinstance(body_data, str) and body_data:
@@ -93,47 +171,45 @@ def handle_api_request(
         email = body.get("email", "").strip().lower()
         password = body.get("password", "")
 
-        # Rate Limiting Check
         is_allowed, rate_err = check_rate_limit(email)
         if not is_allowed:
-            return _json_response(429, {
-                "success": False,
-                "error": rate_err
-            })
+            return _json_response(429, {"success": False, "error": rate_err}, req_origin)
 
         user = storage.get_user_by_email(email)
         if not user:
             record_failed_login(email)
-            return _json_response(401, {
-                "success": False,
-                "error": "Invalid email or password."
-            })
+            return _json_response(401, {"success": False, "error": "Invalid email or password."}, req_origin)
 
         stored_hash = user.get("passwordHash") or user.get("password") or ""
         if not verify_password(password, stored_hash):
             record_failed_login(email)
-            return _json_response(401, {
-                "success": False,
-                "error": "Invalid email or password."
-            })
+            return _json_response(401, {"success": False, "error": "Invalid email or password."}, req_origin)
 
-        # Login successful - reset rate limit
         reset_failed_login(email)
 
-        # Check approval status
         if user.get("approvalStatus") == "Pending" and user.get("role") != "admin":
             return _json_response(403, {
                 "success": False,
                 "status": "Pending",
                 "error": "Access Denied: Your account is pending administrator approval."
-            })
+            }, req_origin)
 
         if user.get("approvalStatus") == "Rejected":
             return _json_response(403, {
                 "success": False,
                 "status": "Rejected",
                 "error": "Access Denied: Your registration was rejected by an administrator."
-            })
+            }, req_origin)
+
+        user_org = user.get("org_id") or user.get("orgId")
+        if not user_org:
+            if ENVIRONMENT == "production":
+                return _json_response(403, {
+                    "success": False,
+                    "error": "Account configuration error: No verified organization membership."
+                }, req_origin)
+            user_org = DEV_DEFAULT_ORG_ID
+            user["org_id"] = user_org
 
         token = create_access_token(user)
         safe_user = sanitize_user(user)
@@ -141,7 +217,7 @@ def handle_api_request(
 
         record_audit_event(
             action="USER_LOGIN",
-            org_id=user.get("org_id", DEFAULT_ORG_ID),
+            org_id=user_org,
             details={"email": user["email"], "role": user.get("role")}
         )
 
@@ -149,7 +225,7 @@ def handle_api_request(
             "success": True,
             "token": token,
             "user": safe_user
-        })
+        }, req_origin)
 
     if (norm_path == "/api/v1/auth/register" or norm_path == "/api/register") and method == "POST":
         email = body.get("email", "").strip().lower()
@@ -157,39 +233,50 @@ def handle_api_request(
         role = body.get("role", "user").strip().lower()
         name = body.get("name", "").strip() or email.split("@")[0]
         specialty = body.get("specialty") if role == "technician" else None
+        org_id = (body.get("org_id") or body.get("orgId") or "").strip()
 
-        # MANDATORY REQUIREMENT 1: Public registration as administrator is strictly prohibited
+        # Requirement 1: Public registration as administrator is strictly prohibited
         if role == "admin":
             return _json_response(403, {
                 "success": False,
                 "error": "Security Restriction: Public administrator registration is prohibited. Administrator accounts must be provisioned internally."
-            })
+            }, req_origin)
+
+        # Requirement 2: Reject missing or unknown organization membership in production
+        if not org_id:
+            if ENVIRONMENT == "production":
+                return _json_response(400, {
+                    "success": False,
+                    "error": "Organisation ID (org_id) is mandatory for registration."
+                }, req_origin)
+            org_id = DEV_DEFAULT_ORG_ID
 
         if not email or not password:
             return _json_response(400, {
                 "success": False,
                 "error": "Email and password are required for registration."
-            })
+            }, req_origin)
 
         if len(password) < 6:
             return _json_response(400, {
                 "success": False,
                 "error": "Password must be at least 6 characters long."
-            })
+            }, req_origin)
 
         existing = storage.get_user_by_email(email)
         if existing:
             return _json_response(400, {
                 "success": False,
                 "error": "An account with this email already exists."
-            })
+            }, req_origin)
 
         prefix = "tech" if role == "technician" else "usr"
         user_id = f"{prefix}_{int(datetime.utcnow().timestamp()*1000)}_{secrets.randbelow(1000)}"
 
         new_user = {
             "id": user_id,
-            "org_id": DEFAULT_ORG_ID,
+            "org_id": org_id,
+            "orgId": org_id,
             "name": name,
             "email": email,
             "passwordHash": hash_password(password),
@@ -208,7 +295,7 @@ def handle_api_request(
         saved = storage.save_user(new_user)
         record_audit_event(
             action="USER_REGISTERED",
-            org_id=DEFAULT_ORG_ID,
+            org_id=org_id,
             details={"userId": user_id, "email": email, "role": role, "specialty": specialty}
         )
 
@@ -216,38 +303,76 @@ def handle_api_request(
             "success": True,
             "message": "Account created. Please wait for an administrator to approve your account.",
             "user": saved
-        })
+        }, req_origin)
 
     # ==========================================================================
     # ALL SUBSEQUENT ROUTES REQUIRE JWT AUTHENTICATION
     # ==========================================================================
     user, auth_error = authenticate_request(headers)
     if auth_error:
-        return _json_response(auth_error["statusCode"], auth_error["body"])
+        return _json_response(auth_error["statusCode"], auth_error["body"], req_origin)
+
+    # Reject caller if organization is missing or untrusted
+    if not user.org_id:
+        return _json_response(403, {
+            "success": False,
+            "error": "Access Denied: Missing verified organisation membership claim."
+        }, req_origin)
 
     # 2. CURRENT USER INFO (/api/v1/auth/me)
     if norm_path == "/api/v1/auth/me" and method == "GET":
         u_data = storage.get_user_by_id(user.id, user.org_id)
         if not u_data:
-            return _json_response(404, {"success": False, "error": "User not found"})
-        return _json_response(200, {"success": True, "user": sanitize_user(u_data)})
+            return _json_response(404, {"success": False, "error": "User not found in tenant organization"}, req_origin)
+        return _json_response(200, {"success": True, "user": sanitize_user(u_data)}, req_origin)
 
     # ==========================================================================
-    # 3. ADMIN USER MANAGEMENT ROUTES (ADMIN ONLY)
+    # 3. UPLOAD & PRESIGNED S3 ENDPOINTS
+    # ==========================================================================
+    if (norm_path == "/api/v1/uploads/presign" or norm_path == "/api/uploads/presign") and method == "POST":
+        mime_type = (body.get("mimeType") or "").strip().lower()
+        file_size = int(body.get("fileSize", 0) or 0)
+
+        if mime_type not in ALLOWED_MIME_TYPES:
+            return _json_response(400, {
+                "success": False,
+                "error": f"Invalid MIME type '{mime_type}'. Permitted types: {', '.join(ALLOWED_MIME_TYPES)}"
+            }, req_origin)
+
+        if file_size > MAX_UPLOAD_SIZE_BYTES:
+            return _json_response(400, {
+                "success": False,
+                "error": f"File size exceeds maximum allowed {MAX_UPLOAD_SIZE_BYTES // (1024*1024)}MB."
+            }, req_origin)
+
+        ext = "jpg" if "jpeg" in mime_type else ("png" if "png" in mime_type else "webp")
+        unique_key = f"uploads/{user.org_id}/{int(time.time()*1000)}_{secrets.token_hex(6)}.{ext}"
+        presigned_upload_url = f"https://{S3_BUCKET_NAME}.s3.{S3_REGION}.amazonaws.com/{unique_key}"
+
+        return _json_response(200, {
+            "success": True,
+            "uploadUrl": presigned_upload_url,
+            "fileKey": unique_key,
+            "bucket": S3_BUCKET_NAME,
+            "expiresIn": 900
+        }, req_origin)
+
+    # ==========================================================================
+    # 4. ADMIN USER MANAGEMENT ROUTES (ADMIN ONLY)
     # ==========================================================================
     if norm_path == "/api/v1/admin/users" and method == "GET":
         if not user.is_admin():
-            return _json_response(403, {"success": False, "error": "Administrative permissions required."})
+            return _json_response(403, {"success": False, "error": "Administrative permissions required."}, req_origin)
         users_list = storage.list_users(user.org_id)
-        return _json_response(200, {"success": True, "users": users_list})
+        return _json_response(200, {"success": True, "users": users_list}, req_origin)
 
     if norm_path.startswith("/api/v1/admin/users/") and norm_path.endswith("/approve") and method == "POST":
         if not user.is_admin():
-            return _json_response(403, {"success": False, "error": "Administrative permissions required."})
+            return _json_response(403, {"success": False, "error": "Administrative permissions required."}, req_origin)
         target_id = norm_path.split("/")[-2]
         target = storage.get_user_by_id(target_id, user.org_id)
         if not target:
-            return _json_response(404, {"success": False, "error": "User not found in this organization"})
+            return _json_response(404, {"success": False, "error": "User not found in this organization"}, req_origin)
         target["approvalStatus"] = "Approved"
         target["approvedAt"] = datetime.utcnow().isoformat() + "Z"
         target["approvedBy"] = user.email
@@ -258,15 +383,15 @@ def handle_api_request(
             actor=user,
             details={"approvedUserId": target_id, "email": target.get("email")}
         )
-        return _json_response(200, {"success": True, "user": saved})
+        return _json_response(200, {"success": True, "user": saved}, req_origin)
 
     if norm_path.startswith("/api/v1/admin/users/") and norm_path.endswith("/reject") and method == "POST":
         if not user.is_admin():
-            return _json_response(403, {"success": False, "error": "Administrative permissions required."})
+            return _json_response(403, {"success": False, "error": "Administrative permissions required."}, req_origin)
         target_id = norm_path.split("/")[-2]
         target = storage.get_user_by_id(target_id, user.org_id)
         if not target:
-            return _json_response(404, {"success": False, "error": "User not found in this organization"})
+            return _json_response(404, {"success": False, "error": "User not found in this organization"}, req_origin)
         target["approvalStatus"] = "Rejected"
         target["rejectedAt"] = datetime.utcnow().isoformat() + "Z"
         target["rejectedBy"] = user.email
@@ -277,35 +402,50 @@ def handle_api_request(
             actor=user,
             details={"rejectedUserId": target_id, "email": target.get("email")}
         )
-        return _json_response(200, {"success": True, "user": saved})
+        return _json_response(200, {"success": True, "user": saved}, req_origin)
 
     # ==========================================================================
-    # 4. TICKET ENDPOINTS (STRICT TENANT ISOLATION)
+    # 5. TICKET ENDPOINTS (STRICT TENANT ISOLATION & QUEUE SEPARATION)
     # ==========================================================================
-    # GET /api/v1/tickets: List tenant tickets scoped to user role & specialty
-    if (norm_path == "/api/v1/tickets" or norm_path == "/api/tickets") and method == "GET":
+    # GET /api/v1/tickets & GET /api/v1/tickets/claimable
+    if (norm_path == "/api/v1/tickets" or norm_path == "/api/tickets" or norm_path == "/api/v1/tickets/claimable") and method == "GET":
+        queue = query_params.get("queue")
+        if norm_path.endswith("/claimable"):
+            queue = "claimable"
+
         tickets = storage.list_tickets(
             org_id=user.org_id,
             role=user.role,
             user_id=user.id,
-            specialty=user.specialty
+            specialty=user.specialty,
+            queue=queue
         )
-        return _json_response(200, {"success": True, "tickets": tickets, "count": len(tickets)})
+        return _json_response(200, {"success": True, "tickets": tickets, "count": len(tickets)}, req_origin)
 
-    # POST /api/v1/tickets: Create ticket with mandatory image + AI triage + Safety check
+    # POST /api/v1/tickets: Create ticket with mandatory image + server-side validation + AI triage
     if (norm_path == "/api/v1/tickets" or norm_path == "/api/tickets") and method == "POST":
         complaint = body.get("complaint") or body.get("description") or ""
         image_data = body.get("image") or body.get("photo") or ""
         mime_type = body.get("mimeType", "image/jpeg")
 
         if not complaint.strip():
-            return _json_response(400, {"success": False, "error": "A complaint description is required."})
+            return _json_response(400, {"success": False, "error": "A complaint description is required."}, req_origin)
 
         if not image_data:
             return _json_response(400, {
                 "success": False,
                 "error": "A photo of the maintenance fault is mandatory for verification."
-            })
+            }, req_origin)
+
+        # Server-side Image Security Validation (MIME type, file size, magic bytes)
+        is_valid_img, detected_mime, img_err = validate_image_payload(image_data)
+        if not is_valid_img:
+            return _json_response(400, {
+                "success": False,
+                "error": f"Image security validation failed: {img_err}"
+            }, req_origin)
+
+        effective_mime = detected_mime or mime_type
 
         try:
             # 1. Query RAG vector store for past similar repairs
@@ -315,17 +455,18 @@ def handle_api_request(
             triage = analyze_maintenance_fault(
                 complaint=complaint,
                 image_base64=image_data,
-                mime_type=mime_type,
+                mime_type=effective_mime,
                 historical_matches=rag_matches
             )
 
-            # 3. Create authoritative ticket
+            # 3. Create authoritative ticket with version: 1
             ticket_id = f"TCK-{secrets.randbelow(9000)+1000}"
             now_iso = datetime.utcnow().isoformat() + "Z"
 
             ticket = {
                 "id": ticket_id,
                 "org_id": user.org_id,
+                "orgId": user.org_id,
                 "title": triage["title"],
                 "description": triage["description"],
                 "category": triage["category"],
@@ -353,6 +494,7 @@ def handle_api_request(
                 "ragMatches": rag_matches,
                 "ragSearchMode": search_mode,
                 "reopenCount": 0,
+                "version": 1,
                 "createdAt": now_iso,
                 "updatedAt": now_iso
             }
@@ -380,9 +522,9 @@ def handle_api_request(
                     details={"priority": "Emergency", "reason": "Hazard keywords detected"}
                 )
 
-            return _json_response(201, {"success": True, "ticket": saved})
+            return _json_response(201, {"success": True, "ticket": saved}, req_origin)
         except Exception as e:
-            return _json_response(422, {"success": False, "error": str(e)})
+            return _json_response(422, {"success": False, "error": str(e)}, req_origin)
 
     # Single Ticket Sub-Routes
     if norm_path.startswith("/api/v1/tickets/"):
@@ -390,7 +532,7 @@ def handle_api_request(
         ticket = storage.get_ticket(ticket_id, user.org_id)
 
         if not ticket:
-            return _json_response(404, {"success": False, "error": "Ticket not found or access denied."})
+            return _json_response(404, {"success": False, "error": "Ticket not found or access denied."}, req_origin)
 
         # Consumer Isolation: Consumers may retrieve only tickets they reported
         if user.is_consumer():
@@ -400,7 +542,7 @@ def handle_api_request(
                 return _json_response(403, {
                     "success": False,
                     "error": "Access Denied: Consumers may retrieve only tickets they reported."
-                })
+                }, req_origin)
 
         # Technician Isolation: Technicians cannot fetch another technician's private ticket
         if user.is_technician():
@@ -409,62 +551,120 @@ def handle_api_request(
                 return _json_response(403, {
                     "success": False,
                     "error": "Access Denied: You are not assigned to this work order."
-                })
+                }, req_origin)
 
         # GET /api/v1/tickets/:id
         if norm_path == f"/api/v1/tickets/{ticket_id}" and method == "GET":
-            return _json_response(200, {"success": True, "ticket": ticket})
+            return _json_response(200, {"success": True, "ticket": ticket}, req_origin)
 
-        # PATCH /api/v1/tickets/:id/status
+        # POST /api/v1/tickets/:id/claim (Atomic Technician Claim Operation)
+        if norm_path == f"/api/v1/tickets/{ticket_id}/claim" and method == "POST":
+            if not user.is_technician():
+                return _json_response(403, {
+                    "success": False,
+                    "error": "Access Denied: Only field technicians can claim unassigned work orders."
+                }, req_origin)
+
+            try:
+                # Workload check: active In Progress count
+                active_workload = [
+                    t for t in storage.list_tickets(user.org_id, role="technician", user_id=user.id, queue="assigned")
+                    if t.get("status") == TicketStatus.IN_PROGRESS
+                ]
+                updated = claim_ticket_for_technician(ticket, user, active_workload_count=len(active_workload))
+                expected_ver = int(body.get("version") or ticket.get("version", 1) or 1)
+
+                saved = storage.save_ticket(updated, user.org_id, expected_version=expected_ver)
+                record_audit_event(
+                    action="TICKET_CLAIMED",
+                    org_id=user.org_id,
+                    actor=user,
+                    ticket_id=ticket_id,
+                    details={"assignedTechId": user.id, "technician": user.name}
+                )
+                return _json_response(200, {"success": True, "ticket": saved}, req_origin)
+            except ConcurrencyError as ce:
+                return _json_response(409, {
+                    "success": False,
+                    "error": f"Conflict: {str(ce)}",
+                    "conflict": True
+                }, req_origin)
+            except (ValueError, PermissionError) as e:
+                is_perm = isinstance(e, PermissionError)
+                err_msg = str(e)
+                is_conflict = "Conflict" in err_msg or "already been claimed" in err_msg
+                status_code = 409 if is_conflict else (403 if is_perm else 400)
+                resp_payload = {"success": False, "error": err_msg}
+                if is_conflict:
+                    resp_payload["conflict"] = True
+                return _json_response(status_code, resp_payload, req_origin)
+
+        # PATCH /api/v1/tickets/:id/status (Optimistic Concurrency)
         if norm_path == f"/api/v1/tickets/{ticket_id}/status" and method == "PATCH":
             new_status = body.get("status")
+            expected_ver = int(body.get("version") or ticket.get("version", 1) or 1)
             try:
                 updated = transition_ticket_status(ticket, new_status, user)
-                saved = storage.save_ticket(updated, user.org_id)
+                saved = storage.save_ticket(updated, user.org_id, expected_version=expected_ver)
                 record_audit_event(
                     action="STATUS_CHANGED",
                     org_id=user.org_id,
                     actor=user,
                     ticket_id=ticket_id,
-                    details={"from": ticket.get("status"), "to": new_status}
+                    details={"from": ticket.get("status"), "to": new_status, "version": saved.get("version")}
                 )
-                return _json_response(200, {"success": True, "ticket": saved})
+                return _json_response(200, {"success": True, "ticket": saved}, req_origin)
+            except ConcurrencyError as ce:
+                return _json_response(409, {
+                    "success": False,
+                    "error": f"Conflict: {str(ce)}",
+                    "conflict": True
+                }, req_origin)
             except (ValueError, PermissionError) as e:
                 return _json_response(403 if isinstance(e, PermissionError) else 400, {
                     "success": False,
                     "error": str(e)
-                })
+                }, req_origin)
 
-        # POST /api/v1/tickets/:id/tech-complete (Contract: resolutionNotes)
+        # POST /api/v1/tickets/:id/tech-complete (Contract: resolutionNotes + Optimistic Concurrency)
         if norm_path == f"/api/v1/tickets/{ticket_id}/tech-complete" and method == "POST":
             notes = body.get("resolutionNotes") or body.get("resolution_notes") or body.get("notes") or ""
+            expected_ver = int(body.get("version") or ticket.get("version", 1) or 1)
             try:
                 updated = tech_complete_ticket(ticket, user, notes)
-                saved = storage.save_ticket(updated, user.org_id)
+                saved = storage.save_ticket(updated, user.org_id, expected_version=expected_ver)
                 record_audit_event(
                     action="TECH_CONFIRMED",
                     org_id=user.org_id,
                     actor=user,
                     ticket_id=ticket_id,
-                    details={"resolutionNotes": notes}
+                    details={"resolutionNotes": notes, "version": saved.get("version")}
                 )
-                return _json_response(200, {"success": True, "ticket": saved})
+                return _json_response(200, {"success": True, "ticket": saved}, req_origin)
+            except ConcurrencyError as ce:
+                return _json_response(409, {
+                    "success": False,
+                    "error": f"Conflict: {str(ce)}",
+                    "conflict": True
+                }, req_origin)
             except (ValueError, PermissionError) as e:
                 return _json_response(403 if isinstance(e, PermissionError) else 400, {
                     "success": False,
                     "error": str(e)
-                })
+                }, req_origin)
 
-        # POST /api/v1/tickets/:id/verify-closure (Dual confirmation completed)
+        # POST /api/v1/tickets/:id/verify-closure (Dual confirmation completed + Optimistic Concurrency)
         if norm_path == f"/api/v1/tickets/{ticket_id}/verify-closure" and method == "POST":
+            expected_ver = int(body.get("version") or ticket.get("version", 1) or 1)
             try:
                 updated = consumer_verify_closure(ticket, user)
-                saved = storage.save_ticket(updated, user.org_id)
+                saved = storage.save_ticket(updated, user.org_id, expected_version=expected_ver)
                 record_audit_event(
                     action="CONSUMER_CONFIRMED",
                     org_id=user.org_id,
                     actor=user,
-                    ticket_id=ticket_id
+                    ticket_id=ticket_id,
+                    details={"version": saved.get("version")}
                 )
 
                 # Ingest verified repair into trusted RAG knowledge base
@@ -477,42 +677,59 @@ def handle_api_request(
                         ticket_id=ticket_id
                     )
 
-                return _json_response(200, {"success": True, "ticket": saved})
+                return _json_response(200, {"success": True, "ticket": saved}, req_origin)
+            except ConcurrencyError as ce:
+                return _json_response(409, {
+                    "success": False,
+                    "error": f"Conflict: {str(ce)}",
+                    "conflict": True
+                }, req_origin)
             except (ValueError, PermissionError) as e:
                 return _json_response(403 if isinstance(e, PermissionError) else 400, {
                     "success": False,
                     "error": str(e)
-                })
+                }, req_origin)
 
-        # POST /api/v1/tickets/:id/reject-closure (Contract: rejectionReason)
+        # POST /api/v1/tickets/:id/reject-closure (Contract: rejectionReason + Optimistic Concurrency)
         if norm_path == f"/api/v1/tickets/{ticket_id}/reject-closure" and method == "POST":
             reason = body.get("rejectionReason") or body.get("rejection_reason") or body.get("reason") or ""
+            expected_ver = int(body.get("version") or ticket.get("version", 1) or 1)
             try:
                 updated = consumer_reject_closure(ticket, user, reason)
-                saved = storage.save_ticket(updated, user.org_id)
+                saved = storage.save_ticket(updated, user.org_id, expected_version=expected_ver)
                 record_audit_event(
                     action="CONSUMER_REJECTED",
                     org_id=user.org_id,
                     actor=user,
                     ticket_id=ticket_id,
-                    details={"rejectionReason": reason, "reopenCount": saved["reopenCount"]}
+                    details={
+                        "rejectionReason": reason,
+                        "reopenCount": saved["reopenCount"],
+                        "version": saved.get("version")
+                    }
                 )
                 return _json_response(200, {
                     "success": True,
                     "message": "Work order reopened and returned to assigned technician.",
                     "ticket": saved
-                })
+                }, req_origin)
+            except ConcurrencyError as ce:
+                return _json_response(409, {
+                    "success": False,
+                    "error": f"Conflict: {str(ce)}",
+                    "conflict": True
+                }, req_origin)
             except (ValueError, PermissionError) as e:
                 return _json_response(403 if isinstance(e, PermissionError) else 400, {
                     "success": False,
                     "error": str(e)
-                })
+                }, req_origin)
 
         # DELETE /api/v1/tickets/:id
         if norm_path == f"/api/v1/tickets/{ticket_id}" and method == "DELETE":
             is_owner = ticket.get("reporterId") == user.id
             if not user.is_admin() and not is_owner:
-                return _json_response(403, {"success": False, "error": "Only an administrator or the reporter can delete this ticket."})
+                return _json_response(403, {"success": False, "error": "Only an administrator or the reporter can delete this ticket."}, req_origin)
 
             storage.delete_ticket(ticket_id, user.org_id)
             record_audit_event(
@@ -521,16 +738,15 @@ def handle_api_request(
                 actor=user,
                 ticket_id=ticket_id
             )
-            return _json_response(200, {"success": True, "message": f"Ticket #{ticket_id} deleted."})
+            return _json_response(200, {"success": True, "message": f"Ticket #{ticket_id} deleted."}, req_origin)
 
     # ==========================================================================
-    # 5. AUDIT LOGS ENDPOINT (/api/v1/audit-logs) (ADMIN ONLY)
+    # 6. AUDIT LOGS ENDPOINT (/api/v1/audit-logs) (ADMIN ONLY)
     # ==========================================================================
     if (norm_path == "/api/v1/audit-logs" or norm_path == "/api/audit-logs") and method == "GET":
         if not user.is_admin():
-            return _json_response(403, {"success": False, "error": "Administrative permissions required to view audit logs."})
+            return _json_response(403, {"success": False, "error": "Administrative permissions required to view audit logs."}, req_origin)
         logs = storage.list_audit_logs(user.org_id)
-        # Return both auditLogs and audit_logs for frontend contract compatibility
-        return _json_response(200, {"success": True, "auditLogs": logs, "audit_logs": logs})
+        return _json_response(200, {"success": True, "auditLogs": logs, "audit_logs": logs}, req_origin)
 
-    return _json_response(404, {"success": False, "error": f"Endpoint not found: {method} {norm_path}"})
+    return _json_response(404, {"success": False, "error": f"Endpoint not found: {method} {norm_path}"}, req_origin)

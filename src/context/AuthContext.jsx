@@ -171,8 +171,14 @@ export function AuthProvider({ children }) {
     clearToken();
     setTokenState(null);
     setCurrentUser(null);
+    setUsers([]);
     try {
       localStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      localStorage.removeItem('maintainx_tickets_v1');
+      localStorage.removeItem('maintainx_tickets');
+      localStorage.removeItem('maintainx_role_v1');
+      localStorage.removeItem('maintainx_jwt_token_v1');
+      localStorage.removeItem('maintainx_active_user');
     } catch {}
   }, []);
 

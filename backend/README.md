@@ -179,14 +179,21 @@ All protected routes mandate `Authorization: Bearer <jwt_token>`.
 ### Work Orders / Tickets
 | Method | Endpoint | Description |
 | :--- | :--- | :--- |
-| `GET` | `/api/v1/tickets` | List tenant tickets scoped to caller's role |
-| `POST` | `/api/v1/tickets` | Create work order (with photo, AI triage, safety override) |
+| `GET` | `/api/v1/tickets` | List tenant tickets scoped to caller's role (supports `?queue=claimable` vs `?queue=assigned`) |
+| `GET` | `/api/v1/tickets/claimable` | Unassigned tickets eligible for caller's specialty |
+| `POST` | `/api/v1/tickets` | Create work order (with photo, magic byte validation, AI triage, safety override) |
+| `POST` | `/api/v1/tickets/:id/claim` | Atomic technician claim with specialty & workload checks |
 | `GET` | `/api/v1/tickets/:id` | Get work order details (scoped to owner/assignee/admin) |
-| `PATCH` | `/api/v1/tickets/:id/status` | Authoritative status transition (e.g. `In Progress`) |
-| `POST` | `/api/v1/tickets/:id/tech-complete` | Tech marks complete with `{ resolutionNotes: "..." }` |
-| `POST` | `/api/v1/tickets/:id/verify-closure`| Consumer confirms physical fix; closes ticket |
-| `POST` | `/api/v1/tickets/:id/reject-closure`| Consumer rejects fix with `{ rejectionReason: "..." }` |
+| `PATCH` | `/api/v1/tickets/:id/status` | Authoritative status transition with optimistic concurrency |
+| `POST` | `/api/v1/tickets/:id/tech-complete` | Tech marks complete with `{ resolutionNotes, version }` |
+| `POST` | `/api/v1/tickets/:id/verify-closure`| Consumer confirms physical fix with version check; closes ticket |
+| `POST` | `/api/v1/tickets/:id/reject-closure`| Consumer rejects fix with `{ rejectionReason, version }` |
 | `DELETE`| `/api/v1/tickets/:id` | Delete ticket (Admin or reporter only) |
+
+### Uploads & Storage
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `POST` | `/api/v1/uploads/presign` | Request presigned S3 upload URL with MIME & size validation |
 
 ---
 
@@ -195,27 +202,25 @@ All protected routes mandate `Authorization: Bearer <jwt_token>`.
 The test suite runs under the Python standard library `unittest` framework:
 
 ```bash
-# Run all 21 unit and integration tests:
+# Run all 33 unit, integration, and security tests:
 python -m unittest discover -s backend/tests -p "test_*.py" -v
 ```
 
-The 21 tests validate:
-- Unauthenticated requests rejected (`401`).
-- Consumer cannot fetch another consumer's ticket (`403`).
-- Technician cannot fetch another technician's private work order (`403`).
-- Technician cannot complete an unassigned ticket (`403`).
-- Administrator cannot impersonate consumer verification (`403`).
-- Consumer cannot confirm another user's ticket (`403`).
-- Rejection reason is persisted in database (`200`).
-- Rejection reopens the same ticket with incremented `reopenCount`.
-- Dual approval flow required for `Completed` status.
-- Direct status transition to `Completed` is prohibited (`400`).
-- Cross-tenant audit logs are completely inaccessible across organizations.
-- Forged JWT signatures and expired tokens are rejected (`401`).
-- Public admin registration blockage.
-- Deterministic safety hazard auto-escalation.
-- Untrusted tickets rejected from RAG vector ingestion.
-- PBKDF2 password hashing integrity.
+The 33 tests validate:
+- **Phase 1 Invariants**: Public admin registration block, multi-tenant isolation, unassigned technician completion prevention, state machine dual confirmation, consumer rejection reopen, deterministic safety escalation, RAG gating, and PBKDF2 hashing.
+- **Phase 2 Router Invariants**: Unauthenticated request rejection (`401`), consumer and technician access isolation (`403`), anti-impersonation checks (`403`), rejection reason persistence, direct transition to Completed block (`400`), cross-tenant audit isolation, and JWT signature verification.
+- **Phase 3 Production Security & Concurrency**:
+  - Cryptographic RS256 signature verification for Amazon Cognito JWKS.
+  - Forged Cognito JWT rejection.
+  - Mismatched issuer (`iss`) and audience (`aud`/`client_id`) rejection.
+  - Expired Cognito token rejection.
+  - Missing organisation membership rejection.
+  - Two simultaneous technician claims returning HTTP 409 Conflict.
+  - Two simultaneous confirmation requests returning HTTP 409 Conflict.
+  - Version conflict detection returning HTTP 409 Conflict.
+  - Cross-tenant ticket access blockage.
+  - Technician skill restrictions (general technician blocked from specialized tickets).
+  - Server-side image magic bytes and MIME validation.
 
 ---
 

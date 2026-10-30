@@ -140,22 +140,34 @@ export const apiClient = {
 
   // Ticket Lifecycle Endpoints
   tickets: {
-    list: () =>
-      apiClient.get('/api/v1/tickets'),
+    list: (params = {}) => {
+      const q = params.queue ? `?queue=${encodeURIComponent(params.queue)}` : '';
+      return apiClient.get(`/api/v1/tickets${q}`);
+    },
+    listClaimable: () =>
+      apiClient.get('/api/v1/tickets/claimable'),
     get: (id) =>
       apiClient.get(`/api/v1/tickets/${id}`),
     create: (ticketData) =>
       apiClient.post('/api/v1/tickets', ticketData),
-    techComplete: (id, resolutionNotes) =>
-      apiClient.post(`/api/v1/tickets/${id}/tech-complete`, { resolutionNotes }),
-    verifyClosure: (id) =>
-      apiClient.post(`/api/v1/tickets/${id}/verify-closure`),
-    rejectClosure: (id, rejectionReason) =>
-      apiClient.post(`/api/v1/tickets/${id}/reject-closure`, { rejectionReason }),
-    updateStatus: (id, status, resolutionNotes = '') =>
-      apiClient.patch(`/api/v1/tickets/${id}/status`, { status, resolutionNotes }),
+    claim: (id, version) =>
+      apiClient.post(`/api/v1/tickets/${id}/claim`, { version }),
+    techComplete: (id, resolutionNotes, version) =>
+      apiClient.post(`/api/v1/tickets/${id}/tech-complete`, { resolutionNotes, version }),
+    verifyClosure: (id, version) =>
+      apiClient.post(`/api/v1/tickets/${id}/verify-closure`, { version }),
+    rejectClosure: (id, rejectionReason, version) =>
+      apiClient.post(`/api/v1/tickets/${id}/reject-closure`, { rejectionReason, version }),
+    updateStatus: (id, status, resolutionNotes = '', version) =>
+      apiClient.patch(`/api/v1/tickets/${id}/status`, { status, resolutionNotes, version }),
     delete: (id) =>
       apiClient.delete(`/api/v1/tickets/${id}`)
+  },
+
+  // Uploads
+  uploads: {
+    presign: (fileData) =>
+      apiClient.post('/api/v1/uploads/presign', fileData)
   }
 };
 
