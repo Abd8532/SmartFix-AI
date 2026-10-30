@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
 import Avatar from './Avatar';
 import UserProfileModal from './UserProfileModal';
 import { Wrench, ShieldCheck, Camera } from 'lucide-react';
 
 export default function Header({ currentUser: propUser, onLogout }) {
+  const auth = useAuth();
   const context = useTickets();
-  const user = propUser || context?.currentUser;
-  const handleLogout = onLogout || context?.logout;
+  const user = propUser || auth?.currentUser || context?.currentUser;
+  const handleLogout = onLogout || auth?.logout || context?.logout;
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   if (!user) return null;

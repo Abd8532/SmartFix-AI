@@ -387,12 +387,76 @@ def handle_api_request(
     if norm_path == "/api/v1/auth/me" and method == "GET":
         u_data = storage.get_user_by_id(user.id, user.org_id)
         if not u_data:
+            u_data = storage.get_user_by_email(user.email, user.org_id)
+        if not u_data:
             return _json_response(404, {"success": False, "error": "User not found in tenant organization"}, req_origin)
         csrf_token = secrets.token_hex(24)
         csrf_cookie = generate_csrf_cookie_header(csrf_token)
         return _json_response(200, {
             "success": True,
             "user": sanitize_user(u_data),
+            "csrfToken": csrf_token
+        }, req_origin, extra_headers={"Set-Cookie": csrf_cookie})
+
+    # UPDATE USER PROFILE (/api/v1/users/profile or /api/v1/auth/me)
+    if (norm_path in ("/api/v1/users/profile", "/api/v1/auth/me", "/api/users/profile")
+        and method in ("PATCH", "PUT")):
+        u_data = storage.get_user_by_id(user.id, user.org_id)
+        if not u_data:
+            u_data = storage.get_user_by_email(user.email, user.org_id)
+        if not u_data:
+            return _json_response(404, {"success": False, "error": "User record not found in tenant organization"}, req_origin)
+
+        # Apply profile updates safely
+        changed = False
+        if "avatar" in body:
+            new_avatar = str(body["avatar"] or "").strip()
+            if new_avatar:
+                u_data["avatar"] = new_avatar
+                changed = True
+
+        if "name" in body:
+            new_name = str(body["name"] or "").strip()
+            if new_name:
+                u_data["name"] = new_name
+                changed = True
+
+        if "department" in body:
+            new_dept = str(body["department"] or "").strip()
+            u_data["department"] = new_dept
+            if u_data.get("role") == "technician":
+                u_data["specialty"] = new_dept
+            changed = True
+
+        if "specialty" in body and u_data.get("role") == "technician":
+            new_spec = str(body["specialty"] or "").strip()
+            if new_spec:
+                u_data["specialty"] = new_spec
+                changed = True
+
+        if changed:
+            u_data["updatedAt"] = datetime.utcnow().isoformat() + "Z"
+            saved = storage.save_user(u_data)
+        else:
+            saved = u_data
+
+        record_audit_event(
+            action="USER_PROFILE_UPDATED",
+            org_id=user.org_id,
+            details={
+                "userId": user.id,
+                "email": user.email,
+                "avatarUpdated": bool("avatar" in body),
+                "nameUpdated": bool("name" in body)
+            }
+        )
+
+        csrf_token = secrets.token_hex(24)
+        csrf_cookie = generate_csrf_cookie_header(csrf_token)
+        return _json_response(200, {
+            "success": True,
+            "message": "User profile updated successfully.",
+            "user": sanitize_user(saved),
             "csrfToken": csrf_token
         }, req_origin, extra_headers={"Set-Cookie": csrf_cookie})
 

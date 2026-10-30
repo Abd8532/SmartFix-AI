@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useTickets } from '../../context/TicketContext';
 import Avatar from './Avatar';
@@ -48,9 +48,20 @@ export default function UserProfileModal({ isOpen, onClose }) {
 
   const fileInputRef = useRef(null);
 
+  // Synchronize modal state with currentUser whenever modal opens or user changes
+  useEffect(() => {
+    if (isOpen && currentUser) {
+      setAvatarUrl(currentUser.avatar || '');
+      setName(currentUser.name || '');
+      setDepartment(currentUser.department || currentUser.specialty || '');
+      setIsUrlInputOpen(false);
+      setCustomUrl('');
+    }
+  }, [isOpen, currentUser]);
+
   if (!isOpen || !currentUser) return null;
 
-  // Handle local image file upload (converts to base64 data URL)
+  // Handle local image file upload with client-side canvas compression for crisp avatars
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -68,22 +79,57 @@ export default function UserProfileModal({ isOpen, onClose }) {
 
     const reader = new FileReader();
     reader.onload = (event) => {
-      const dataUrl = event.target?.result;
-      if (dataUrl) {
-        setAvatarUrl(dataUrl);
+      const rawDataUrl = event.target?.result;
+      if (!rawDataUrl) return;
+
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const maxSize = 320;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > maxSize) {
+              height = Math.round((height * maxSize) / width);
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width = Math.round((width * maxSize) / height);
+              height = maxSize;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+
+          const compressed = canvas.toDataURL('image/jpeg', 0.88);
+          setAvatarUrl(compressed);
+        } catch {
+          setAvatarUrl(rawDataUrl);
+        }
+
         if (addToast) {
           addToast({
             type: 'info',
             title: 'Image Selected',
-            message: 'Click "Save Changes" to apply your new profile photo.'
+            message: 'Click "Save Changes" to save and persist your new profile photo.'
           });
         }
-      }
+      };
+      img.onerror = () => {
+        setAvatarUrl(rawDataUrl);
+      };
+      img.src = rawDataUrl;
     };
     reader.readAsDataURL(file);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
     const updates = {
       avatar: avatarUrl.trim() || currentUser.avatar,
@@ -91,20 +137,30 @@ export default function UserProfileModal({ isOpen, onClose }) {
       department: department.trim() || currentUser.department
     };
 
-    if (updateUserProfile) {
-      updateUserProfile(updates);
-    }
+    try {
+      if (updateUserProfile) {
+        await updateUserProfile(updates);
+      }
 
-    if (addToast) {
-      addToast({
-        type: 'success',
-        title: 'Profile Updated',
-        message: 'Your profile picture and account settings have been saved.'
-      });
+      if (addToast) {
+        addToast({
+          type: 'success',
+          title: 'Profile Updated',
+          message: 'Your profile picture and account settings have been saved.'
+        });
+      }
+      onClose();
+    } catch (err) {
+      if (addToast) {
+        addToast({
+          type: 'error',
+          title: 'Update Error',
+          message: err?.message || 'Failed to save profile changes. Please try again.'
+        });
+      }
+    } finally {
+      setIsSaving(false);
     }
-
-    setIsSaving(false);
-    onClose();
   };
 
   const handleLogout = () => {
@@ -323,10 +379,14 @@ export default function UserProfileModal({ isOpen, onClose }) {
               type="button"
               onClick={handleSave}
               disabled={isSaving}
-              className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-[#2D60FF]/25 transition-all duration-200 active:scale-[0.98]"
+              className="h-11 px-6 rounded-2xl bg-[#2D60FF] hover:bg-[#1814F3] text-white text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-[#2D60FF]/25 transition-all duration-200 active:scale-[0.98] disabled:opacity-75 cursor-pointer"
             >
-              <Check className="w-4 h-4" />
-              <span>Save Changes</span>
+              {isSaving ? (
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                <Check className="w-4 h-4" />
+              )}
+              <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
             </button>
           </div>
         </div>

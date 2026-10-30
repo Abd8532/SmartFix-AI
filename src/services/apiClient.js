@@ -218,6 +218,11 @@ export const apiClient = {
       const data = await apiClient.get('/api/v1/auth/me');
       if (data?.csrfToken) setCsrfToken(data.csrfToken);
       return data;
+    },
+    updateProfile: async (profileData) => {
+      const data = await apiClient.patch('/api/v1/users/profile', profileData);
+      if (data?.csrfToken) setCsrfToken(data.csrfToken);
+      return data;
     }
   },
 

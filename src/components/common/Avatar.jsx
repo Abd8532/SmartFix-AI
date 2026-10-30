@@ -1,7 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export default function Avatar({ src, name, size = "w-8 h-8", className = "" }) {
   const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [src]);
 
   const getInitials = (str) => {
     if (!str) return 'U';

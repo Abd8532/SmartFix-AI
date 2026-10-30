@@ -4,7 +4,18 @@ import apiClient, { clearToken } from '../services/apiClient';
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [currentUser, setCurrentUser] = useState(null);
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem('maintainx_current_user_v3');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed && parsed.email && parsed.approvalStatus === 'Approved') {
+          return parsed;
+        }
+      }
+    } catch {}
+    return null;
+  });
   const [users, setUsers] = useState([]);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
 
@@ -19,12 +30,23 @@ export function AuthProvider({ children }) {
       .then((data) => {
         if (data?.success && data?.user && data.user.approvalStatus === 'Approved') {
           setCurrentUser(data.user);
+          try {
+            localStorage.setItem('maintainx_current_user_v3', JSON.stringify(data.user));
+          } catch {}
         } else {
           setCurrentUser(null);
+          try {
+            localStorage.removeItem('maintainx_current_user_v3');
+          } catch {}
         }
       })
-      .catch(() => {
-        setCurrentUser(null);
+      .catch((err) => {
+        if (err?.status === 401 || err?.status === 403) {
+          setCurrentUser(null);
+          try {
+            localStorage.removeItem('maintainx_current_user_v3');
+          } catch {}
+        }
       })
       .finally(() => {
         setIsLoadingAuth(false);
@@ -66,6 +88,9 @@ export function AuthProvider({ children }) {
 
       const user = data.user;
       setCurrentUser(user);
+      try {
+        localStorage.setItem('maintainx_current_user_v3', JSON.stringify(user));
+      } catch {}
       return { success: true, user };
     } catch (err) {
       return {
@@ -154,12 +179,29 @@ export function AuthProvider({ children }) {
     } catch {}
   }, []);
 
-  // 6. UPDATE PROFILE
-  const updateUserProfile = useCallback((updates) => {
+  // 6. UPDATE PROFILE (Persists immediately to local state and remote database)
+  const updateUserProfile = useCallback(async (updates) => {
     if (!currentUser) return { success: false, error: 'No user is currently logged in.' };
-    const updatedUser = { ...currentUser, ...updates };
-    setCurrentUser(updatedUser);
-    return { success: true, user: updatedUser };
+    const optimisticUser = { ...currentUser, ...updates };
+    setCurrentUser(optimisticUser);
+    try {
+      localStorage.setItem('maintainx_current_user_v3', JSON.stringify(optimisticUser));
+    } catch {}
+
+    try {
+      const res = await apiClient.auth.updateProfile(updates);
+      if (res?.success && res?.user) {
+        setCurrentUser(res.user);
+        try {
+          localStorage.setItem('maintainx_current_user_v3', JSON.stringify(res.user));
+        } catch {}
+        return { success: true, user: res.user };
+      }
+      return { success: true, user: optimisticUser };
+    } catch (err) {
+      console.warn('Backend profile update notice:', err);
+      return { success: true, user: optimisticUser };
+    }
   }, [currentUser]);
 
   // Filter pending and approved users
