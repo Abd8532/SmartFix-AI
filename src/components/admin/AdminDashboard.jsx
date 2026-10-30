@@ -300,42 +300,6 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
         <p className="text-sm text-slate-500 font-medium mt-2 max-w-xl mx-auto leading-relaxed">
           Live campus maintenance requests, automatically routed and ready for review.
         </p>
-
-        {/* System Security & Admin Sign-Up Header Control */}
-        <div className="mt-5 p-3.5 px-4 sm:px-5 rounded-2xl bg-white border border-[#E6EFF5] shadow-xs flex items-center justify-between gap-4 text-xs max-w-2xl mx-auto text-left">
-          <div className="flex items-center gap-3">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs ${
-              allowAdminSignup ? 'bg-[#E7EDFF] text-[#2D60FF]' : 'bg-amber-100 text-amber-700'
-            }`}>
-              <ShieldAlert className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-slate-900 font-['Plus_Jakarta_Sans']">Allow New Administrator Sign-Ups</span>
-                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                  allowAdminSignup ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                }`}>
-                  {allowAdminSignup ? 'Sign-Up Enabled' : 'Locked'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500 font-medium hidden sm:block mt-0.5">
-                {allowAdminSignup
-                  ? 'Outside users can register as Administrator directly from the portal.'
-                  : 'Administrator registration is locked by system security settings.'}
-              </p>
-            </div>
-          </div>
-
-          <label className="relative inline-flex items-center cursor-pointer shrink-0" title="Toggle Administrator Sign-Up">
-            <input
-              type="checkbox"
-              checked={Boolean(allowAdminSignup)}
-              onChange={handleAdminSignupToggle}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#2D60FF]"></div>
-          </label>
-        </div>
       </div>
 
       {/* PENDING APPROVALS NOTICE (Visible in Overview if there are pending users) */}

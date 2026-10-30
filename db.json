@@ -2981,6 +2981,33 @@
   ],
   "audit_logs": [
     {
+      "id": "aud_1793370313283",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "adm_1793368640345_253",
+      "actor_email": "bpssarthak321@gmail.com",
+      "actor_role": "admin",
+      "action": "ADMIN_SETTINGS_UPDATED",
+      "details": {
+        "allowAdminSignup": false
+      },
+      "timestamp": "2026-10-30T19:55:13.275657Z"
+    },
+    {
+      "id": "aud_1793370306924",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_LOGIN",
+      "details": {
+        "email": "bpssarthak321@gmail.com",
+        "role": "admin"
+      },
+      "timestamp": "2026-10-30T19:55:06.916846Z"
+    },
+    {
       "id": "aud_1793369964829",
       "org_id": "org_campus_main",
       "ticket_id": null,
@@ -4781,5 +4808,7 @@
       "timestamp": "2026-10-30T15:44:43.201Z"
     }
   ],
-  "settings": {}
+  "settings": {
+    "allow_admin_signup": false
+  }
 }
