@@ -394,7 +394,7 @@ export default function NewIssueForm({ onTicketCreated }) {
 
       const created = await addTicket({
         complaint: complaint.trim(),
-        image: s3FileKey ? null : base64DataUrl,
+        image: base64DataUrl,
         photo: s3FileKey || base64DataUrl,
         fileKey: s3FileKey,
         mimeType: imageMimeType

@@ -264,6 +264,15 @@ export const apiClient = {
     presign: (fileData) =>
       apiClient.post('/api/v1/uploads/presign', fileData),
     uploadToS3: async (presignResponse, binaryData, mimeType) => {
+      const targetUrl = typeof presignResponse === 'string' ? presignResponse : presignResponse?.uploadUrl;
+
+      // In local development/test environments where S3 is simulated (?mock_presigned=true),
+      // avoid firing a browser network request to a non-existent AWS domain which causes CORS net::ERR_FAILED.
+      if (targetUrl && (targetUrl.includes('mock_presigned=true') || targetUrl.includes('mock-s3'))) {
+        console.info('[Dev S3] Presigned upload simulated in local environment for key:', presignResponse?.fileKey);
+        return true;
+      }
+
       // S3 Presigned POST flow (fields provided with policy conditions)
       if (presignResponse && typeof presignResponse === 'object' && presignResponse.fields) {
         const formData = new FormData();
@@ -280,7 +289,6 @@ export const apiClient = {
       }
 
       // S3 Presigned PUT flow
-      const targetUrl = typeof presignResponse === 'string' ? presignResponse : presignResponse?.uploadUrl;
       const response = await fetch(targetUrl, {
         method: 'PUT',
         headers: {
