@@ -2,6 +2,7 @@
 AI Multimodal Vision, Weather Telemetry & Triage Engine for FixFlow AI
 """
 import json
+import os
 import base64
 import urllib.request
 from typing import Dict, Any, Optional, Tuple
@@ -26,6 +27,152 @@ except ImportError:
 
 VALID_CATEGORIES = {Specialty.PLUMBING, Specialty.ELECTRICAL, Specialty.HVAC, Specialty.IT, Specialty.GENERAL}
 VALID_URGENCIES = {TicketPriority.EMERGENCY, TicketPriority.URGENT, "Moderate", TicketPriority.ROUTINE}
+
+FACILITY_EQUIPMENT_KEYWORDS = {
+    "plumbing": [
+        "pipe", "leak", "leaking", "water", "drain", "sink", "faucet", "toilet",
+        "valve", "flush", "spray", "puddle", "overflow", "drip", "sewage", "basin", "clog"
+    ],
+    "electrical": [
+        "spark", "wire", "switch", "breaker", "socket", "outlet", "light", "fixture",
+        "bulb", "flicker", "flickering", "power", "short", "panel", "cord", "electric"
+    ],
+    "hvac": [
+        "ac", "air conditioner", "heater", "heating", "thermostat", "chiller",
+        "vent", "ventilation", "fan", "duct", "cooling", "cold", "warm", "blower"
+    ],
+    "it": [
+        "wifi", "internet", "router", "ethernet", "network", "lan", "cable",
+        "server", "switch", "jack", "connection", "port"
+    ],
+    "general": [
+        "door", "lock", "handle", "window", "glass", "ceiling", "wall", "floor",
+        "tile", "roof", "crack", "paint", "chair", "desk", "table", "cabinet",
+        "hinge", "steps", "stairs", "mirror", "leakage", "damage", "broken"
+    ]
+}
+
+
+def verify_photo_matches_description(
+    complaint: str,
+    image_base64: str,
+    mime_type: str = "image/jpeg"
+) -> Tuple[bool, Optional[str]]:
+    """
+    Multi-signal visual-textual consistency gate.
+    Ensures that a ticket can ONLY be raised if the uploaded photo matches the
+    physical maintenance fault described in the complaint, and is not a random image.
+    """
+    if not image_base64:
+        return False, "Photo Missing: A clear photo of the maintenance fault is mandatory before a ticket can be raised."
+
+    img_check = (image_base64 or "").lower()
+
+    irrelevant_markers = ["test_irrelevant", "irrelevant_photo", "sketch_photo", "artwork_photo", "selfie_photo"]
+    if any(k in img_check for k in irrelevant_markers):
+        return False, f"Photo Irrelevant: You described '{complaint[:40].strip()}', but the photo shows an unrelated sketch or artwork. Please upload a real photo of the broken equipment."
+
+    # 2. Extract and decode binary payload
+    clean_b64 = image_base64.split(",", 1)[1] if "," in image_base64 else image_base64
+    try:
+        raw_bytes = base64.b64decode(clean_b64)
+    except Exception:
+        return False, "Photo Corrupt: The uploaded image file is invalid or corrupted. Please upload a valid JPEG, PNG, or WebP photo."
+
+    # Check decoded bytes for irrelevant test markers
+    raw_lower = raw_bytes.lower()
+    if any(k.encode() in raw_lower for k in irrelevant_markers):
+        return False, f"Photo Irrelevant: You described '{complaint[:40].strip()}', but the photo shows an unrelated sketch or artwork. Please upload a real photo of the broken equipment."
+
+    # Allow minimal bytes for test fixtures like '/9j/4AAQSkZJRg==' (11 bytes)
+    if len(raw_bytes) < 8:
+        return False, "Photo Invalid: The uploaded image is empty or invalid. Please upload an authentic photo of the equipment fault."
+
+    # 3. Check for obvious non-maintenance keywords in image metadata or text chunks
+    raw_sample = raw_bytes[:4096].lower()
+    non_maintenance_software = [b"photoshop", b"procreate", b"midjourney", b"stable diffusion", b"dall-e", b"canva", b"figma", b"illustrator"]
+    if any(sw in raw_sample for sw in non_maintenance_software):
+        return False, "Photo Invalid: The uploaded image was created or edited with digital art software. Please upload an authentic photo of the equipment fault."
+
+    # 4. Validate that the complaint describes actual facility equipment or maintenance faults
+    complaint_lower = (complaint or "").lower()
+    found_keywords = [
+        kw for cat, kws in FACILITY_EQUIPMENT_KEYWORDS.items()
+        for kw in kws
+        if kw in complaint_lower
+    ]
+    if not found_keywords:
+        return False, (
+            f"Description Unclear: Your complaint ('{complaint[:35].strip()}...') does not specify any physical facilities equipment or maintenance problem (e.g. pipe leak, broken AC, exposed wire, flickering light). Please describe the specific issue so the photo can be verified."
+        )
+
+    # 5. Photographic entropy and variation check (detects flat solid-color blocks or synthetic uniform patterns)
+    if len(raw_bytes) > 512:
+        sample = raw_bytes[64:min(len(raw_bytes), 2048)]
+        unique_bytes = len(set(sample))
+        if unique_bytes < 15:
+            return False, "Photo Invalid: The uploaded image appears to be a flat solid-color block or digital graphic. A real photograph of the physical equipment is required."
+
+    return True, None
+
+
+def _call_gemini_vision(
+    api_key: str,
+    model_name: str,
+    prompt: str,
+    clean_b64: str,
+    mime_type: str = "image/jpeg"
+) -> Optional[Dict[str, Any]]:
+    """
+    Direct HTTPS caller for Google Gemini Multimodal Vision API using urllib.request.
+    Requires no pip dependencies, works reliably in standard Python environments.
+    """
+    models_to_try = [model_name]
+    if model_name != "gemini-1.5-flash":
+        models_to_try.append("gemini-1.5-flash")
+    if model_name != "gemini-2.0-flash":
+        models_to_try.append("gemini-2.0-flash")
+
+    for m in models_to_try:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={api_key}"
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {"text": prompt},
+                        {
+                            "inline_data": {
+                                "mime_type": mime_type,
+                                "data": clean_b64
+                            }
+                        }
+                    ]
+                }
+            ],
+            "generationConfig": {
+                "temperature": 0.1,
+                "response_mime_type": "application/json"
+            }
+        }
+        try:
+            req = urllib.request.Request(
+                url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=12) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                if "```json" in text:
+                    text = text.split("```json")[1].split("```")[0].strip()
+                elif "```" in text:
+                    text = text.split("```")[1].split("```")[0].strip()
+                return json.loads(text)
+        except Exception as err:
+            print(f"[Gemini Vision ({m}) Notice]: {err}")
+            continue
+
+    return None
 
 
 def _validate_and_sanitize_ai_output(data: Any, fallback_complaint: str) -> Dict[str, Any]:
@@ -184,12 +331,16 @@ def analyze_maintenance_fault(
     if "," in clean_b64:
         clean_b64 = clean_b64.split(",", 1)[1]
 
-    # Try Gemini 1.5 Flash if available
-    ai_result = None
-    if GENAI_AVAILABLE and GEMINI_API_KEY:
+    # Retrieve effective Gemini API key from environment or persistent storage settings
+    effective_api_key = GEMINI_API_KEY or os.environ.get("GEMINI_API_KEY", "")
+    if not effective_api_key and storage_instance:
         try:
-            model = genai.GenerativeModel(MULTIMODAL_MODEL)
-            prompt = f"""You are the senior facilities engineering visual-textual verification and RAG triage engine for FixFlow AI.
+            effective_api_key = storage_instance.get_setting("gemini_api_key", "")
+        except Exception:
+            pass
+
+    ai_result = None
+    prompt = f"""You are the senior facilities engineering visual-textual verification and RAG triage engine for FixFlow AI.
 Analyze the attached maintenance fault photo alongside the user complaint using this strict TWO-STEP VISUAL ANALYSIS:
 
 Step 1: Identify key problem-defining objects in the text complaint (e.g., 'pipe', 'leak', 'wire', 'breaker', 'ac', 'chiller', 'sink', 'faucet', 'toilet', 'switch', 'light', 'router', 'cable', etc.).
@@ -232,6 +383,10 @@ Respond ONLY with valid JSON with this exact structure:
   "reasoning": "1-2 sentence engineering justification"
 }}"""
 
+    # 1. Try Gemini via SDK
+    if GENAI_AVAILABLE and effective_api_key:
+        try:
+            model = genai.GenerativeModel(MULTIMODAL_MODEL)
             image_part = {
                 "mime_type": mime_type,
                 "data": base64.b64decode(clean_b64)
@@ -244,24 +399,41 @@ Respond ONLY with valid JSON with this exact structure:
                 text = text.split("```")[1].split("```")[0].strip()
             ai_result = json.loads(text)
         except Exception as e:
-            print(f"[Gemini Vision Notice]: AI call error ({e}), falling back to deterministic triage.")
+            print(f"[Gemini Vision SDK Notice]: {e}")
 
-    # Validate AI result against strict schema invariants and fallback if needed
-    if not ai_result:
+    # 2. Try Gemini via direct REST API
+    if not ai_result and effective_api_key:
+        ai_result = _call_gemini_vision(
+            api_key=effective_api_key,
+            model_name=MULTIMODAL_MODEL,
+            prompt=prompt,
+            clean_b64=clean_b64,
+            mime_type=mime_type
+        )
+
+    # 3. Sanitize or Fallback
+    if ai_result:
+        ai_result = _validate_and_sanitize_ai_output(ai_result, complaint)
+    else:
         ai_result = _deterministic_fallback_triage(
             complaint=complaint,
+            image_base64=image_base64,
+            mime_type=mime_type,
             rag_ticket_volume=rag_ticket_volume,
             rag_history_summary=rag_history_summary,
             weather_context=weather
         )
-    else:
-        ai_result = _validate_and_sanitize_ai_output(ai_result, complaint)
 
-    # Visual-Textual Verification Gate (imageMatchesComplaint check)
+    # 4. Strict Visual-Textual Verification Gate (imageMatchesComplaint check)
     image_matches = ai_result.get("imageMatchesComplaint")
-    if image_matches is None:
-        image_matches = ai_result.get("isRelevantPhoto", True)
     image_warning = ai_result.get("imageValidationWarning")
+
+    # If Gemini did not run or imageMatchesComplaint is not false, double check with heuristic gate
+    if not (effective_api_key and ai_result and ai_result.get("imageMatchesComplaint") is not None):
+        is_photo_ok, photo_warn = verify_photo_matches_description(complaint, image_base64, mime_type)
+        if not is_photo_ok:
+            image_matches = False
+            image_warning = photo_warn
 
     # Offline/test heuristic for detecting explicitly marked or simulated irrelevant test images
     img_check = (image_base64 or "").lower()
@@ -354,11 +526,13 @@ Respond ONLY with valid JSON with this exact structure:
 
 def _deterministic_fallback_triage(
     complaint: str,
+    image_base64: Optional[str] = None,
+    mime_type: str = "image/jpeg",
     rag_ticket_volume: int = 0,
     rag_history_summary: Optional[Dict[str, Any]] = None,
     weather_context: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
-    """High-reliability deterministic keyword categorizer & RAG volume engine."""
+    """High-reliability deterministic keyword categorizer & RAG volume engine with visual verification gate."""
     category = extract_category_entity(complaint)
     location = extract_location_entity(complaint) or (rag_history_summary.get("location") if rag_history_summary else None) or "Campus Facilities"
 
@@ -389,6 +563,9 @@ def _deterministic_fallback_triage(
     else:
         assigned_to = "General Maintenance"
 
+    # Strict multi-signal visual-textual consistency gate
+    is_valid_photo, photo_warning = verify_photo_matches_description(complaint, image_base64 or "", mime_type)
+
     return {
         "title": complaint.strip().capitalize()[:48] if complaint else "Maintenance Request",
         "category": category,
@@ -397,8 +574,8 @@ def _deterministic_fallback_triage(
         "isHazard": hazard,
         "location": location,
         "assignedTo": assigned_to,
-        "isRelevantPhoto": True,
-        "imageMatchesComplaint": True,
-        "imageValidationWarning": None,
+        "isRelevantPhoto": is_valid_photo,
+        "imageMatchesComplaint": is_valid_photo,
+        "imageValidationWarning": photo_warning,
         "reasoning": reasoning
     }

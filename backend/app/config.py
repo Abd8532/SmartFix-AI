@@ -6,6 +6,28 @@ and tenant boundary rules.
 import os
 from typing import List, Optional
 
+# Automatically load environment variables from .env file if present
+def _load_dotenv():
+    cur = os.path.abspath(os.path.dirname(__file__))
+    for _ in range(4):
+        env_file = os.path.join(cur, ".env")
+        if os.path.isfile(env_file):
+            try:
+                with open(env_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line and not line.startswith("#") and "=" in line:
+                            k, v = line.split("=", 1)
+                            k, v = k.strip(), v.strip().strip('"').strip("'")
+                            if k and k not in os.environ:
+                                os.environ[k] = v
+            except Exception:
+                pass
+            break
+        cur = os.path.dirname(cur)
+
+_load_dotenv()
+
 # Environment mode: 'development', 'test', 'production'
 ENVIRONMENT = os.environ.get("ENVIRONMENT", os.environ.get("NODE_ENV", "development")).lower()
 

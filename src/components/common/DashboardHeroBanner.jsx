@@ -146,7 +146,7 @@ export default function DashboardHeroBanner({
             value={searchQuery}
             onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
             placeholder="Search tickets by ID, problem, room, or equipment..."
-            className="w-full bg-[#1c1c21] border border-[#2a2a32] rounded-lg pl-10 pr-4 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
+            className="w-full bg-[#1c1c21] border border-[#2a2a32] rounded-lg pl-11 pr-4 py-2 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-indigo-500 transition"
           />
         </div>
 
