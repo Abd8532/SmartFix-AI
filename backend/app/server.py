@@ -14,6 +14,7 @@ backend_dir = os.path.abspath(os.path.join(current_dir, "..", ".."))
 if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
+from backend.app.config import ENVIRONMENT
 from backend.app.api import handle_api_request
 
 
@@ -37,14 +38,17 @@ class ApiRequestHandler(BaseHTTPRequestHandler):
             import traceback
             sys.stderr.write(f"[Server Error] {self.command} {self.path}: {str(e)}\n")
             traceback.print_exc()
+            err_msg = "An unexpected internal server error occurred." if ENVIRONMENT == "production" else f"Internal Server Error: {str(e)}"
             response = {
                 "statusCode": 500,
                 "headers": {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": headers_dict.get("Origin") or "http://localhost:5173",
-                    "Access-Control-Allow-Credentials": "true"
+                    "Access-Control-Allow-Credentials": "true",
+                    "X-Content-Type-Options": "nosniff",
+                    "X-Frame-Options": "DENY"
                 },
-                "body": json.dumps({"success": False, "error": f"Internal Server Error: {str(e)}"})
+                "body": json.dumps({"success": False, "error": err_msg})
             }
 
         status_code = response.get("statusCode", 200)

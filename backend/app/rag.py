@@ -34,6 +34,7 @@ except ImportError:
 SEED_VERIFIED_REPAIRS = [
     {
         "id": "TICK-HIST-101",
+        "org_id": "public_base",
         "title": "Cafeteria Sink Cold Water Pipe Leak",
         "category": "Plumbing",
         "urgency": "Routine",
@@ -49,6 +50,7 @@ SEED_VERIFIED_REPAIRS = [
     },
     {
         "id": "TICK-HIST-102",
+        "org_id": "public_base",
         "title": "Keller Science Server Room Breaker Trip",
         "category": "Electrical",
         "urgency": "Urgent",
@@ -64,6 +66,7 @@ SEED_VERIFIED_REPAIRS = [
     },
     {
         "id": "TICK-HIST-103",
+        "org_id": "public_base",
         "title": "Carrow Library Rooftop Chiller Noise",
         "category": "HVAC",
         "urgency": "Routine",
@@ -119,18 +122,25 @@ def extract_location_entity(complaint: str) -> Optional[str]:
 
 def keyword_search_fallback(
     complaint: str,
+    org_id: Optional[str] = None,
     location_filter: Optional[str] = None,
     top_k: int = 3
 ) -> List[Dict[str, Any]]:
     """
     Explicitly labelled keyword/lexical fallback search when vector store or embeddings are offline.
-    Uses token overlap and location matching. Returns search_mode: 'keyword_fallback'.
+    Enforces tenant boundaries: records from other organisations are strictly excluded.
+    Returns search_mode: 'keyword_fallback'.
     """
     query_tokens = set(re.findall(r"\w+", complaint.lower()))
     scored_records = []
 
     for item in SEED_VERIFIED_REPAIRS:
-        doc_text = f"{item['title']} {item['description']} {item['location']} {item['category']}".lower()
+        # Tenant isolation boundary check
+        item_org = item.get("org_id")
+        if org_id and item_org and item_org != org_id and item_org != "public_base":
+            continue
+
+        doc_text = f"{item.get('title', '')} {item.get('description', '')} {item.get('location', '')} {item.get('category', '')} {item.get('fixApplied', '')} {item.get('resolutionNotes', '')} {item.get('resolution_notes', '')}".lower()
         doc_tokens = set(re.findall(r"\w+", doc_text))
 
         overlap = len(query_tokens.intersection(doc_tokens))
@@ -140,9 +150,10 @@ def keyword_search_fallback(
             score += 0.4
 
         scored_records.append({
-            "id": item["id"],
+            "id": item.get("id", "rec_0"),
             "score": round(min(score, 1.0), 3),
             "search_mode": "keyword_fallback",
+            "resolutionNotes": item.get("fixApplied") or item.get("resolutionNotes") or item.get("resolution_notes") or "",
             "metadata": item
         })
 
@@ -158,6 +169,7 @@ def query_knowledge_base(
     """
     Retrieve past matching historical equipment faults for context injection.
     Prefers Pinecone vector retrieval with real embeddings; falls back to labelled keyword search.
+    Enforces strict tenant isolation in both vector and keyword queries.
     Returns (matches_list, search_mode).
     """
     loc_filter = extract_location_entity(complaint)
@@ -192,8 +204,8 @@ def query_knowledge_base(
             except Exception as e:
                 print(f"[Pinecone Query Notice]: {e}, falling back to keyword search")
 
-    # 2. Explicitly labelled keyword search fallback
-    fallback_matches = keyword_search_fallback(complaint, location_filter=loc_filter, top_k=top_k)
+    # 2. Explicitly labelled keyword search fallback with mandatory tenant isolation
+    fallback_matches = keyword_search_fallback(complaint, org_id=org_id, location_filter=loc_filter, top_k=top_k)
     return fallback_matches, "keyword_fallback"
 
 
@@ -264,9 +276,11 @@ def ingest_verified_repair_to_rag(ticket: Dict[str, Any], org_id: str) -> bool:
             except Exception as e:
                 print(f"[Pinecone Ingest Error]: {e}")
 
-    # Also record in local verified seed storage for current session
+    # Also record in local verified seed storage for current session with tenant isolation
     SEED_VERIFIED_REPAIRS.append({
         "id": ticket["id"],
+        "ticket_id": ticket["id"],
+        "org_id": org_id,
         "title": ticket.get("title", "Maintenance Fault"),
         "category": ticket.get("category", "General"),
         "urgency": ticket.get("priority", "Routine"),
@@ -275,6 +289,7 @@ def ingest_verified_repair_to_rag(ticket: Dict[str, Any], org_id: str) -> bool:
         "assignedTo": ticket.get("assignedTo", "Field Technician"),
         "fixApplied": resolution_notes,
         "verified": True,
+        "approval_status": "Completed",
         "resolvedAt": ticket.get("resolvedAt", datetime.utcnow().isoformat())
     })
     return True

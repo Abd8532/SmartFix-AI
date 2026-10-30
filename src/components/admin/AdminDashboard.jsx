@@ -156,9 +156,10 @@ export default function AdminDashboard({ onSelectTicket, activeTab = 'overview',
     return counts;
   }, [tickets]);
 
-  // All Hazard tickets
+  // All Hazard tickets (Active/Unresolved)
   const hazardTickets = useMemo(() => {
     return tickets.filter((t) => {
+      if (t.status === 'Completed' || t.status === 'Done') return false;
       return (
         t.isHazard === true ||
         t.priority === 'Critical' ||

@@ -211,6 +211,10 @@ class TestPhase4ProductionStorageEnforcement(unittest.TestCase):
         mock_client.describe_table.return_value = {
             "Table": {
                 "TableStatus": "CREATING",
+                "KeySchema": [
+                    {"AttributeName": "PK", "KeyType": "HASH"},
+                    {"AttributeName": "SK", "KeyType": "RANGE"}
+                ],
                 "GlobalSecondaryIndexes": [{"IndexName": "GSI1"}]
             }
         }
@@ -222,6 +226,10 @@ class TestPhase4ProductionStorageEnforcement(unittest.TestCase):
         mock_client.describe_table.return_value = {
             "Table": {
                 "TableStatus": "ACTIVE",
+                "KeySchema": [
+                    {"AttributeName": "PK", "KeyType": "HASH"},
+                    {"AttributeName": "SK", "KeyType": "RANGE"}
+                ],
                 "GlobalSecondaryIndexes": [{"IndexName": "OtherIndex"}]
             }
         }
@@ -233,7 +241,17 @@ class TestPhase4ProductionStorageEnforcement(unittest.TestCase):
         mock_client.describe_table.return_value = {
             "Table": {
                 "TableStatus": "ACTIVE",
-                "GlobalSecondaryIndexes": [{"IndexName": "GSI1"}, {"IndexName": "StatusIndex"}]
+                "KeySchema": [
+                    {"AttributeName": "PK", "KeyType": "HASH"},
+                    {"AttributeName": "SK", "KeyType": "RANGE"}
+                ],
+                "GlobalSecondaryIndexes": [{
+                    "IndexName": "GSI1",
+                    "KeySchema": [
+                        {"AttributeName": "GSI1PK", "KeyType": "HASH"},
+                        {"AttributeName": "GSI1SK", "KeyType": "RANGE"}
+                    ]
+                }]
             }
         }
         res = repo.validate_table()

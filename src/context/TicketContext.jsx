@@ -65,7 +65,7 @@ function normalizeTicketRecord(ticket) {
     isRecurring: Boolean(ticket.isRecurring),
     recurringFixSummary: ticket.recurringFixSummary || null,
     safetyPrecautions: ticket.safetyPrecautions || null,
-    org_id: ticket.org_id || 'org_campus_main',
+    org_id: ticket.org_id || ticket.orgId || '',
     reportedBy: {
       id: reporterId,
       name: reporterName,
@@ -240,8 +240,12 @@ export function TicketProvider({ children }) {
     }
   }, [userTab]);
 
-  // Auth actions
+  // Auth actions (Quick dev role switcher disabled in production)
   const loginAs = async (newRole, userDetails = null) => {
+    if (import.meta.env.PROD) {
+      console.warn('Quick role switching with default credentials is disabled in production builds.');
+      return;
+    }
     if (auth?.login) {
       const targetRole = typeof newRole === 'string' ? newRole : (userDetails?.role || 'user');
       const email = typeof newRole === 'string' 

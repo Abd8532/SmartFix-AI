@@ -168,6 +168,9 @@ export function AuthProvider({ children }) {
 
   // 5. LOGOUT
   const logout = useCallback(() => {
+    try {
+      apiClient.auth.logout().catch(() => {});
+    } catch {}
     clearToken();
     setTokenState(null);
     setCurrentUser(null);

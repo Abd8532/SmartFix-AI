@@ -18,7 +18,56 @@ except ImportError:
     GENAI_AVAILABLE = False
 
 
-def get_live_weather_context(lat: float = CAMPUS_LAT, lon: float = CAMPUS_LON) -> Dict[str, Any]:
+VALID_CATEGORIES = {Specialty.PLUMBING, Specialty.ELECTRICAL, Specialty.HVAC, Specialty.IT, Specialty.GENERAL}
+VALID_URGENCIES = {TicketPriority.EMERGENCY, TicketPriority.URGENT, TicketPriority.ROUTINE}
+
+
+def _validate_and_sanitize_ai_output(data: Any, fallback_complaint: str) -> Dict[str, Any]:
+    """
+    Validates AI multimodal output against strict schema invariants.
+    Mitigates prompt injection, hallucinated fields, or malformed data.
+    """
+    if not isinstance(data, dict):
+        return _deterministic_fallback_triage(fallback_complaint)
+
+    # 1. Sanitize Category
+    raw_cat = str(data.get("category", "")).strip().capitalize()
+    category = raw_cat if raw_cat in VALID_CATEGORIES else Specialty.GENERAL
+
+    # 2. Sanitize Urgency
+    raw_urgency = str(data.get("urgency", "")).strip().capitalize()
+    urgency = raw_urgency if raw_urgency in VALID_URGENCIES else TicketPriority.ROUTINE
+
+    # 3. Sanitize Priority Score
+    try:
+        score = int(data.get("priorityScore", 50))
+        score = max(0, min(100, score))
+    except (ValueError, TypeError):
+        score = 50
+
+    # 4. Sanitize Hazard & Photo flags
+    is_hazard = bool(data.get("isHazard", False))
+    is_relevant = bool(data.get("isRelevantPhoto", True))
+
+    # 5. Sanitize Text Fields
+    raw_title = str(data.get("title", "")).strip()
+    title = raw_title[:80] if raw_title else fallback_complaint[:50]
+    reasoning = str(data.get("reasoning", "Automated facilities triage.")).strip()[:200]
+    location = str(data.get("location", "Campus Facilities")).strip()[:100]
+
+    return {
+        "title": title,
+        "category": category,
+        "urgency": urgency,
+        "priorityScore": score,
+        "isHazard": is_hazard,
+        "isRelevantPhoto": is_relevant,
+        "location": location,
+        "reasoning": reasoning
+    }
+
+
+def get_live_weather_context(lat: float = 37.7749, lon: float = -122.4194) -> Dict[str, Any]:
     """Fetch live weather conditions from Open-Meteo."""
     url = (
         f"https://api.open-meteo.com/v1/forecast?"
@@ -125,9 +174,8 @@ Respond ONLY with valid JSON with this exact structure:
         except Exception as e:
             print(f"[Gemini Vision Notice]: AI call error ({e}), falling back to deterministic triage.")
 
-    # If AI failed or was not configured, run deterministic fallback triage
-    if not ai_result or not isinstance(ai_result, dict):
-        ai_result = _deterministic_fallback_triage(complaint)
+    # Validate AI result against strict schema invariants and fallback if needed
+    ai_result = _validate_and_sanitize_ai_output(ai_result, complaint)
 
     # Validate image relevance
     if ai_result.get("isRelevantPhoto") is False:

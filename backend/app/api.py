@@ -26,8 +26,11 @@ from .auth import (
     verify_password,
     create_access_token,
     check_rate_limit,
+    check_endpoint_rate_limit,
     record_failed_login,
     reset_failed_login,
+    generate_session_cookie_header,
+    generate_csrf_cookie_header,
     AuthenticatedUser
 )
 from .models import (
@@ -40,9 +43,11 @@ from .models import (
 from .storage import storage, ConcurrencyError
 from .s3 import (
     generate_presigned_upload_url,
+    generate_presigned_post_data,
     generate_presigned_view_url,
     validate_s3_key_tenant,
     validate_upload_request,
+    verify_uploaded_s3_object,
     get_s3_client
 )
 from .lifecycle import (
@@ -62,8 +67,13 @@ from .ai import analyze_maintenance_fault
 from .audit import record_audit_event
 
 
-def _json_response(status_code: int, body: Any, req_origin: Optional[str] = None) -> Dict[str, Any]:
-    """Build standardized JSON response with strict CORS origin verification."""
+def _json_response(
+    status_code: int,
+    body: Any,
+    req_origin: Optional[str] = None,
+    extra_headers: Optional[Dict[str, str]] = None
+) -> Dict[str, Any]:
+    """Build standardized JSON response with strict CORS, security headers, and optional cookies."""
     allow_origin = None
     if req_origin:
         clean_req = req_origin.rstrip("/")
@@ -75,15 +85,28 @@ def _json_response(status_code: int, body: Any, req_origin: Optional[str] = None
     if not allow_origin:
         allow_origin = ALLOWED_ORIGINS[0] if ALLOWED_ORIGINS else "http://localhost:5173"
 
+    resp_headers = {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": allow_origin,
+        "Access-Control-Allow-Credentials": "true",
+        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-CSRF-Token,X-XSRF-Token,X-Requested-With,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
+        "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "X-XSS-Protection": "1; mode=block",
+        "Referrer-Policy": "strict-origin-when-cross-origin",
+        "Cache-Control": "no-store, no-cache, must-revalidate"
+    }
+
+    if ENVIRONMENT == "production":
+        resp_headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+
+    if extra_headers:
+        resp_headers.update(extra_headers)
+
     return {
         "statusCode": status_code,
-        "headers": {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": allow_origin,
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
-            "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS"
-        },
+        "headers": resp_headers,
         "body": json.dumps(body) if not isinstance(body, str) else body
     }
 
@@ -171,18 +194,26 @@ def handle_api_request(
     else:
         body = {}
 
-    # Health check endpoint
+    # Health check endpoint (clean minimal payload in production to prevent reconnaissance)
     if (norm_path == "/api/v1/health" or norm_path == "/health") and method == "GET":
-        return _json_response(200, {
+        resp_payload = {
             "status": "healthy",
-            "environment": ENVIRONMENT,
-            "dataBackend": DATA_BACKEND,
             "version": "1.0.0"
-        }, req_origin)
+        }
+        if ENVIRONMENT != "production":
+            resp_payload["environment"] = ENVIRONMENT
+            resp_payload["dataBackend"] = DATA_BACKEND
+        return _json_response(200, resp_payload, req_origin)
 
     # ==========================================================================
     # 1. PUBLIC AUTH ROUTES
     # ==========================================================================
+    if (norm_path == "/api/v1/auth/logout" or norm_path == "/api/logout") and method == "POST":
+        clear_cookie = {
+            "Set-Cookie": "smartfix_session=; Path=/; HttpOnly; Max-Age=0; SameSite=Strict, smartfix_csrf=; Path=/; Max-Age=0; SameSite=Strict"
+        }
+        return _json_response(200, {"success": True, "message": "Logged out successfully."}, req_origin, extra_headers=clear_cookie)
+
     if (norm_path == "/api/v1/auth/login" or norm_path == "/api/login") and method == "POST":
         email = body.get("email", "").strip().lower()
         password = body.get("password", "")
@@ -231,6 +262,14 @@ def handle_api_request(
         safe_user = sanitize_user(user)
         safe_user["token"] = token
 
+        # Generate CSRF token and Set-Cookie session headers for secure cookie migration
+        csrf_token = secrets.token_hex(24)
+        session_cookie = generate_session_cookie_header(token)
+        csrf_cookie = generate_csrf_cookie_header(csrf_token)
+        cookie_headers = {
+            "Set-Cookie": f"{session_cookie}, {csrf_cookie}"
+        }
+
         record_audit_event(
             action="USER_LOGIN",
             org_id=user_org,
@@ -240,10 +279,16 @@ def handle_api_request(
         return _json_response(200, {
             "success": True,
             "token": token,
+            "csrfToken": csrf_token,
             "user": safe_user
-        }, req_origin)
+        }, req_origin, extra_headers=cookie_headers)
 
     if (norm_path == "/api/v1/auth/register" or norm_path == "/api/register") and method == "POST":
+        # Rate limit registrations to prevent automated account creation abuse
+        client_tag = headers.get("Origin", "global")
+        is_reg_ok, reg_err = check_endpoint_rate_limit(f"reg_{client_tag}", max_requests=15, window_seconds=60)
+        if not is_reg_ok:
+            return _json_response(429, {"success": False, "error": reg_err}, req_origin)
         email = body.get("email", "").strip().lower()
         password = body.get("password", "")
         role = body.get("role", "user").strip().lower()
@@ -322,9 +367,9 @@ def handle_api_request(
         }, req_origin)
 
     # ==========================================================================
-    # ALL SUBSEQUENT ROUTES REQUIRE JWT AUTHENTICATION
+    # ALL SUBSEQUENT ROUTES REQUIRE JWT OR COOKIE AUTHENTICATION
     # ==========================================================================
-    user, auth_error = authenticate_request(headers)
+    user, auth_error = authenticate_request(headers, method=method)
     if auth_error:
         return _json_response(auth_error["statusCode"], auth_error["body"], req_origin)
 
@@ -346,18 +391,33 @@ def handle_api_request(
     # 3. UPLOAD & PRESIGNED S3 ENDPOINTS
     # ==========================================================================
     if (norm_path == "/api/v1/uploads/presign" or norm_path == "/api/uploads/presign") and method == "POST":
+        # Rate limit upload URL requests per user
+        is_up_ok, up_err = check_endpoint_rate_limit(f"up_{user.id}", max_requests=25, window_seconds=60)
+        if not is_up_ok:
+            return _json_response(429, {"success": False, "error": up_err}, req_origin)
+
         mime_type = (body.get("mimeType") or "").strip().lower()
         file_size = int(body.get("fileSize", 0) or 0)
         file_name = (body.get("fileName") or "upload.jpg").strip()
+        upload_mode = (body.get("uploadMode") or "put").strip().lower()
 
         try:
-            result = generate_presigned_upload_url(
-                org_id=user.org_id,
-                file_name=file_name,
-                mime_type=mime_type,
-                file_size=file_size,
-                expires_in=900
-            )
+            if upload_mode == "post":
+                result = generate_presigned_post_data(
+                    org_id=user.org_id,
+                    file_name=file_name,
+                    mime_type=mime_type,
+                    max_bytes=MAX_UPLOAD_SIZE_BYTES,
+                    expires_in=900
+                )
+            else:
+                result = generate_presigned_upload_url(
+                    org_id=user.org_id,
+                    file_name=file_name,
+                    mime_type=mime_type,
+                    file_size=file_size,
+                    expires_in=900
+                )
             return _json_response(200, result, req_origin)
         except ValueError as ve:
             return _json_response(400, {"success": False, "error": str(ve)}, req_origin)
@@ -371,6 +431,47 @@ def handle_api_request(
         file_key = qs.get("key", [None])[0]
         if not file_key:
             return _json_response(400, {"success": False, "error": "Query parameter 'key' is required."}, req_origin)
+
+        # 1. Enforce strict tenant isolation on S3 key prefix
+        if not validate_s3_key_tenant(file_key, user.org_id):
+            return _json_response(403, {
+                "success": False,
+                "error": f"Cross-tenant access violation: key '{file_key}' does not belong to organization '{user.org_id}'."
+            }, req_origin)
+
+        # 2. Verify attachment is actually linked to a ticket and check authorization
+        ticket_id = qs.get("ticket_id", [None])[0] or qs.get("ticketId", [None])[0]
+        associated_ticket = None
+        if ticket_id:
+            associated_ticket = storage.get_ticket(ticket_id, user.org_id)
+        else:
+            tenant_tickets = storage.list_tickets(org_id=user.org_id, role="admin", user_id=user.id)
+            associated_ticket = next((t for t in tenant_tickets if t.get("fileKey") == file_key or t.get("photoKey") == file_key), None)
+
+        if not associated_ticket:
+            return _json_response(404, {
+                "success": False,
+                "error": "Attachment is not associated with any authorized ticket in this organization."
+            }, req_origin)
+
+        # Consumer Authorization: Consumer may view only attachments on tickets they reported
+        if user.is_consumer():
+            rep_id = associated_ticket.get("reporterId") or associated_ticket.get("reportedBy", {}).get("id")
+            rep_email = (associated_ticket.get("reporterEmail") or associated_ticket.get("reportedBy", {}).get("email") or "").lower()
+            if rep_id != user.id and rep_email != user.email.lower():
+                return _json_response(403, {
+                    "success": False,
+                    "error": "Access Denied: Consumers may view attachments only for tickets they reported."
+                }, req_origin)
+
+        # Technician Authorization: Technician may view only assigned or claimable ticket attachments
+        if user.is_technician():
+            assigned_tech = associated_ticket.get("assignedTechId")
+            if assigned_tech and assigned_tech != user.id:
+                return _json_response(403, {
+                    "success": False,
+                    "error": "Access Denied: Work order attachment belongs to another technician's ticket."
+                }, req_origin)
 
         try:
             view_url = generate_presigned_view_url(file_key=file_key, org_id=user.org_id, expires_in=3600)
@@ -447,6 +548,11 @@ def handle_api_request(
 
     # POST /api/v1/tickets: Create ticket with mandatory image + server-side validation + AI triage
     if (norm_path == "/api/v1/tickets" or norm_path == "/api/tickets") and method == "POST":
+        # Rate limit ticket creation per user to prevent flooding
+        is_tck_ok, tck_err = check_endpoint_rate_limit(f"ticket_{user.id}", max_requests=30, window_seconds=60)
+        if not is_tck_ok:
+            return _json_response(429, {"success": False, "error": tck_err}, req_origin)
+
         complaint = body.get("complaint") or body.get("description") or ""
         image_data = body.get("image") or body.get("photo") or ""
         file_key = body.get("fileKey") or body.get("photoKey") or ""
@@ -461,12 +567,19 @@ def handle_api_request(
                 "error": "A photo of the maintenance fault (or verified S3 upload key) is mandatory for verification."
             }, req_origin)
 
-        # Validate S3 tenant scoping if fileKey provided
+        # Validate S3 tenant scoping and verify actual uploaded object in storage
         if file_key:
             if not validate_s3_key_tenant(file_key, user.org_id):
                 return _json_response(403, {
                     "success": False,
                     "error": f"Invalid attachment key: file key does not belong to tenant '{user.org_id}'."
+                }, req_origin)
+            try:
+                verify_uploaded_s3_object(file_key, user.org_id)
+            except Exception as e:
+                return _json_response(400, {
+                    "success": False,
+                    "error": f"S3 attachment verification failed: {str(e)}"
                 }, req_origin)
 
         # Server-side Image Security Validation (MIME type, file size, magic bytes)

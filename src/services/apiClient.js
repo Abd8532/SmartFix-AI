@@ -4,7 +4,8 @@
  */
 
 const STORAGE_KEYS = {
-  TOKEN: 'maintainx_jwt_token_v1'
+  TOKEN: 'maintainx_jwt_token_v1',
+  CSRF: 'maintainx_csrf_token_v1'
 };
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL || '';
@@ -45,11 +46,47 @@ export function clearToken() {
 }
 
 /**
- * Core HTTP request handler with unified error handling and token injection
+ * Retrieve current CSRF token
+ */
+export function getCsrfToken() {
+  try {
+    return sessionStorage.getItem(STORAGE_KEYS.CSRF) || null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Save CSRF token
+ */
+export function setCsrfToken(csrfToken) {
+  try {
+    if (csrfToken) {
+      sessionStorage.setItem(STORAGE_KEYS.CSRF, csrfToken);
+    } else {
+      sessionStorage.removeItem(STORAGE_KEYS.CSRF);
+    }
+  } catch {}
+}
+
+/**
+ * Clear CSRF token
+ */
+export function clearCsrfToken() {
+  try {
+    sessionStorage.removeItem(STORAGE_KEYS.CSRF);
+  } catch {}
+}
+
+/**
+ * Core HTTP request handler with unified error handling, token injection,
+ * HttpOnly cookie support, and double-submit CSRF protection.
  */
 export async function request(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const token = options.token || getToken();
+  const csrfToken = getCsrfToken();
+  const method = (options.method || 'GET').toUpperCase();
 
   const headers = {
     'Content-Type': 'application/json',
@@ -61,9 +98,15 @@ export async function request(endpoint, options = {}) {
     headers['Authorization'] = cleanToken;
   }
 
+  // Attach CSRF protection token for state-changing HTTP requests
+  if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken;
+  }
+
   const fetchConfig = {
-    method: options.method || 'GET',
-    headers
+    method,
+    headers,
+    credentials: 'include' // Always transmit cookies for secure backend session validation
   };
 
   if (options.body !== undefined) {
@@ -118,8 +161,20 @@ export const apiClient = {
 
   // Auth Endpoints
   auth: {
-    login: (email, password) =>
-      apiClient.post('/api/v1/auth/login', { email, password }),
+    login: async (email, password) => {
+      const data = await apiClient.post('/api/v1/auth/login', { email, password });
+      if (data?.token) setToken(data.token);
+      if (data?.csrfToken) setCsrfToken(data.csrfToken);
+      return data;
+    },
+    logout: async () => {
+      try {
+        await apiClient.post('/api/v1/auth/logout');
+      } finally {
+        clearToken();
+        clearCsrfToken();
+      }
+    },
     register: (userData) =>
       apiClient.post('/api/v1/auth/register', userData),
     getMe: () =>
@@ -168,8 +223,25 @@ export const apiClient = {
   uploads: {
     presign: (fileData) =>
       apiClient.post('/api/v1/uploads/presign', fileData),
-    uploadToS3: async (uploadUrl, binaryData, mimeType) => {
-      const response = await fetch(uploadUrl, {
+    uploadToS3: async (presignResponse, binaryData, mimeType) => {
+      // S3 Presigned POST flow (fields provided)
+      if (presignResponse && typeof presignResponse === 'object' && presignResponse.fields) {
+        const formData = new FormData();
+        Object.entries(presignResponse.fields).forEach(([k, v]) => formData.append(k, v));
+        formData.append('file', binaryData);
+        const response = await fetch(presignResponse.uploadUrl, {
+          method: 'POST',
+          body: formData
+        });
+        if (!response.ok) {
+          throw new Error(`S3 direct upload failed with status ${response.status}`);
+        }
+        return true;
+      }
+
+      // S3 Presigned PUT flow
+      const targetUrl = typeof presignResponse === 'string' ? presignResponse : presignResponse?.uploadUrl;
+      const response = await fetch(targetUrl, {
         method: 'PUT',
         headers: {
           'Content-Type': mimeType
@@ -181,8 +253,10 @@ export const apiClient = {
       }
       return true;
     },
-    getViewUrl: (fileKey) =>
-      apiClient.get(`/api/v1/uploads/presigned-view?key=${encodeURIComponent(fileKey)}`)
+    getViewUrl: (fileKey, ticketId) => {
+      const q = ticketId ? `&ticket_id=${encodeURIComponent(ticketId)}` : '';
+      return apiClient.get(`/api/v1/uploads/presigned-view?key=${encodeURIComponent(fileKey)}${q}`);
+    }
   }
 };
 

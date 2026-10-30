@@ -1,0 +1,318 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  SmartFix AI - Serverless Multi-Tenant Maintenance Platform
+  Production CloudFormation / SAM Infrastructure as Code Template.
+  Provisions Cognito User Pool, DynamoDB single-table with GSI1, private S3 bucket,
+  least-privilege IAM roles, Lambda function, and API Gateway.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: production
+    AllowedValues: [production, staging, dev]
+    Description: Deployment environment.
+
+  AppName:
+    Type: String
+    Default: smartfix-ai
+    Description: Base application identifier.
+
+  AllowedCorsOrigin:
+    Type: String
+    Default: https://campus.edu
+    Description: Production domain permitted for CORS and Cookie credentials.
+
+Globals:
+  Function:
+    Timeout: 30
+    MemorySize: 512
+    Runtime: python3.11
+    Tracing: Active
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        DATA_BACKEND: dynamodb
+        DYNAMODB_TABLE_NAME: !Ref SmartFixDynamoDBTable
+        S3_BUCKET_NAME: !Ref SmartFixS3Bucket
+        COGNITO_USER_POOL_ID: !Ref SmartFixCognitoUserPool
+        COGNITO_APP_CLIENT_ID: !Ref SmartFixCognitoAppClient
+        COGNITO_REGION: !Ref AWS::Region
+        ALLOWED_ORIGINS: !Ref AllowedCorsOrigin
+
+Resources:
+  # ============================================================================
+  # 1. AMAZON COGNITO AUTHENTICATION & MULTI-TENANT IDENTITY
+  # ============================================================================
+  SmartFixCognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub "${AppName}-${Environment}-user-pool"
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+      MfaConfiguration: "OPTIONAL"
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: false
+        - Name: role
+          AttributeDataType: String
+          Mutable: true
+          Description: "User role (admin, technician, user)"
+        - Name: org_id
+          AttributeDataType: String
+          Mutable: false
+          Description: "Tenant organization identifier for isolation"
+        - Name: approval_status
+          AttributeDataType: String
+          Mutable: true
+          Description: "Administrator approval status (Approved, Pending, Rejected)"
+        - Name: specialty
+          AttributeDataType: String
+          Mutable: true
+          Description: "Technician specialty (Plumbing, Electrical, HVAC, IT, General)"
+      UserPoolTags:
+        Environment: !Ref Environment
+        Application: !Ref AppName
+
+  SmartFixCognitoAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub "${AppName}-${Environment}-client"
+      UserPoolId: !Ref SmartFixCognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_SRP_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_CUSTOM_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+      EnableTokenRevocation: true
+
+  # ============================================================================
+  # 2. AMAZON DYNAMODB PRODUCTION MULTI-TENANT STORAGE
+  # ============================================================================
+  SmartFixDynamoDBTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${AppName}-${Environment}-core-table"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
+
+  # ============================================================================
+  # 3. AMAZON S3 PRIVATE ATTACHMENT STORAGE
+  # ============================================================================
+  SmartFixS3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${AppName}-${Environment}-attachments-${AWS::AccountId}"
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: AbortIncompleteMultipartUploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+          - Id: TransitionOldAttachmentsToStandardIA
+            Status: Enabled
+            Transitions:
+              - TransitionInDays: 90
+                StorageClass: STANDARD_IA
+      CorsConfiguration:
+        CorsRules:
+          - AllowedOrigins:
+              - !Ref AllowedCorsOrigin
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+              - HEAD
+            AllowedHeaders:
+              - "*"
+            ExposedHeaders:
+              - ETag
+              - x-amz-request-id
+            MaxAge: 3600
+      Tags:
+        - Key: Environment
+          Value: !Ref Environment
+        - Key: Application
+          Value: !Ref AppName
+
+  # ============================================================================
+  # 4. IAM LEAST-PRIVILEGE EXECUTION ROLE
+  # ============================================================================
+  SmartFixLambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${AppName}-${Environment}-lambda-role"
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess
+      Policies:
+        - PolicyName: DynamoDBTableLeastPrivilege
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                  - dynamodb:DescribeTable
+                Resource:
+                  - !GetAtt SmartFixDynamoDBTable.Arn
+                  - !Sub "${SmartFixDynamoDBTable.Arn}/index/*"
+        - PolicyName: S3BucketLeastPrivilege
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:HeadObject
+                  - s3:AbortMultipartUpload
+                Resource:
+                  - !Sub "${SmartFixS3Bucket.Arn}/*"
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource:
+                  - !GetAtt SmartFixS3Bucket.Arn
+
+  # ============================================================================
+  # 5. SERVERLESS API & LAMBDA BACKEND
+  # ============================================================================
+  SmartFixBackendFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub "${AppName}-${Environment}-backend"
+      CodeUri: backend/
+      Handler: lambda_function.lambda_handler
+      Role: !GetAtt SmartFixLambdaExecutionRole.Arn
+      Events:
+        ApiGatewayProxy:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SmartFixRestApi
+            Path: /{proxy+}
+            Method: ANY
+        ApiGatewayRoot:
+          Type: Api
+          Properties:
+            RestApiId: !Ref SmartFixRestApi
+            Path: /
+            Method: ANY
+
+  SmartFixRestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub "${AppName}-${Environment}-api"
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,PUT,PATCH,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-CSRF-Token,X-XSRF-Token,X-Requested-With'"
+        AllowOrigin: !Sub "'${AllowedCorsOrigin}'"
+        AllowCredentials: true
+      GatewayResponses:
+        DEFAULT_4XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${AllowedCorsOrigin}'"
+              Access-Control-Allow-Credentials: "'true'"
+        DEFAULT_5XX:
+          ResponseParameters:
+            Headers:
+              Access-Control-Allow-Origin: !Sub "'${AllowedCorsOrigin}'"
+              Access-Control-Allow-Credentials: "'true'"
+
+Outputs:
+  ApiEndpoint:
+    Description: "Production API Gateway URL"
+    Value: !Sub "https://${SmartFixRestApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}"
+
+  CognitoUserPoolId:
+    Description: "Cognito User Pool ID"
+    Value: !Ref SmartFixCognitoUserPool
+
+  CognitoAppClientId:
+    Description: "Cognito App Client ID"
+    Value: !Ref SmartFixCognitoAppClient
+
+  DynamoDBTableName:
+    Description: "DynamoDB Production Core Table"
+    Value: !Ref SmartFixDynamoDBTable
+
+  S3BucketName:
+    Description: "S3 Private Upload Bucket"
+    Value: !Ref SmartFixS3Bucket

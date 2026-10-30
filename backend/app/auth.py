@@ -37,11 +37,13 @@ def _base64url_decode(data: str) -> bytes:
 
 
 # ==============================================================================
-# LOGIN RATE LIMITER (In-Memory Protection against Brute-Force)
+# RATE LIMITERS (In-Memory Protection against Brute-Force & Abuse)
 # ==============================================================================
 _failed_attempts: Dict[str, List[float]] = {}
 RATE_LIMIT_WINDOW = 900  # 15 minutes
 MAX_FAILED_ATTEMPTS = 5
+
+_endpoint_rate_limits: Dict[str, List[float]] = {}
 
 
 def check_rate_limit(identifier: str) -> Tuple[bool, Optional[str]]:
@@ -61,6 +63,28 @@ def check_rate_limit(identifier: str) -> Tuple[bool, Optional[str]]:
         retry_after = int(RATE_LIMIT_WINDOW - (now - valid_attempts[0]))
         return False, f"Too many failed login attempts. Please try again in {max(1, retry_after // 60)} minutes."
 
+    return True, None
+
+
+def check_endpoint_rate_limit(
+    key: str,
+    max_requests: int = 60,
+    window_seconds: int = 60
+) -> Tuple[bool, Optional[str]]:
+    """
+    Sliding window rate limiter for general API endpoints.
+    Protects ticket creation, uploads, and AI triage from abuse and resource exhaustion.
+    """
+    now = time.time()
+    clean_key = (key or "global").strip().lower()
+    timestamps = _endpoint_rate_limits.get(clean_key, [])
+    valid_ts = [t for t in timestamps if now - t < window_seconds]
+    _endpoint_rate_limits[clean_key] = valid_ts
+
+    if len(valid_ts) >= max_requests:
+        return False, f"Rate limit exceeded. Maximum {max_requests} requests per {window_seconds}s. Please retry shortly."
+
+    valid_ts.append(now)
     return True, None
 
 
@@ -463,24 +487,92 @@ class AuthenticatedUser:
         return self.approval_status == "Approved"
 
 
-def authenticate_request(headers: Dict[str, str]) -> Tuple[Optional[AuthenticatedUser], Optional[Dict[str, Any]]]:
+def generate_session_cookie_header(token: str, max_age: int = 86400) -> str:
     """
-    Extract Authorization header, verify JWT token, and return AuthenticatedUser.
+    Generates a Secure, HttpOnly, SameSite=Strict Set-Cookie header string for JWT session storage.
+    """
+    secure_flag = "Secure; " if ENVIRONMENT == "production" else ""
+    return f"smartfix_session={token}; Path=/; HttpOnly; {secure_flag}SameSite=Strict; Max-Age={max_age}"
+
+
+def generate_csrf_cookie_header(csrf_token: str, max_age: int = 86400) -> str:
+    """
+    Generates a client-readable SameSite=Strict CSRF cookie for the Double Submit Cookie pattern.
+    """
+    secure_flag = "Secure; " if ENVIRONMENT == "production" else ""
+    return f"smartfix_csrf={csrf_token}; Path=/; {secure_flag}SameSite=Strict; Max-Age={max_age}"
+
+
+def extract_token_from_request(headers: Dict[str, str]) -> Tuple[Optional[str], str]:
+    """
+    Extracts authentication token from Authorization header (Bearer) or smartfix_session Cookie.
+    Returns (token, auth_source) where auth_source is 'header', 'cookie', or 'none'.
+    """
+    # 1. Prefer explicit Authorization header
+    for k, v in headers.items():
+        if k.lower() == "authorization" and v:
+            clean = v.strip()
+            if clean.lower().startswith("bearer "):
+                clean = clean[7:].strip()
+            if clean:
+                return clean, "header"
+
+    # 2. Check Cookie header for HttpOnly session
+    for k, v in headers.items():
+        if k.lower() == "cookie" and v:
+            cookies = [c.strip() for c in v.split(";") if c.strip()]
+            for c in cookies:
+                if "=" in c:
+                    ckey, cval = c.split("=", 1)
+                    if ckey.strip() == "smartfix_session" and cval.strip():
+                        return cval.strip(), "cookie"
+
+    return None, "none"
+
+
+def authenticate_request(
+    headers: Dict[str, str],
+    method: Optional[str] = None
+) -> Tuple[Optional[AuthenticatedUser], Optional[Dict[str, Any]]]:
+    """
+    Extract Authorization header or smartfix_session cookie, verify JWT token, and return AuthenticatedUser.
+    Enforces CSRF protection on state-changing requests when authenticated via cookie.
     Rejects any unauthenticated or tampered request.
     """
-    auth_header = None
-    for k, v in headers.items():
-        if k.lower() == "authorization":
-            auth_header = v
-            break
+    token, auth_source = extract_token_from_request(headers)
 
-    if not auth_header:
+    if not token:
         return None, {
             "statusCode": 401,
-            "body": {"success": False, "error": "Unauthorized: Missing Authorization header"}
+            "body": {"success": False, "error": "Unauthorized: Missing Authorization header or session cookie"}
         }
 
-    is_valid, claims, error_msg = verify_jwt_token(auth_header)
+    # CSRF protection: If authenticated via cookie on state-changing methods, require matching X-CSRF-Token
+    if auth_source == "cookie" and method in ("POST", "PUT", "PATCH", "DELETE"):
+        csrf_header = None
+        for k, v in headers.items():
+            if k.lower() in ("x-csrf-token", "x-xsrf-token"):
+                csrf_header = v.strip()
+                break
+
+        # Check CSRF cookie
+        csrf_cookie = None
+        for k, v in headers.items():
+            if k.lower() == "cookie" and v:
+                for c in v.split(";"):
+                    if "=" in c:
+                        ck, cv = c.strip().split("=", 1)
+                        if ck == "smartfix_csrf":
+                            csrf_cookie = cv.strip()
+                            break
+
+        if not csrf_header or (csrf_cookie and csrf_header != csrf_cookie):
+            return None, {
+                "statusCode": 403,
+                "body": {"success": False, "error": "Forbidden: CSRF validation failed for cookie-authenticated request."}
+            }
+
+    is_valid, claims, error_msg = verify_jwt_token(token)
     if not is_valid or not claims:
         return None, {
             "statusCode": 401,

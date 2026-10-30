@@ -178,10 +178,28 @@ class JsonFileRepository(BaseRepository):
         return data
 
     def _write_data(self, data: Dict[str, Any]):
-        tmp_path = self.db_path + ".tmp"
+        tmp_path = self.db_path + f".tmp.{os.getpid()}"
         with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
-        os.replace(tmp_path, self.db_path)
+
+        # Windows-safe atomic replace with retry on transient file lock
+        for attempt in range(5):
+            try:
+                os.replace(tmp_path, self.db_path)
+                return
+            except (PermissionError, OSError):
+                if attempt == 4:
+                    try:
+                        with open(self.db_path, "w", encoding="utf-8") as f:
+                            json.dump(data, f, indent=2)
+                    finally:
+                        if os.path.exists(tmp_path):
+                            try:
+                                os.remove(tmp_path)
+                            except OSError:
+                                pass
+                    return
+                time.sleep(0.05 * (attempt + 1))
 
     def get_organization(self, org_id: str) -> Optional[Dict[str, Any]]:
         if not org_id:
@@ -482,7 +500,7 @@ class DynamoDBRepository(BaseRepository):
     def validate_table(self) -> Dict[str, Any]:
         """
         Validates DynamoDB table status and required indexes for production readiness.
-        Requires table status to be ACTIVE and index GSI1 to be present.
+        Requires table status to be ACTIVE, primary keys PK/SK, and secondary index GSI1.
         """
         try:
             import boto3
@@ -495,18 +513,32 @@ class DynamoDBRepository(BaseRepository):
                     f"DynamoDB table '{self.table_name}' status is '{status}', expected 'ACTIVE'."
                 )
 
-            gsi_list = [g.get("IndexName") for g in table_meta.get("GlobalSecondaryIndexes", [])]
-            if "GSI1" not in gsi_list:
+            # Validate primary key schema
+            key_schema = {k["AttributeName"]: k["KeyType"] for k in table_meta.get("KeySchema", [])}
+            if key_schema.get("PK") != "HASH" or key_schema.get("SK") != "RANGE":
+                raise ValueError(
+                    f"DynamoDB table '{self.table_name}' has invalid key schema {key_schema}. Expected PK (HASH) and SK (RANGE)."
+                )
+
+            gsi_meta = {g.get("IndexName"): g for g in table_meta.get("GlobalSecondaryIndexes", [])}
+            if "GSI1" not in gsi_meta:
                 raise ValueError(
                     f"DynamoDB table '{self.table_name}' is missing required secondary index 'GSI1'. "
-                    f"Existing GSIs: {gsi_list}"
+                    f"Existing GSIs: {list(gsi_meta.keys())}"
+                )
+
+            gsi1_keys = {k["AttributeName"]: k["KeyType"] for k in gsi_meta["GSI1"].get("KeySchema", [])}
+            if gsi1_keys.get("GSI1PK") != "HASH" or gsi1_keys.get("GSI1SK") != "RANGE":
+                raise ValueError(
+                    f"DynamoDB table '{self.table_name}' index GSI1 has invalid schema {gsi1_keys}. Expected GSI1PK (HASH) and GSI1SK (RANGE)."
                 )
 
             return {
                 "valid": True,
                 "tableName": self.table_name,
                 "status": status,
-                "indexes": gsi_list
+                "primaryKeys": key_schema,
+                "indexes": list(gsi_meta.keys())
             }
         except Exception as e:
             raise RuntimeError(f"DynamoDB schema validation failed: {str(e)}")
@@ -515,7 +547,9 @@ class DynamoDBRepository(BaseRepository):
         if self._table is None:
             try:
                 import boto3
-                dynamodb = boto3.resource("dynamodb")
+                from botocore.config import Config
+                cfg = Config(retries={"max_attempts": 5, "mode": "adaptive"})
+                dynamodb = boto3.resource("dynamodb", config=cfg)
                 self._table = dynamodb.Table(self.table_name)
             except Exception as e:
                 raise RuntimeError(
@@ -572,10 +606,18 @@ class DynamoDBRepository(BaseRepository):
         table = self._get_table()
         try:
             from boto3.dynamodb.conditions import Key
-            res = table.query(
-                KeyConditionExpression=Key("PK").eq(f"ORG#{org_id}") & Key("SK").begins_with("USER#")
-            )
-            return [sanitize_user(item) for item in res.get("Items", [])]
+            items = []
+            query_kwargs = {
+                "KeyConditionExpression": Key("PK").eq(f"ORG#{org_id}") & Key("SK").begins_with("USER#")
+            }
+            while True:
+                res = table.query(**query_kwargs)
+                items.extend(res.get("Items", []))
+                lek = res.get("LastEvaluatedKey")
+                if not lek:
+                    break
+                query_kwargs["ExclusiveStartKey"] = lek
+            return [sanitize_user(item) for item in items]
         except Exception as e:
             raise RuntimeError(f"DynamoDB list users failed: {e}")
 
@@ -619,10 +661,18 @@ class DynamoDBRepository(BaseRepository):
         table = self._get_table()
         try:
             from boto3.dynamodb.conditions import Key
-            res = table.query(
-                KeyConditionExpression=Key("PK").eq(f"ORG#{org_id}") & Key("SK").begins_with("TICKET#")
-            )
-            tickets = [sanitize_ticket(i) for i in res.get("Items", [])]
+            items = []
+            query_kwargs = {
+                "KeyConditionExpression": Key("PK").eq(f"ORG#{org_id}") & Key("SK").begins_with("TICKET#")
+            }
+            while True:
+                res = table.query(**query_kwargs)
+                items.extend(res.get("Items", []))
+                lek = res.get("LastEvaluatedKey")
+                if not lek:
+                    break
+                query_kwargs["ExclusiveStartKey"] = lek
+            tickets = [sanitize_ticket(i) for i in items]
 
             filtered = []
             for clean_t in tickets:
