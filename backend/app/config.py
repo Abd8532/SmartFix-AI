@@ -40,7 +40,7 @@ DYNAMODB_TABLE_NAME = os.environ.get("DYNAMODB_TABLE_NAME", "SmartFix_MultiTenan
 
 # AI & Multimodal credentials (Server-side ONLY, never sent to frontend)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-MULTIMODAL_MODEL = os.environ.get("MULTIMODAL_MODEL", "gemini-1.5-flash")
+MULTIMODAL_MODEL = os.environ.get("MULTIMODAL_MODEL", "gemini-2.5-flash")
 EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "models/text-embedding-004")
 
 # Pinecone Vector Store (Server-side RAG)

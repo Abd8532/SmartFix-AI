@@ -22,7 +22,7 @@ import confetti from 'canvas-confetti';
 // RAG Progressive Stages for smooth UX during vector retrieval + multimodal reasoning
 const RAG_STAGES = [
   { step: 1, text: "Querying Pinecone vector store for matching historical equipment faults..." },
-  { step: 2, text: "Injecting historical context & analyzing fault image via Gemini 1.5 Flash..." },
+  { step: 2, text: "Injecting historical context & analyzing fault image via Gemini 2.5 Flash..." },
   { step: 3, text: "Evaluating safety-critical hazard checks & department routing..." },
   { step: 4, text: "Committing work order to backend repository & immutable audit log..." }
 ];
@@ -834,7 +834,7 @@ export default function NewIssueForm({ onTicketCreated }) {
             {/* Current Step Text */}
             <p className="text-xs font-medium text-zinc-300 animate-pulse flex items-center gap-2">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-indigo-400 shrink-0" />
-              <span>{aiStatusMessage || 'Processing with Pinecone & Gemini 1.5 Flash...'}</span>
+              <span>{aiStatusMessage || 'Processing with Pinecone & Gemini 2.5 Flash...'}</span>
             </p>
 
             {/* Step Checkmarks */}

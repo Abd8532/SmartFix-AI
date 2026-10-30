@@ -44,7 +44,7 @@ export default function DashboardHeroBanner({
           </div>
           <div className="min-w-0">
             <p className="text-sm font-bold text-white truncate">AI Multimodal Triage</p>
-            <p className="text-xs text-zinc-400 mt-0.5">Vision + Gemini 1.5</p>
+            <p className="text-xs text-zinc-400 mt-0.5">Vision + Gemini 2.5 Flash</p>
           </div>
         </div>
 
