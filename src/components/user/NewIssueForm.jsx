@@ -569,6 +569,9 @@ export default function NewIssueForm({ onTicketCreated }) {
                 Routed to: {typeof successTicket.assignedTo === 'string' ? successTicket.assignedTo : successTicket.assignedTo?.name || 'Technician'}
               </span>
             )}
+            <span className="px-3 py-1 rounded-full bg-[#E7EDFF] text-[#2D60FF] font-bold text-xs border border-[#2D60FF]/30">
+              📊 RAG History: {successTicket.ragTicketVolume || 1} Reports • Score: {successTicket.priorityScore ?? 40}/100
+            </span>
           </div>
 
           <div className="pt-2 border-t border-[#DFEAF2]">

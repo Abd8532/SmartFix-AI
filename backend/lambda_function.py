@@ -16,7 +16,10 @@ def run_rag_multimodal_analysis(
     complaint: str,
     image_base64: str = None,
     mime_type: str = "image/jpeg",
-    historical_matches: list = None
+    historical_matches: list = None,
+    rag_ticket_volume: int = None,
+    rag_history_summary: dict = None,
+    org_id: str = "org_campus_main"
 ) -> dict:
     """
     Multimodal RAG reasoning & visual-textual verification engine for FixFlow AI.
@@ -25,22 +28,37 @@ def run_rag_multimodal_analysis(
       Step 2: Inspect the image to check if those exact problem-defining objects or physical symptoms are visibly present.
     If the image contains something completely unrelated (e.g. drawings, artwork, food, faces, animals, or unrelated furniture/walls),
     Gemini sets imageMatchesComplaint: False and returns a precise warning string in imageValidationWarning.
+    Calculates RAG historical recurrence volume and strictly escalates priority & routes to department.
     """
     from app.ai import analyze_maintenance_fault
-    from app.rag import query_knowledge_base
+    from app.rag import retrieve_rag_ticket_history
 
-    if historical_matches is None:
+    if rag_ticket_volume is None or rag_history_summary is None or historical_matches is None:
         try:
-            matches, _ = query_knowledge_base(complaint)
-            historical_matches = matches
-        except Exception:
-            historical_matches = []
+            vol, summary, matches = retrieve_rag_ticket_history(complaint, org_id=org_id)
+            if rag_ticket_volume is None:
+                rag_ticket_volume = vol
+            if rag_history_summary is None:
+                rag_history_summary = summary
+            if historical_matches is None:
+                historical_matches = matches
+        except Exception as e:
+            print(f"[RAG Retrieval Notice]: {e}")
+            if rag_ticket_volume is None:
+                rag_ticket_volume = 0
+            if rag_history_summary is None:
+                rag_history_summary = {}
+            if historical_matches is None:
+                historical_matches = []
 
     return analyze_maintenance_fault(
         complaint=complaint,
         image_base64=image_base64,
         mime_type=mime_type,
-        historical_matches=historical_matches
+        historical_matches=historical_matches,
+        rag_ticket_volume=rag_ticket_volume,
+        rag_history_summary=rag_history_summary,
+        org_id=org_id
     )
 
 
@@ -74,6 +92,8 @@ def sync_to_airtable(ticket: dict, image_payload: str = None) -> bool:
         "Status": ticket.get("status", "Assigned"),
         "Location": ticket.get("location", "Campus Facilities"),
         "Reporter Email": ticket.get("reporterEmail", ""),
+        "RAG Ticket Volume": ticket.get("ragTicketVolume", 1),
+        "Priority Score": ticket.get("priorityScore", 40),
     }
 
     if img_data:

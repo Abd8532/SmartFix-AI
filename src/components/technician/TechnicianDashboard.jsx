@@ -27,17 +27,25 @@ export default function TechnicianDashboard({ onSelectTicket }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [processingTicketId, setProcessingTicketId] = useState(null);
 
-  // Strict Department Queue Filtering & Priority Scoring
+  // Strict Department Queue Filtering & RAG Priority Sorting
   const myDepartmentTickets = useMemo(() => {
     const deptFiltered = tickets.filter((ticket) => {
       if (!currentUser?.specialty) return true;
-      const spec = currentUser.specialty.toLowerCase();
-      const cat = (ticket.category || '').toLowerCase();
-      const assigned = (ticket.assignedTo || '').toLowerCase();
-      return cat === spec || assigned.includes(spec);
+      const spec = currentUser.specialty.toLowerCase().trim();
+      const cat = (ticket.category || '').toLowerCase().trim();
+      return cat === spec;
     });
 
-    return [...deptFiltered].sort((a, b) => (b.priorityScore || 0) - (a.priorityScore || 0));
+    return [...deptFiltered].sort((a, b) => {
+      const scoreA = Number(a.priorityScore !== undefined ? a.priorityScore : 40);
+      const scoreB = Number(b.priorityScore !== undefined ? b.priorityScore : 40);
+      if (scoreB !== scoreA) {
+        return scoreB - scoreA;
+      }
+      const volA = Number(a.ragTicketVolume || 1);
+      const volB = Number(b.ragTicketVolume || 1);
+      return volB - volA;
+    });
   }, [tickets, currentUser]);
 
   // Department-specific KPI stats calculated strictly over myDepartmentTickets
@@ -269,6 +277,13 @@ export default function TechnicianDashboard({ onSelectTicket }) {
                     {/* Status Badge */}
                     <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${statusStyle.pill}`}>
                       <span>{statusStyle.label}</span>
+                    </span>
+                  </div>
+
+                  {/* RAG History & Recurrence Score Badge */}
+                  <div className="mb-3.5">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#E7EDFF] border border-[#2D60FF]/20 text-[#2D60FF] text-[11px] font-bold shadow-2xs">
+                      <span>📊 RAG History: {ticket.ragTicketVolume || 1} Tickets Raised • Score: {ticket.priorityScore !== undefined ? ticket.priorityScore : 40}/100</span>
                     </span>
                   </div>
 

@@ -64,7 +64,8 @@ from .lifecycle import (
 )
 from .rag import (
     query_knowledge_base,
-    ingest_verified_repair_to_rag
+    ingest_verified_repair_to_rag,
+    retrieve_rag_ticket_history
 )
 from .ai import analyze_maintenance_fault
 from .audit import record_audit_event
@@ -801,8 +802,13 @@ def handle_api_request(
             effective_mime = detected_mime or mime_type
 
         try:
-            # 1. Query RAG vector store for past similar repairs
-            rag_matches, search_mode = query_knowledge_base(complaint, org_id=user.org_id)
+            # 1. Query RAG vector store and active tickets for past equipment history & recurrence
+            rag_vol, rag_summary, rag_matches = retrieve_rag_ticket_history(
+                complaint=complaint,
+                org_id=user.org_id,
+                storage_instance=storage
+            )
+            search_mode = "vector_semantic" if any(m.get("search_mode") == "vector_semantic" for m in rag_matches) else "keyword_fallback"
 
             # 2. Run multimodal vision triage (retrieving verified S3 image if key is provided)
             effective_img_b64 = image_data
@@ -813,7 +819,11 @@ def handle_api_request(
                 complaint=complaint,
                 image_base64=effective_img_b64,
                 mime_type=effective_mime,
-                historical_matches=rag_matches
+                historical_matches=rag_matches,
+                rag_ticket_volume=rag_vol,
+                rag_history_summary=rag_summary,
+                org_id=user.org_id,
+                storage_instance=storage
             )
 
             # Strict Visual-Textual Verification Gate: Reject irrelevant photos immediately
@@ -846,9 +856,12 @@ def handle_api_request(
                 "title": triage["title"],
                 "description": triage["description"],
                 "category": triage["category"],
+                "assignedSpecialty": triage.get("assignedSpecialty") or triage.get("category"),
                 "priority": triage["priority"],
                 "urgency": triage["urgency"],
                 "priorityScore": triage["priorityScore"],
+                "ragTicketVolume": triage.get("ragTicketVolume", rag_vol + 1),
+                "deviceHistoryLog": triage.get("deviceHistoryLog", rag_summary),
                 "isHazard": triage["isHazard"],
                 "safetyOverride": triage["safetyOverride"],
                 "status": TicketStatus.ASSIGNED,

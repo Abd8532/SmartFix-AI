@@ -25,16 +25,21 @@ function normalizeTicketRecord(ticket) {
   const title = ticket.title || ticket.Title || 'Maintenance Request';
   const description = ticket.description || ticket.Description || '';
   const category = ticket.category || ticket.Category || 'General';
-  const urgency = ticket.urgency || ticket.Urgency || ticket.priority || 'Moderate';
+  const rawUrgency = ticket.urgency || ticket.Urgency || ticket.priority || 'Moderate';
+  const urgency = rawUrgency === 'Emergency' ? 'Emergency' : rawUrgency === 'Urgent' ? 'Urgent' : rawUrgency === 'Routine' ? 'Routine' : 'Moderate';
   const location = ticket.location || ticket.Location || 'Campus Facilities';
   const createdAt = ticket.createdAt || ticket.CreatedAt || new Date().toISOString();
   const reporterId = ticket.reporterId || ticket.reportedBy?.id || 'usr_anonymous';
   const reporterName = ticket.reporterName || ticket.reportedBy?.name || 'Campus Reporter';
   const reporterEmail = ticket.reporterEmail || ticket.reportedBy?.email || 'reporter@campus.edu';
 
-  const assignedTo = ticket.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : 'General Maintenance');
+  const assignedTo = ticket.assignedTo || (category === 'Electrical' ? 'Electrical Tech' : category === 'Plumbing' ? 'Plumbing Tech' : category === 'HVAC' ? 'HVAC Specialist' : category === 'IT' ? 'IT Support Specialist' : 'General Maintenance');
+  const assignedSpecialty = ticket.assignedSpecialty || category;
   const imagePayload = ticket.image || ticket.photo || ticket.imageUrl || ticket.Photo || ticket.Image || ticket.ImageUrl || null;
   const fileKey = ticket.fileKey || ticket.photoKey || ticket.FileKey || null;
+
+  const ragTicketVolume = Number(ticket.ragTicketVolume || ticket.RagTicketVolume || 1);
+  const priorityScore = ticket.priorityScore !== undefined ? Number(ticket.priorityScore) : (urgency === 'Emergency' ? 95 : urgency === 'Urgent' ? 70 : urgency === 'Moderate' ? 45 : 20);
 
   return {
     id: ticket.id,
@@ -44,10 +49,15 @@ function normalizeTicketRecord(ticket) {
     Description: description,
     category,
     Category: category,
+    assignedSpecialty,
+    assignedTo,
+    assignedTechId: ticket.assignedTechId || null,
     urgency,
     Urgency: urgency,
-    priority: urgency === 'Emergency' ? 'Emergency' : urgency === 'Urgent' ? 'Urgent' : 'Routine',
-    priorityScore: ticket.priorityScore ?? (urgency === 'Emergency' ? 95 : urgency === 'Urgent' ? 70 : 40),
+    priority: urgency === 'Emergency' ? 'Emergency' : urgency === 'Urgent' ? 'Urgent' : urgency === 'Moderate' ? 'Moderate' : 'Routine',
+    priorityScore,
+    ragTicketVolume,
+    deviceHistoryLog: ticket.deviceHistoryLog || null,
     status,
     Status: status,
     location,
@@ -56,8 +66,6 @@ function normalizeTicketRecord(ticket) {
     TechConfirmed: isTechConfirmed ? 'true' : 'false',
     userConfirmed: isUserConfirmed,
     UserConfirmed: isUserConfirmed ? 'true' : 'false',
-    assignedTo,
-    assignedTechId: ticket.assignedTechId || null,
     photo: imagePayload,
     image: imagePayload,
     imageUrl: imagePayload,
@@ -69,8 +77,8 @@ function normalizeTicketRecord(ticket) {
     resolutionNotes: ticket.resolutionNotes || ticket.ResolutionNotes || null,
     rejectionReason: ticket.rejectionReason || ticket.RejectionReason || ticket.lastRejectionReason || null,
     reopenCount: ticket.reopenCount || 0,
-    isHazard: Boolean(ticket.isHazard),
-    isRecurring: Boolean(ticket.isRecurring),
+    isHazard: Boolean(ticket.isHazard || urgency === 'Emergency'),
+    isRecurring: Boolean(ticket.isRecurring || ragTicketVolume > 1),
     recurringFixSummary: ticket.recurringFixSummary || null,
     safetyPrecautions: ticket.safetyPrecautions || null,
     org_id: ticket.org_id || ticket.orgId || '',
@@ -85,6 +93,104 @@ function normalizeTicketRecord(ticket) {
     reporterEmail,
     reporterName
   };
+}
+
+// Client-side RAG location entity extractor
+export function extractLocationEntityClient(text = '') {
+  const lower = String(text).toLowerCase();
+  const abMatch = lower.match(/\b(?:ab|block|building)\s*[-_]?\s*(\d+[a-z]?)(?:\s*(?:room|floor|fl|rm|lab)?\s*(\d+[a-z]?))?\b/);
+  if (abMatch) {
+    const blockNum = abMatch[1];
+    const subUnit = abMatch[2];
+    if (subUnit) {
+      if (lower.includes('floor') || lower.includes('fl')) {
+        return `AB ${blockNum.toUpperCase()} Floor ${subUnit.toUpperCase()}`;
+      }
+      return `AB ${blockNum.toUpperCase()} Room ${subUnit.toUpperCase()}`;
+    }
+    return `AB ${blockNum.toUpperCase()}`;
+  }
+  const rmMatch = lower.match(/\b(room|rm|lab|hall)\s*[-_]?\s*(\d+[a-z]?)\b/);
+  if (rmMatch) return `${rmMatch[1].charAt(0).toUpperCase() + rmMatch[1].slice(1)} ${rmMatch[2].toUpperCase()}`;
+  if (lower.includes('cafeteria')) return 'Cafeteria Kitchen';
+  if (lower.includes('server room')) return 'Server Room';
+  if (lower.includes('library')) return 'Carrow Library';
+  if (lower.includes('keller science')) return 'Keller Science Center';
+  return 'Campus Facilities';
+}
+
+// Client-side single-specialty department classifier
+export function extractCategoryEntityClient(text = '') {
+  const lower = String(text).toLowerCase();
+  if (/(pipe|leak|sink|water|drain|toilet|tap|flood|faucet|sewage|spraying)/.test(lower)) return 'Plumbing';
+  if (/(breaker|electric|spark|wire|switch|power|short|socket|light|fuse|voltage)/.test(lower)) return 'Electrical';
+  if (/(ac|air condition|hvac|heater|cooling|chiller|ventilation|compressor)/.test(lower)) return 'HVAC';
+  if (/(server|wifi|wi-fi|router|network|cable|lan|monitor|pc|computer|ethernet)/.test(lower)) return 'IT';
+  return 'General';
+}
+
+// Client-side RAG volume and priority metrics engine
+export function computePriorityMetricsClient(complaint = '', ragTicketVolume = 0) {
+  const lower = String(complaint).toLowerCase();
+
+  // 1. Base Criticality
+  let baseScore = 15;
+  let baseTier = 'Routine';
+  let isHazard = false;
+
+  if (/(live wire|spark|sparking|fire|burst pipe|active flood|flooding|emergency ward|medical equipment|server room cooling|server room power|gas leak|smoke|arc flash|shock)/.test(lower)) {
+    baseScore = 55;
+    baseTier = 'Urgent';
+    isHazard = true;
+  } else if (/(pipe leak|pipe leakage|water leak|water leakage|leakage|ac failure|hvac failure|chiller failure|classroom|lab|ab 12|wifi|wi-fi|network outage|main light|main lighting|breaker trip|power outage)/.test(lower)) {
+    baseScore = 40;
+    baseTier = 'Moderate';
+    isHazard = false;
+  } else if (/(single fixture|noisy fan|slow drain|door|lock|faucet|dripping|fan|drain|flush|switch|handle|outlet)/.test(lower)) {
+    baseScore = 25;
+    baseTier = 'Routine';
+    isHazard = false;
+  }
+
+  // 2. RAG Volume Multiplier
+  let volPts = 0;
+  if (ragTicketVolume >= 3) volPts = 50;
+  else if (ragTicketVolume === 2) volPts = 35;
+  else if (ragTicketVolume === 1) volPts = 20;
+
+  let totalScore = baseScore + volPts;
+  const tiers = ['Routine', 'Moderate', 'Urgent', 'Emergency'];
+  let urgency = 'Routine';
+
+  if (totalScore >= 80) urgency = 'Emergency';
+  else if (totalScore >= 55) urgency = 'Urgent';
+  else if (totalScore >= 35) urgency = 'Moderate';
+  else urgency = 'Routine';
+
+  // Enforce tier bump & floors
+  if (ragTicketVolume === 1) {
+    const baseIdx = tiers.indexOf(baseTier);
+    const bumpedTier = tiers[Math.min(tiers.length - 1, baseIdx + 1)];
+    const currIdx = tiers.indexOf(urgency);
+    const targetIdx = Math.max(currIdx, tiers.indexOf(bumpedTier));
+    urgency = tiers[targetIdx];
+    if (urgency === 'Moderate') totalScore = Math.max(totalScore, 35);
+    else if (urgency === 'Urgent') totalScore = Math.max(totalScore, 55);
+    else if (urgency === 'Emergency') totalScore = Math.max(totalScore, 80);
+  } else if (ragTicketVolume === 2) {
+    if (tiers.indexOf(urgency) < 2) {
+      urgency = 'Urgent';
+      totalScore = Math.max(totalScore, 55);
+    }
+  } else if (ragTicketVolume >= 3) {
+    urgency = 'Emergency';
+    totalScore = Math.max(totalScore, 90);
+    isHazard = true;
+  }
+
+  if (urgency === 'Emergency') isHazard = true;
+  const finalScore = Math.max(0, Math.min(100, totalScore));
+  return { urgency, priorityScore: finalScore, isHazard };
 }
 
 // User Ticket Matching Helper to dynamically connect tickets from database to active user
@@ -282,13 +388,38 @@ export function TicketProvider({ children }) {
       const imgPayload = newTicketData.image || newTicketData.photo || newTicketData.imageUrl || null;
       const fileKey = newTicketData.fileKey || newTicketData.photoKey || null;
 
+      const complaintText = newTicketData.complaint || newTicketData.description || newTicketData.title || '';
+      const clientLocation = newTicketData.location || extractLocationEntityClient(complaintText);
+      const clientCategory = newTicketData.category || extractCategoryEntityClient(complaintText);
+
+      // Pre-calculate RAG volume from current state
+      const matchingExisting = tickets.filter((t) => {
+        const locLower = String(t.location || '').toLowerCase();
+        const clientLocLower = clientLocation.toLowerCase();
+        const locMatch = locLower.includes(clientLocLower) || clientLocLower.includes(locLower) ||
+          (clientLocLower.includes('ab') && locLower.includes('ab'));
+        const catMatch = String(t.category || '').toLowerCase() === clientCategory.toLowerCase();
+        return locMatch && catMatch;
+      });
+      const clientRagVolume = matchingExisting.length;
+      const clientMetrics = computePriorityMetricsClient(complaintText, clientRagVolume);
+
+      let effectiveDescription = newTicketData.description || complaintText;
+      if (clientRagVolume > 0 && !effectiveDescription.includes('[RAG ESCALATION')) {
+        effectiveDescription = `[RAG ESCALATION - ${clientRagVolume + 1} REPORTS DETECTED]: Vector search found ${clientRagVolume} prior/active ticket(s) for this equipment at ${clientLocation}. Priority escalated to ${clientMetrics.urgency} (Score: ${clientMetrics.priorityScore}/100).\n\n${complaintText}`;
+      }
+
       const payload = {
-        complaint: newTicketData.complaint || newTicketData.description || newTicketData.title || '',
-        title: newTicketData.title,
-        description: newTicketData.description,
-        location: newTicketData.location,
-        category: newTicketData.category,
-        urgency: newTicketData.urgency || newTicketData.priority,
+        complaint: complaintText,
+        title: newTicketData.title || `${clientCategory} Issue at ${clientLocation}`,
+        description: effectiveDescription,
+        location: clientLocation,
+        category: clientCategory,
+        assignedSpecialty: clientCategory,
+        urgency: clientMetrics.urgency,
+        priority: clientMetrics.urgency,
+        priorityScore: clientMetrics.priorityScore,
+        ragTicketVolume: clientRagVolume + 1,
         image: imgPayload,
         photo: imgPayload,
         imageUrl: imgPayload,
@@ -304,15 +435,26 @@ export function TicketProvider({ children }) {
         returnedTicket.photo = imgPayload;
         returnedTicket.imageUrl = imgPayload;
       }
+      if (!returnedTicket.ragTicketVolume) {
+        returnedTicket.ragTicketVolume = clientRagVolume + 1;
+      }
+      if (returnedTicket.priorityScore === undefined) {
+        returnedTicket.priorityScore = clientMetrics.priorityScore;
+      }
+      if (!returnedTicket.assignedSpecialty) {
+        returnedTicket.assignedSpecialty = clientCategory;
+      }
+
       const created = normalizeTicketRecord(returnedTicket);
       setTickets((prev) => [created, ...prev.filter((t) => t.id !== created.id)]);
 
+      const volCount = created.ragTicketVolume || (clientRagVolume + 1);
       addToast({
-        type: 'success',
+        type: created.isHazard || created.priority === 'Emergency' ? 'warning' : 'success',
         title: `Work Order #${created.id} Dispatched!`,
-        message: created.isHazard
-          ? 'EMERGENCY: Safety-critical priority auto-assigned.'
-          : 'Ticket created and routed to specialized department queue.'
+        message: volCount > 1
+          ? `📊 RAG Escalation Active (${volCount} reports): Routed to ${created.category} queue with ${created.priority} priority (Score: ${created.priorityScore}/100).`
+          : `Ticket created and routed strictly to ${created.category} Specialist queue.`
       });
 
       return created;
