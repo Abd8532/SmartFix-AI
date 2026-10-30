@@ -20,7 +20,10 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
-      const saved = localStorage.getItem('fixflow_current_user') || localStorage.getItem('maintainx_current_user_v3');
+      const saved =
+        localStorage.getItem('smartfix_current_user') ||
+        localStorage.getItem('fixflow_current_user') ||
+        localStorage.getItem('maintainx_current_user_v3');
       return saved ? JSON.parse(saved) : null;
     } catch {
       return null;
@@ -111,6 +114,7 @@ export function AuthProvider({ children }) {
           setCurrentUser((prev) => {
             const merged = { ...(prev || {}), ...unified };
             try {
+              localStorage.setItem('smartfix_current_user', JSON.stringify(merged));
               localStorage.setItem('fixflow_current_user', JSON.stringify(merged));
               localStorage.setItem('maintainx_current_user_v3', JSON.stringify(merged));
             } catch {}
@@ -149,6 +153,7 @@ export function AuthProvider({ children }) {
               role: found.role || prev.role
             };
             try {
+              localStorage.setItem('smartfix_current_user', JSON.stringify(updated));
               localStorage.setItem('fixflow_current_user', JSON.stringify(updated));
               localStorage.setItem('maintainx_current_user_v3', JSON.stringify(updated));
             } catch {}
@@ -224,6 +229,7 @@ export function AuthProvider({ children }) {
           };
           setCurrentUser(approvedUser);
           try {
+            localStorage.setItem('smartfix_current_user', JSON.stringify(approvedUser));
             localStorage.setItem('fixflow_current_user', JSON.stringify(approvedUser));
             localStorage.setItem('maintainx_current_user_v3', JSON.stringify(approvedUser));
           } catch {}
@@ -264,6 +270,7 @@ export function AuthProvider({ children }) {
 
       setCurrentUser(unifiedUser);
       try {
+        localStorage.setItem('smartfix_current_user', JSON.stringify(unifiedUser));
         localStorage.setItem('fixflow_current_user', JSON.stringify(unifiedUser));
         localStorage.setItem('maintainx_current_user_v3', JSON.stringify(unifiedUser));
       } catch {}
@@ -284,6 +291,7 @@ export function AuthProvider({ children }) {
         };
         setCurrentUser(approvedUser);
         try {
+          localStorage.setItem('smartfix_current_user', JSON.stringify(approvedUser));
           localStorage.setItem('fixflow_current_user', JSON.stringify(approvedUser));
           localStorage.setItem('maintainx_current_user_v3', JSON.stringify(approvedUser));
         } catch {}
@@ -318,6 +326,7 @@ export function AuthProvider({ children }) {
       };
       setCurrentUser(user);
       try {
+        localStorage.setItem('smartfix_current_user', JSON.stringify(user));
         localStorage.setItem('fixflow_current_user', JSON.stringify(user));
         localStorage.setItem('maintainx_current_user_v3', JSON.stringify(user));
       } catch {}
@@ -340,6 +349,7 @@ export function AuthProvider({ children }) {
       };
       setCurrentUser(fallbackUser);
       try {
+        localStorage.setItem('smartfix_current_user', JSON.stringify(fallbackUser));
         localStorage.setItem('fixflow_current_user', JSON.stringify(fallbackUser));
         localStorage.setItem('maintainx_current_user_v3', JSON.stringify(fallbackUser));
       } catch {}
@@ -499,6 +509,8 @@ export function AuthProvider({ children }) {
     setCurrentUser(null);
     setUsers([]);
     try {
+      localStorage.removeItem('smartfix_current_user');
+      localStorage.removeItem('smartfix_tickets');
       localStorage.removeItem('fixflow_current_user');
       localStorage.removeItem('fixflow_tickets');
       localStorage.removeItem('maintainx_current_user_v3');
@@ -511,7 +523,7 @@ export function AuthProvider({ children }) {
       // Clean up all scoped ticket caches across tenants/users
       for (let i = localStorage.length - 1; i >= 0; i--) {
         const key = localStorage.key(i);
-        if (key && (key.startsWith('maintainx_tickets_') || key.startsWith('maintainx_'))) {
+        if (key && (key.startsWith('smartfix_') || key.startsWith('maintainx_tickets_') || key.startsWith('maintainx_') || key.startsWith('fixflow_'))) {
           // Preserve persistent system security settings
           if (key === 'maintainx_allow_admin_signup') continue;
           localStorage.removeItem(key);
@@ -526,6 +538,7 @@ export function AuthProvider({ children }) {
     const optimisticUser = { ...currentUser, ...updates };
     setCurrentUser(optimisticUser);
     try {
+      localStorage.setItem('smartfix_current_user', JSON.stringify(optimisticUser));
       localStorage.setItem('fixflow_current_user', JSON.stringify(optimisticUser));
       localStorage.setItem('maintainx_current_user_v3', JSON.stringify(optimisticUser));
     } catch {}
@@ -535,6 +548,7 @@ export function AuthProvider({ children }) {
       if (res?.success && res?.user) {
         setCurrentUser(res.user);
         try {
+          localStorage.setItem('smartfix_current_user', JSON.stringify(res.user));
           localStorage.setItem('fixflow_current_user', JSON.stringify(res.user));
           localStorage.setItem('maintainx_current_user_v3', JSON.stringify(res.user));
         } catch {}

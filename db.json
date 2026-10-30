@@ -233,12 +233,12 @@
       "approvalStatus": "Approved",
       "avatar": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP",
       "department": "Campus Operations",
-      "updatedAt": "2026-10-30T22:54:35.884778Z"
+      "updatedAt": "2026-10-30T23:02:44.368485Z"
     }
   ],
   "tickets": [
     {
-      "id": "TCK-C652639DACCF",
+      "id": "TCK-58DF828263E3",
       "org_id": "org_campus_main",
       "orgId": "org_campus_main",
       "title": "Hallway light is flickering in hallway",
@@ -284,15 +284,15 @@
       "ragSearchMode": "keyword_fallback",
       "reopenCount": 0,
       "version": 1,
-      "createdAt": "2026-10-30T22:54:31.702767Z",
-      "updatedAt": "2026-10-30T22:54:31.702767Z",
+      "createdAt": "2026-10-30T23:02:35.714184Z",
+      "updatedAt": "2026-10-30T23:02:35.714184Z",
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
       "UserConfirmed": "false"
     },
     {
-      "id": "TCK-39F60B77B15B",
+      "id": "TCK-44C522A8F02C",
       "org_id": "org_campus_main",
       "orgId": "org_campus_main",
       "title": "Faucet leak in bathroom sink",
@@ -338,12 +338,142 @@
       "ragSearchMode": "keyword_fallback",
       "reopenCount": 0,
       "version": 1,
+      "createdAt": "2026-10-30T23:02:34.276694Z",
+      "updatedAt": "2026-10-30T23:02:34.276694Z",
+      "Status": "Assigned",
+      "Urgency": "Routine",
+      "TechConfirmed": "false",
+      "UserConfirmed": "false"
+    },
+    {
+      "id": "TCK-C652639DACCF",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "title": "Hallway light is flickering in hallway",
+      "description": "Hallway light is flickering in hallway",
+      "category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "priority": "Routine",
+      "urgency": "Routine",
+      "priorityScore": 15,
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": {
+        "priorReportsCount": 0,
+        "location": "Campus Facilities",
+        "category": "Electrical",
+        "pastRootCauses": [],
+        "previousFixesAttempted": [],
+        "matchingTicketIds": [],
+        "summaryText": "No prior tickets found for this equipment and location (Initial report)."
+      },
+      "isHazard": false,
+      "safetyOverride": false,
+      "status": "Assigned",
+      "techConfirmed": false,
+      "userConfirmed": false,
+      "location": "Campus Facilities",
+      "assignedTo": "Electrical Specialist",
+      "assignedTechId": null,
+      "photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "fileKey": null,
+      "photoKey": null,
+      "reporterId": "usr_session_1",
+      "reporterName": "Session User",
+      "reporterEmail": "session_user@campus.edu",
+      "reportedBy": {
+        "id": "usr_session_1",
+        "name": "Session User",
+        "email": "session_user@campus.edu",
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
+      },
+      "ragMatches": [],
+      "ragSearchMode": "keyword_fallback",
+      "reopenCount": 0,
+      "version": 1,
+      "createdAt": "2026-10-30T22:54:31.702767Z",
+      "updatedAt": "2026-10-30T22:54:31.702767Z",
+      "Status": "Assigned",
+      "Urgency": "Routine",
+      "TechConfirmed": "false",
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
+    },
+    {
+      "id": "TCK-39F60B77B15B",
+      "org_id": "org_campus_main",
+      "orgId": "org_campus_main",
+      "title": "Faucet leak in bathroom sink",
+      "description": "Faucet leak in bathroom sink",
+      "category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "priority": "Routine",
+      "urgency": "Routine",
+      "priorityScore": 25,
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": {
+        "priorReportsCount": 0,
+        "location": "Campus Facilities",
+        "category": "Plumbing",
+        "pastRootCauses": [],
+        "previousFixesAttempted": [],
+        "matchingTicketIds": [],
+        "summaryText": "No prior tickets found for this equipment and location (Initial report)."
+      },
+      "isHazard": false,
+      "safetyOverride": false,
+      "status": "Assigned",
+      "techConfirmed": false,
+      "userConfirmed": false,
+      "location": "Campus Facilities",
+      "assignedTo": "Plumbing Tech",
+      "assignedTechId": null,
+      "photo": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "fileKey": null,
+      "photoKey": null,
+      "reporterId": "usr_session_1",
+      "reporterName": "Session User",
+      "reporterEmail": "session_user@campus.edu",
+      "reportedBy": {
+        "id": "usr_session_1",
+        "name": "Session User",
+        "email": "session_user@campus.edu",
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
+      },
+      "ragMatches": [],
+      "ragSearchMode": "keyword_fallback",
+      "reopenCount": 0,
+      "version": 1,
       "createdAt": "2026-10-30T22:54:30.652775Z",
       "updatedAt": "2026-10-30T22:54:30.652775Z",
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-190217D6A895",
@@ -357,8 +487,8 @@
       "priorityScore": 40,
       "isHazard": false,
       "safetyOverride": false,
-      "status": "Assigned",
-      "techConfirmed": false,
+      "status": "Pending User Verification",
+      "techConfirmed": true,
       "userConfirmed": false,
       "location": "Campus Facilities",
       "assignedTo": "Electrical Tech",
@@ -375,12 +505,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -402,7 +533,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -424,7 +555,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -450,10 +581,24 @@
       "version": 1,
       "createdAt": "2026-10-30T19:49:20.568986Z",
       "updatedAt": "2026-10-30T19:49:20.568986Z",
-      "Status": "Assigned",
+      "Status": "Pending User Verification",
       "Urgency": "Routine",
-      "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "TechConfirmed": "true",
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null,
+      "techFeedback": ""
     },
     {
       "id": "TCK-B1731ACC330E",
@@ -485,7 +630,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -512,7 +658,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -534,7 +680,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -563,7 +709,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-77235D32855D",
@@ -595,12 +754,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -622,7 +782,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -644,7 +804,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -673,7 +833,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-40FA97152D1A",
@@ -705,7 +878,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -732,7 +906,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -754,7 +928,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -783,7 +957,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-744F324449D2",
@@ -815,12 +1002,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -842,7 +1030,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -864,7 +1052,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -893,7 +1081,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-D865BDD4E4A2",
@@ -925,7 +1126,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -952,7 +1154,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -974,7 +1176,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1003,7 +1205,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-291D5CED6ED5",
@@ -1035,12 +1250,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -1062,7 +1278,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -1084,7 +1300,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1113,7 +1329,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-71E8C031C4EB",
@@ -1145,7 +1374,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -1172,7 +1402,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -1194,7 +1424,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1223,7 +1453,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-3CA4ECA5C665",
@@ -1255,7 +1498,8 @@
         "id": "usr_1793358539789_957",
         "name": "Abhinav",
         "email": "abd@gmail.com",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -1282,7 +1526,7 @@
         },
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -1304,7 +1548,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1333,7 +1577,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Ac is ab 12 room no. 3042 is broken",
+      "Description": "ac is ab 12 room no. 3042 is broken",
+      "Category": "HVAC",
+      "assignedSpecialty": "HVAC",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-5508AA19101B",
@@ -1365,12 +1622,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -1392,7 +1650,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -1414,7 +1672,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1443,7 +1701,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-99CFB2AB53C1",
@@ -1475,7 +1746,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -1502,7 +1774,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -1524,7 +1796,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1553,7 +1825,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-C2B50521F6A8",
@@ -1585,12 +1870,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -1612,7 +1898,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -1634,7 +1920,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1663,7 +1949,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-FFB76CEF81D3",
@@ -1695,7 +1994,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -1722,7 +2022,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -1744,7 +2044,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1773,7 +2073,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-074BBB5878C9",
@@ -1805,12 +2118,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -1832,7 +2146,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -1854,7 +2168,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1883,7 +2197,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-ED58C43768C8",
@@ -1915,7 +2242,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -1942,7 +2270,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -1964,7 +2292,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -1993,7 +2321,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-2811A275CC7C",
@@ -2025,12 +2366,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -2052,7 +2394,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2074,7 +2416,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2103,7 +2445,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-118D0A00A834",
@@ -2135,7 +2490,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -2162,7 +2518,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2184,7 +2540,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2213,7 +2569,20 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-BC0DD034952D",
@@ -2243,12 +2612,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -2270,7 +2640,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2292,7 +2662,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2321,7 +2691,22 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-0101D12964E2",
@@ -2351,7 +2736,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -2378,7 +2764,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2400,7 +2786,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2429,7 +2815,22 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-62FEA5B68E35",
@@ -2459,12 +2860,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -2486,7 +2888,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2508,7 +2910,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2537,7 +2939,22 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-32864F98B206",
@@ -2567,7 +2984,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -2594,7 +3012,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2616,7 +3034,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2645,7 +3063,22 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-D5F49BA1A8F7",
@@ -2675,12 +3108,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -2702,7 +3136,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2724,7 +3158,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2753,7 +3187,22 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-E9CF02D0E2F9",
@@ -2783,7 +3232,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -2810,7 +3260,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2832,7 +3282,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2861,7 +3311,22 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-1528D9468D8B",
@@ -2891,12 +3356,13 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
           "id": "TICK-HIST-101",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Fitted new brass compression washer and tested for 30 minutes under static pressure.",
           "metadata": {
@@ -2918,7 +3384,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -2940,7 +3406,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -2969,7 +3435,22 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Hallway light is flickering in hallway",
+      "Description": "Hallway light is flickering in hallway",
+      "Category": "Electrical",
+      "assignedSpecialty": "Electrical",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     },
     {
       "id": "TCK-6B6273AD64B1",
@@ -2999,7 +3480,8 @@
         "id": "usr_session_1",
         "name": "Session User",
         "email": "session_user@campus.edu",
-        "role": "User"
+        "role": "User",
+        "avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80"
       },
       "ragMatches": [
         {
@@ -3026,7 +3508,7 @@
         },
         {
           "id": "TICK-HIST-102",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "Shifted rack 3 power distributor to phase A; load dropped below 80% breaker rating.",
           "metadata": {
@@ -3048,7 +3530,7 @@
         },
         {
           "id": "TICK-HIST-103",
-          "score": 0.0,
+          "score": 0,
           "search_mode": "keyword_fallback",
           "resolutionNotes": "High-temp synthetic grease injected into bearing nipple.",
           "metadata": {
@@ -3077,7 +3559,22 @@
       "Status": "Assigned",
       "Urgency": "Routine",
       "TechConfirmed": "false",
-      "UserConfirmed": "false"
+      "UserConfirmed": "false",
+      "Title": "Faucet leak in bathroom sink",
+      "Description": "Faucet leak in bathroom sink",
+      "Category": "Plumbing",
+      "assignedSpecialty": "Plumbing",
+      "ragTicketVolume": 1,
+      "deviceHistoryLog": null,
+      "Location": "Campus Facilities",
+      "image": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "imageUrl": "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=",
+      "resolvedAt": null,
+      "resolutionNotes": null,
+      "rejectionReason": null,
+      "isRecurring": false,
+      "recurringFixSummary": null,
+      "safetyPrecautions": null
     }
   ],
   "organizations": [
@@ -3088,6 +3585,185 @@
     }
   ],
   "audit_logs": [
+    {
+      "id": "aud_1793381565834",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-B5BF7B442ACF",
+      "actor_id": "usr_test_reporter",
+      "actor_email": "alex@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Plumbing",
+        "priority": "Urgent",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T23:02:45.825252Z"
+    },
+    {
+      "id": "aud_1793381564472",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_PROFILE_UPDATED",
+      "details": {
+        "userId": "usr_profile_test_101",
+        "email": "abhinav_test@campus.edu",
+        "avatarUpdated": true,
+        "nameUpdated": false
+      },
+      "timestamp": "2026-10-30T23:02:44.436259Z"
+    },
+    {
+      "id": "aud_1793381564022",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_PROFILE_UPDATED",
+      "details": {
+        "userId": "usr_profile_test_101",
+        "email": "abhinav_test@campus.edu",
+        "avatarUpdated": true,
+        "nameUpdated": true
+      },
+      "timestamp": "2026-10-30T23:02:43.983086Z"
+    },
+    {
+      "id": "aud_1793381563659",
+      "org_id": "org_gamma",
+      "ticket_id": "TCK-13C236026653",
+      "actor_id": "usr_tck_test",
+      "actor_email": "tck_test@org_gamma.com",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Electrical",
+        "priority": "Urgent",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T23:02:43.623364Z"
+    },
+    {
+      "id": "aud_1793381555808",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-58DF828263E3",
+      "actor_id": "usr_session_1",
+      "actor_email": "session_user@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Electrical",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T23:02:35.776895Z"
+    },
+    {
+      "id": "aud_1793381554379",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-44C522A8F02C",
+      "actor_id": "usr_session_1",
+      "actor_email": "session_user@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Plumbing",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T23:02:34.338948Z"
+    },
+    {
+      "id": "aud_1793381532409",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-D3FC77B303F6",
+      "actor_id": "usr_img_test_1",
+      "actor_email": "imagetest@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "General",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T23:02:12.373185Z"
+    },
+    {
+      "id": "aud_1793381529969",
+      "org_id": "org_campus_main",
+      "ticket_id": "TCK-124118C3B8F9",
+      "actor_id": "usr_img_test_1",
+      "actor_email": "imagetest@campus.edu",
+      "actor_role": "user",
+      "action": "TICKET_CREATED",
+      "details": {
+        "category": "Plumbing",
+        "priority": "Routine",
+        "safetyOverride": false
+      },
+      "timestamp": "2026-10-30T23:02:09.929718Z"
+    },
+    {
+      "id": "aud_1793381520424",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_LOGIN",
+      "details": {
+        "email": "newadmin@campus.edu",
+        "role": "admin"
+      },
+      "timestamp": "2026-10-30T23:02:00.392625Z"
+    },
+    {
+      "id": "aud_1793381520293",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "system",
+      "actor_email": "system",
+      "actor_role": "system",
+      "action": "USER_REGISTERED",
+      "details": {
+        "userId": "adm_1793381520215_359",
+        "email": "newadmin@campus.edu",
+        "role": "admin",
+        "specialty": null,
+        "approved": true
+      },
+      "timestamp": "2026-10-30T23:02:00.272273Z"
+    },
+    {
+      "id": "aud_1793381520004",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "adm_test_001",
+      "actor_email": "superadmin@campus.edu",
+      "actor_role": "admin",
+      "action": "ADMIN_SETTINGS_UPDATED",
+      "details": {
+        "allowAdminSignup": true
+      },
+      "timestamp": "2026-10-30T23:01:59.976063Z"
+    },
+    {
+      "id": "aud_1793381519932",
+      "org_id": "org_campus_main",
+      "ticket_id": null,
+      "actor_id": "adm_test_001",
+      "actor_email": "superadmin@campus.edu",
+      "actor_role": "admin",
+      "action": "ADMIN_SETTINGS_UPDATED",
+      "details": {
+        "allowAdminSignup": false
+      },
+      "timestamp": "2026-10-30T23:01:59.929177Z"
+    },
     {
       "id": "aud_1793381076833",
       "org_id": "org_campus_main",

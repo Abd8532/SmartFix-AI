@@ -1,5 +1,5 @@
 """
-FixFlow AI - Image Payload Lifecycle & Thumbnail Rendering Verification Tests
+SmartFix AI - Image Payload Lifecycle & Thumbnail Rendering Verification Tests
 Verifies image persistence across 'image', 'photo', and 'imageUrl' keys in lambda_function.py,
 api.py, storage, and frontend payload compatibility.
 """

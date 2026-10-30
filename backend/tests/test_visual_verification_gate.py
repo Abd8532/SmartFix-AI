@@ -1,5 +1,5 @@
 """
-FixFlow AI - Visual-Textual Verification Gate Unit Tests
+SmartFix AI - Visual-Textual Verification Gate Unit Tests
 Verifies strict rejection of irrelevant or random photos (such as sketches, selfies, or unrelated objects)
 that do not match the maintenance problem description.
 """

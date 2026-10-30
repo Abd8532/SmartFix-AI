@@ -1,5 +1,5 @@
 """
-FixFlow AI - AWS Lambda Entrypoint Adapter
+SmartFix AI - AWS Lambda Entrypoint Adapter
 Wraps the modular backend application into an AWS API Gateway proxy handler.
 Enforces strict visual-textual verification with Gemini 2.5 Flash,
 guarantees image persistence across 'image', 'photo', and 'imageUrl',
@@ -22,7 +22,7 @@ def run_rag_multimodal_analysis(
     org_id: str = "org_campus_main"
 ) -> dict:
     """
-    Multimodal RAG reasoning & visual-textual verification engine for FixFlow AI.
+    Multimodal RAG reasoning & visual-textual verification engine for SmartFix AI.
     Executes Gemini 2.5 Flash two-step visual analysis:
       Step 1: Identify key problem-defining objects in the text complaint (e.g. pipe, leak, wire, breaker, ac, chiller, sink).
       Step 2: Inspect the image to check if those exact problem-defining objects or physical symptoms are visibly present.

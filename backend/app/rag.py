@@ -1,5 +1,5 @@
 """
-RAG Knowledge Base & Pinecone Vector Store Integration for FixFlow AI
+RAG Knowledge Base & Pinecone Vector Store Integration for SmartFix AI
 Implements real semantic vector embedding, labelled keyword fallback, and trusted knowledge ingestion.
 """
 import re

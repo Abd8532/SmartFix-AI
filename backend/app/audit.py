@@ -1,5 +1,5 @@
 """
-Audit Logging Service for FixFlow AI
+Audit Logging Service for SmartFix AI
 Records immutable trace records for compliance, governance, and security audits.
 """
 from typing import Dict, Any, Optional

@@ -1,5 +1,5 @@
 """
-Comprehensive Test Suite for FixFlow AI Phase 1 Backend Security & Workflow Invariants
+Comprehensive Test Suite for SmartFix AI Phase 1 Backend Security & Workflow Invariants
 Runs under standard Python unittest without requiring external dependencies.
 """
 import unittest
@@ -35,7 +35,7 @@ from app.rag import ingest_verified_repair_to_rag, query_knowledge_base
 from app.api import handle_api_request
 
 
-class TestFixFlowSecurityAndLifecycle(unittest.TestCase):
+class TestSmartFixSecurityAndLifecycle(unittest.TestCase):
 
     def setUp(self):
         # Create a dedicated temp directory for isolated database tests

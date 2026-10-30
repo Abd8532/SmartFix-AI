@@ -67,7 +67,7 @@ EMBEDDING_MODEL = os.environ.get("EMBEDDING_MODEL", "models/text-embedding-004")
 
 # Pinecone Vector Store (Server-side RAG)
 PINECONE_API_KEY = os.environ.get("PINECONE_API_KEY", "")
-PINECONE_INDEX_NAME = os.environ.get("PINECONE_INDEX_NAME", "fixflow-maintenance-tickets")
+PINECONE_INDEX_NAME = os.environ.get("PINECONE_INDEX_NAME", "smartfix-maintenance-tickets")
 PINECONE_CLOUD = os.environ.get("PINECONE_CLOUD", "aws")
 PINECONE_REGION = os.environ.get("PINECONE_REGION", "us-east-1")
 

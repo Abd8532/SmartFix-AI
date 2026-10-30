@@ -1,5 +1,5 @@
 """
-Domain Models and Data Classes for FixFlow AI
+Domain Models and Data Classes for SmartFix AI
 """
 from typing import Dict, Any, Optional, List
 from datetime import datetime

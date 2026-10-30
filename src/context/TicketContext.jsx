@@ -255,10 +255,14 @@ export function TicketProvider({ children }) {
     }
   });
 
-  // Active tickets state - synchronously initialized from fixflow_tickets so refresh never wipes state
+  // Active tickets state - synchronously initialized from smartfix_tickets so refresh never wipes state
   const [tickets, setTickets] = useState(() => {
     try {
-      const saved = localStorage.getItem('fixflow_tickets') || localStorage.getItem(STORAGE_KEYS.TICKETS) || localStorage.getItem('maintainx_tickets_v3');
+      const saved =
+        localStorage.getItem('smartfix_tickets') ||
+        localStorage.getItem('fixflow_tickets') ||
+        localStorage.getItem(STORAGE_KEYS.TICKETS) ||
+        localStorage.getItem('maintainx_tickets_v3');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
@@ -323,6 +327,7 @@ export function TicketProvider({ children }) {
       const localRaw = (() => {
         try {
           return JSON.parse(
+            localStorage.getItem('smartfix_tickets') ||
             localStorage.getItem('fixflow_tickets') ||
             localStorage.getItem(STORAGE_KEYS.TICKETS) ||
             localStorage.getItem('maintainx_tickets_v3') ||
@@ -347,6 +352,7 @@ export function TicketProvider({ children }) {
       setTickets(mergedTickets);
       isHydrated.current = true;
       try {
+        localStorage.setItem('smartfix_tickets', JSON.stringify(mergedTickets));
         localStorage.setItem('fixflow_tickets', JSON.stringify(mergedTickets));
         localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(mergedTickets));
         localStorage.setItem('maintainx_tickets_v3', JSON.stringify(mergedTickets));
@@ -376,6 +382,7 @@ export function TicketProvider({ children }) {
     if (!isHydrated.current) return;
     if (tickets.length > 0) {
       try {
+        localStorage.setItem('smartfix_tickets', JSON.stringify(tickets));
         localStorage.setItem('fixflow_tickets', JSON.stringify(tickets));
         localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(tickets));
         localStorage.setItem('maintainx_tickets_v3', JSON.stringify(tickets));
@@ -513,6 +520,7 @@ export function TicketProvider({ children }) {
       setTickets((prev) => {
         const nextList = [created, ...prev.filter((t) => String(t.id) !== String(created.id))];
         try {
+          localStorage.setItem('smartfix_tickets', JSON.stringify(nextList));
           localStorage.setItem('fixflow_tickets', JSON.stringify(nextList));
           localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(nextList));
           localStorage.setItem('maintainx_tickets_v3', JSON.stringify(nextList));
@@ -527,7 +535,12 @@ export function TicketProvider({ children }) {
       try {
         const currentStored = (() => {
           try {
-            return JSON.parse(localStorage.getItem('fixflow_tickets') || localStorage.getItem('maintainx_tickets_v3') || '[]');
+            return JSON.parse(
+              localStorage.getItem('smartfix_tickets') ||
+              localStorage.getItem('fixflow_tickets') ||
+              localStorage.getItem('maintainx_tickets_v3') ||
+              '[]'
+            );
           } catch { return []; }
         })();
         const allTicketsToSync = [created, ...currentStored.filter((t) => String(t.id) !== String(created.id))];
@@ -734,6 +747,7 @@ export function TicketProvider({ children }) {
     setTickets((prev) => {
       const nextList = prev.map((t) => (String(t.id) === String(ticketId) ? updated : t));
       try {
+        localStorage.setItem('smartfix_tickets', JSON.stringify(nextList));
         localStorage.setItem('fixflow_tickets', JSON.stringify(nextList));
         localStorage.setItem(STORAGE_KEYS.TICKETS, JSON.stringify(nextList));
         localStorage.setItem('maintainx_tickets_v3', JSON.stringify(nextList));

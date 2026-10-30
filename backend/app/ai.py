@@ -1,5 +1,5 @@
 """
-AI Multimodal Vision, Weather Telemetry & Triage Engine for FixFlow AI
+AI Multimodal Vision, Weather Telemetry & Triage Engine for SmartFix AI
 """
 import json
 import os
@@ -243,7 +243,7 @@ def get_live_weather_context(lat: float = 37.7749, lon: float = -122.4194) -> Di
         f"precipitation,weather_code,wind_speed_10m&timezone=auto"
     )
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": "FixFlowAI-Backend/2.0"})
+        req = urllib.request.Request(url, headers={"User-Agent": "SmartFixAI-Backend/2.0"})
         with urllib.request.urlopen(req, timeout=3.5) as resp:
             data = json.loads(resp.read().decode("utf-8"))
             curr = data.get("current", {})
@@ -342,7 +342,7 @@ def analyze_maintenance_fault(
             pass
 
     ai_result = None
-    prompt = f"""You are the senior facilities engineering visual-textual verification and RAG triage engine for FixFlow AI.
+    prompt = f"""You are the senior facilities engineering visual-textual verification and RAG triage engine for SmartFix AI.
 Analyze the attached maintenance fault photo alongside the user complaint using this strict TWO-STEP VISUAL ANALYSIS:
 
 Step 1: Identify key problem-defining objects in the text complaint (e.g., 'pipe', 'leak', 'wire', 'breaker', 'ac', 'chiller', 'sink', 'faucet', 'toilet', 'switch', 'light', 'router', 'cable', etc.).

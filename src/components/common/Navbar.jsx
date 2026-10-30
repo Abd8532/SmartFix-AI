@@ -19,7 +19,7 @@ export default function Navbar({ onLogout }) {
           <Wrench className="w-4 h-4" />
         </div>
         <span className="font-bold text-base tracking-tight text-white font-['Plus_Jakarta_Sans',sans-serif]">
-          FixFlow AI
+          SmartFix AI
         </span>
       </div>
 

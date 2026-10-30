@@ -173,7 +173,7 @@ export default function LoginView({ onLogin }) {
         {/* Brand Logo & Header */}
         <div className="text-center mb-6">
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight font-['Plus_Jakarta_Sans',sans-serif]">
-            FixFlow AI<span className="text-indigo-500">.</span>
+            SmartFix AI<span className="text-indigo-500">.</span>
           </h1>
           <p className="text-zinc-400 text-xs sm:text-sm mt-1 max-w-sm mx-auto">
             {isSignUp ? 'Request campus maintenance portal credentials' : 'Sign in to access your operations dashboard'}
@@ -398,7 +398,7 @@ export default function LoginView({ onLogin }) {
 
         {/* Switch Login / Sign-up Mode */}
         <div className="mt-5 text-center text-xs text-zinc-400">
-          {isSignUp ? 'Already registered? ' : 'New to FixFlow AI? '}
+          {isSignUp ? 'Already registered? ' : 'New to SmartFix AI? '}
           <button
             type="button"
             onClick={() => {

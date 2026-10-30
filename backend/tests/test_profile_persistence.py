@@ -1,5 +1,5 @@
 """
-FixFlow AI - User Profile Persistence & Avatar Refresh Tests
+SmartFix AI - User Profile Persistence & Avatar Refresh Tests
 Verifies that profile updates (avatar, name, department) persist across page refreshes,
 backend API calls, and tenant storage.
 """

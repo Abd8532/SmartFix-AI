@@ -1,8 +1,8 @@
-# SmartFixFlow - AI
+# SmartFix AI
 
 > AI-Powered Campus Maintenance & Work Order Dispatching System with Dual-Approval Resolution and Gated Authentication.
 
-SmartFixFlow - AI is a modern facilities management platform built with **React 19, Vite, and Tailwind CSS**. It features multimodal Gemini AI for automatic fault extraction and queue routing, live **Airtable** central database synchronization, a **Dual-Approval Closure Engine**, and an **Admin Gated Authentication** system.
+SmartFix AI is a modern facilities management platform built with **React 19, Vite, and Tailwind CSS**. It features multimodal Gemini AI for automatic fault extraction and queue routing, live **Airtable** central database synchronization, a **Dual-Approval Closure Engine**, and an **Admin Gated Authentication** system.
 
 ---
 
