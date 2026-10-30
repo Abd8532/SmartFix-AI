@@ -44,11 +44,21 @@ export function clearToken() {
 }
 
 /**
- * Retrieve current CSRF token from sessionStorage
+ * Retrieve current CSRF token from sessionStorage or document.cookie
  */
 export function getCsrfToken() {
   try {
-    return sessionStorage.getItem(STORAGE_KEYS.CSRF) || null;
+    const fromSession = sessionStorage.getItem(STORAGE_KEYS.CSRF);
+    if (fromSession) return fromSession;
+    if (typeof document !== 'undefined' && document.cookie) {
+      const match = document.cookie.match(/(?:^|;\s*)smartfix_csrf=([^;]+)/);
+      if (match) {
+        const val = decodeURIComponent(match[1].trim());
+        sessionStorage.setItem(STORAGE_KEYS.CSRF, val);
+        return val;
+      }
+    }
+    return null;
   } catch {
     return null;
   }
@@ -83,8 +93,35 @@ export function clearCsrfToken() {
 export async function request(endpoint, options = {}) {
   const url = `${BASE_URL}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`;
   const token = options.token || inMemoryBearerToken;
-  const csrfToken = getCsrfToken();
+  let csrfToken = getCsrfToken();
   const method = (options.method || 'GET').toUpperCase();
+
+  // If making a state-changing mutation under cookie session without a cached CSRF token,
+  // proactively fetch the CSRF token from /api/v1/auth/me so the mutation never fails with 403
+  if (
+    !['GET', 'HEAD', 'OPTIONS'].includes(method) &&
+    !csrfToken &&
+    !token &&
+    endpoint !== '/api/v1/auth/login' &&
+    endpoint !== '/api/v1/auth/register'
+  ) {
+    try {
+      const meRes = await fetch(`${BASE_URL}/api/v1/auth/me`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        if (meData?.csrfToken) {
+          csrfToken = meData.csrfToken;
+          setCsrfToken(csrfToken);
+        }
+      }
+    } catch (e) {
+      console.warn('Proactive CSRF token sync notice:', e);
+    }
+  }
 
   const headers = {
     'Content-Type': 'application/json',

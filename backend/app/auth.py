@@ -562,7 +562,7 @@ def authenticate_request(
                 for c in v.split(";"):
                     if "=" in c:
                         ck, cv = c.strip().split("=", 1)
-                        if ck == "smartfix_csrf":
+                        if ck.strip() == "smartfix_csrf":
                             csrf_cookie = cv.strip()
                             break
 

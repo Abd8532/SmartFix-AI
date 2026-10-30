@@ -57,7 +57,24 @@ class ApiRequestHandler(BaseHTTPRequestHandler):
 
         self.send_response(status_code)
         for h_key, h_val in resp_headers.items():
-            self.send_header(h_key, h_val)
+            if h_key.lower() == "set-cookie":
+                if isinstance(h_val, list):
+                    for cookie in h_val:
+                        self.send_header("Set-Cookie", cookie)
+                elif isinstance(h_val, str) and ", smartfix_" in h_val:
+                    # Multi-cookie folding split (session + csrf)
+                    for cookie in h_val.split(", smartfix_"):
+                        c_str = cookie if cookie.startswith("smartfix_") else f"smartfix_{cookie}"
+                        self.send_header("Set-Cookie", c_str.strip())
+                else:
+                    self.send_header(h_key, h_val)
+            else:
+                self.send_header(h_key, h_val)
+
+        multi_headers = response.get("multiValueHeaders", {})
+        for h_key, vals in multi_headers.items():
+            for val in vals:
+                self.send_header(h_key, val)
         self.end_headers()
 
         if isinstance(resp_body, str):
